@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import { Briefcase, ArrowLeft, CheckCircle2, X } from 'lucide-react';
 
-export default function CrearOferta() {
+export default function EditarOferta() {
+    const { id: ofertaId } = useParams();
     const { user } = useAuth();
     const navigate = useNavigate();
     
@@ -32,23 +33,52 @@ export default function CrearOferta() {
             return;
         }
 
-        const fetchEmpresa = async () => {
-            const { data, error } = await supabase
+        const initialize = async () => {
+            const { data: empresaData, error: empErr } = await supabase
                 .from('empresas')
                 .select('id')
                 .eq('auth_id', user.id)
                 .maybeSingle();
 
-            if (error || !data) {
+            if (empErr || !empresaData) {
                 navigate('/dashboard-empresa');
-            } else {
-                setEmpresaId(data.id);
-                setLoading(false);
+                return;
             }
+            setEmpresaId(empresaData.id);
+
+            // Cargar datos de la oferta
+            const { data: ofData, error: ofErr } = await supabase
+                .from('ofertas')
+                .select('*, oferta_skills(skill_id, nombre_original)')
+                .eq('id', ofertaId)
+                .eq('empresa_id', empresaData.id)
+                .single();
+
+            if (ofErr || !ofData) {
+                navigate('/dashboard-empresa');
+                return;
+            }
+
+            setFormData({
+                titulo: ofData.titulo || '',
+                descripcion: ofData.descripcion || '',
+                modalidad: ofData.modalidad || 'Remoto',
+                salario_min_usd: ofData.salario_min_usd || '',
+                salario_max_usd: ofData.salario_max_usd || '',
+                limite_postulaciones: ofData.limite_postulaciones || '',
+                estado: ofData.estado || 'Publicada'
+            });
+
+            if (ofData.oferta_skills && ofData.oferta_skills.length > 0) {
+                const loadedSkills = ofData.oferta_skills.map(s => s.nombre_original).filter(Boolean);
+                setSkillsList(loadedSkills);
+            }
+
+            setLoading(false);
         };
 
-        fetchEmpresa();
-    }, [user, navigate]);
+        initialize();
+    }, [user, navigate, ofertaId]);
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' || e.key === ',') {
@@ -71,11 +101,10 @@ export default function CrearOferta() {
         setError(null);
 
         try {
-            // 1. Crear la Oferta
-            const { data: ofertaData, error: ofertaError } = await supabase
+            // 1. Actualizar la Oferta
+            const { error: ofertaError } = await supabase
                 .from('ofertas')
-                .insert({
-                    empresa_id: empresaId,
+                .update({
                     titulo: formData.titulo,
                     descripcion: formData.descripcion,
                     modalidad: formData.modalidad,
@@ -84,12 +113,14 @@ export default function CrearOferta() {
                     estado: formData.estado,
                     limite_postulaciones: formData.limite_postulaciones ? parseInt(formData.limite_postulaciones) : null,
                 })
-                .select()
-                .single();
+                .eq('id', ofertaId);
 
-            if (ofertaError) throw new Error("Error creando oferta base: " + ofertaError.message);
+            if (ofertaError) throw new Error("Error actualizando oferta base: " + ofertaError.message);
 
-            // 2. Procesar las Skills
+            // Limpiar skills viejas
+            await supabase.from('oferta_skills').delete().eq('oferta_id', ofertaId);
+
+            // 2. Procesar las nuevas Skills
             if (skillsList.length > 0) {
                 const { data: matchedSkills, error: rpcError } = await supabase
                     .rpc('match_skills', { skill_names: skillsList });
@@ -111,7 +142,7 @@ export default function CrearOferta() {
                 Array.from(bestMatchPerSkill.values()).forEach(match => {
                     if (!uniqueSkillsMap.has(match.esco_id)) {
                         uniqueSkillsMap.set(match.esco_id, {
-                            oferta_id: ofertaData.id,
+                            oferta_id: ofertaId,
                             skill_id: match.esco_id,
                             nivel_requerido: 3,
                             nombre_original: match.original_skill 
@@ -139,7 +170,7 @@ export default function CrearOferta() {
                         newDictionarySkills.forEach(ns => {
                             if (!uniqueSkillsMap.has(ns.id)) {
                                 uniqueSkillsMap.set(ns.id, {
-                                    oferta_id: ofertaData.id,
+                                    oferta_id: ofertaId,
                                     skill_id: ns.id,
                                     nivel_requerido: 3,
                                     nombre_original: ns.nombre_skill
@@ -162,7 +193,7 @@ export default function CrearOferta() {
                 }
             }
 
-            navigate('/dashboard-empresa');
+            navigate(`/oferta-empresa/${ofertaId}`);
             
         } catch (err) {
             console.error(err);
@@ -192,7 +223,7 @@ export default function CrearOferta() {
                     <Briefcase size={28} color="var(--primary)" />
                 </div>
                 <h1 style={{ fontSize: '2.2rem', color: 'var(--text-dark)', margin: 0, letterSpacing: '-0.5px' }}>
-                    Publicar Nueva Oferta
+                    Editar Oferta
                 </h1>
             </div>
 
@@ -370,7 +401,7 @@ export default function CrearOferta() {
                             boxShadow: '0 8px 20px rgba(0,214,107,0.3)',
                         }}
                     >
-                        {saving ? 'Publicando...' : <><CheckCircle2 size={22} /> Publicar Oferta</>}
+                        {saving ? 'Guardando...' : <><CheckCircle2 size={22} /> Guardar Cambios</>}
                     </button>
                 </div>
 

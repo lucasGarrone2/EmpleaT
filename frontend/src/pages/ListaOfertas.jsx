@@ -47,11 +47,15 @@ export default function ListaOfertas() {
 
                 const { data: candSkills, error: skillsError } = await supabase
                     .from('candidato_skills')
-                    .select('skill_id')
+                    .select(`
+                        skill_id,
+                        nombre_original,
+                        diccionario_skills(nombre_skill)
+                    `)
                     .eq('candidato_id', candData.id);
                 
                 if (skillsError) throw skillsError;
-                const setSkillsCandidato = new Set(candSkills.map(s => s.skill_id));
+                const arraySkillsCandidato = candSkills || [];
 
                 const { data: misPostulaciones } = await supabase
                     .from('postulaciones')
@@ -83,9 +87,26 @@ export default function ListaOfertas() {
 
                     if (totalRequeridas > 0) {
                         skillsRequeridas.forEach(req => {
-                            if (setSkillsCandidato.has(req.skill_id)) {
-                                coincidencias++;
-                            }
+                            const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+                            const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
+                            
+                            // Lenient Match: Same skill_id OR string overlap
+                            const hasMatch = arraySkillsCandidato.some(cs => {
+                                if (cs.skill_id === req.skill_id) return true;
+                                const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
+                                
+                                if (!csStr || !reqStr) return false;
+                                if (csStr === reqStr) return true;
+                                
+                                // Prevent false positives like "c" inside "teacher"
+                                const minLen = Math.min(csStr.length, reqStr.length);
+                                if (minLen >= 4 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
+                                
+                                return false;
+                            });
+
+                            req.isMatch = hasMatch;
+                            if (hasMatch) coincidencias++;
                         });
                     }
 
@@ -311,9 +332,22 @@ export default function ListaOfertas() {
                                                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                                     {oferta.oferta_skills?.map(sk => {
                                                         const label = sk.nombre_original || sk.diccionario_skills?.nombre_skill || 'Skill';
+                                                        const matched = sk.isMatch;
+                                                        
                                                         return (
-                                                            <span key={sk.skill_id} style={{ padding: '6px 14px', background: '#F8F9FA', borderRadius: '8px', fontSize: '0.9rem', color: '#333', border: '1px solid #EAEAEA' }}>
-                                                                {label}
+                                                            <span key={sk.skill_id} style={{ 
+                                                                padding: '6px 14px', 
+                                                                background: matched ? 'rgba(0,214,107,0.1)' : '#F8F9FA', 
+                                                                borderRadius: '8px', 
+                                                                fontSize: '0.9rem', 
+                                                                color: matched ? 'var(--primary)' : '#888', 
+                                                                border: `1px solid ${matched ? 'rgba(0,214,107,0.2)' : '#EAEAEA'}`,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '6px',
+                                                                fontWeight: matched ? 'bold' : 'normal'
+                                                            }}>
+                                                                <span style={{ fontSize: '1.1rem' }}>{matched ? '✓' : '✗'}</span> {label}
                                                             </span>
                                                         );
                                                     })}

@@ -51,8 +51,8 @@ REGLAS ESTRICTAS DE EXTRACCIÓN:
 1. Regla de Años de Experiencia ('experiencia_anios'):
    - SUMA ÚNICAMENTE el tiempo de experiencia laboral real.
    - IGNORA por completo el tiempo de estudio o bootcamps.
-   - Si la experiencia laboral es nula o menor a 6 meses, el valor OBLIGATORIO es 0.
-   - Si la experiencia es entre 6 meses y 1.5 años, el valor es 1.
+   - Si la experiencia laboral es nula o menor a 4 meses, el valor OBLIGATORIO es 0.
+   - Si la experiencia es entre 4 meses y 1.5 años, el valor es 1.
    - Mayor a 1.5 años, redondea al número entero más cercano.
 
 2. Regla de Niveles de Skills (del 1 al 5):
@@ -67,6 +67,11 @@ REGLAS ESTRICTAS DE EXTRACCIÓN:
    - Estandariza los nombres: Usa "Desarrollo web frontend" en lugar de "Hacer páginas web", o "Trabajo en equipo" en lugar de "Me gusta trabajar con otros".
    - Extrae tanto "Hard Skills" (tecnologías, lenguajes, herramientas) como "Soft Skills" (competencias transversales).
    - Evita frases largas, jerga de empresas específicas o verbos conjugados. Limítate a conceptos concretos (ej: "Python", "Liderazgo", "Gestión de bases de datos").
+
+4. Regla de Extracción Exhaustiva e Inferencia (¡MUY IMPORTANTE!):
+   - NO te limites a lo mínimo. Extrae TODAS las skills mencionadas explícitamente.
+   - DEDUCE e INFIERE habilidades fundamentales basadas en la profesión o en el conjunto de herramientas. (Ejemplo: Si el rol es "Cloud Engineer" o menciona AWS/Azure, DEBES agregar imperativamente la skill general "Cloud Computing" o similar, aunque no lo diga textual).
+   - Apunta a extraer un perfil muy denso y robusto, garantizando que el candidato no pierda oportunidades por omitir obviedades de su rubro.
 
 Texto del CV:
 ${cvText}

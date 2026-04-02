@@ -73,7 +73,7 @@ const LandingPage = () => {
                 marchitarse en puestos que no les daban espacio para respirar.
               </p>
               <p>
-                Nuestra pasión es la <strong>**reforestación profesional**</strong>. Creemos que cada 
+                Nuestra pasión es la <strong>reforestación profesional</strong>. Creemos que cada 
                 individuo es una semilla única que necesita el suelo adecuado para alcanzar 
                 su máximo esplendor.
               </p>

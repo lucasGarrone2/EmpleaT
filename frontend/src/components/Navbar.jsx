@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { LogOut } from 'lucide-react';
+import { LogOut, Menu, User, Briefcase, PlusCircle, Search, Home } from 'lucide-react';
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -10,6 +10,18 @@ const Navbar = () => {
     const { user } = useAuth();
     const [userName, setUserName] = useState('');
     const [scrolled, setScrolled] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (!event.target.closest('.user-menu-container')) {
+                setMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -70,6 +82,19 @@ const Navbar = () => {
         transition: 'color 0.3s'
     });
 
+    const dropdownItemStyle = {
+        padding: '12px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        cursor: 'pointer',
+        color: 'var(--text-dark)',
+        fontWeight: '500',
+        borderRadius: '8px',
+        transition: 'background 0.2s',
+        textDecoration: 'none'
+    };
+
     return (
         <header 
             className="navbar" 
@@ -111,15 +136,10 @@ const Navbar = () => {
                     </span>
                 </div>
                 
-                {/* Navigation Links */}
+                {/* Navigation Links (Public) */}
                 <nav className="nav-links" style={{ display: 'flex', gap: '2.5rem' }}>
                     <a href="/" style={navItemStyle('/')}>Inicio</a>
-                    {user && user.user_metadata?.rol === 'empresa' ? (
-                        <>
-                            <a href="/dashboard-empresa" style={navItemStyle('/dashboard-empresa')}>Mis Búsquedas</a>
-                            <a href="/crear-oferta" style={navItemStyle('/crear-oferta')}>Crear Oferta</a>
-                        </>
-                    ) : (
+                    {!user && (
                         <>
                             <a href="/ofertas" style={navItemStyle('/ofertas')}>Encontrar Trabajo</a>
                             <a href="#proximamente" style={navItemStyle('/para-empresas')}>Para Empresas</a>
@@ -128,29 +148,30 @@ const Navbar = () => {
                 </nav>
                 
                 {/* Auth & Profile Actions */}
-                <div className="auth-buttons">
+                <div className="auth-buttons user-menu-container">
                     {user ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                        <div style={{ position: 'relative' }}>
                             <div 
-                                onClick={() => navigate(user.user_metadata?.rol === 'empresa' ? '/dashboard-empresa' : '/mi-perfil')} 
+                                onClick={() => setMenuOpen(!menuOpen)} 
                                 style={{ 
                                     fontWeight: '600', 
                                     color: 'var(--text-dark)', 
                                     cursor: 'pointer', 
-                                    padding: '10px 18px', 
+                                    padding: '8px 16px', 
                                     borderRadius: '12px',
-                                    border: (location.pathname === '/mi-perfil' || location.pathname === '/dashboard-empresa') ? '1px solid rgba(0,214,107,0.3)' : '1px solid transparent',
-                                    background: (location.pathname === '/mi-perfil' || location.pathname === '/dashboard-empresa') ? 'rgba(0,214,107,0.05)' : 'transparent',
+                                    border: '1px solid rgba(0,0,0,0.1)',
+                                    background: menuOpen ? '#f9f9f9' : 'white',
                                     transition: 'all 0.2s',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '6px'
+                                    gap: '12px'
                                 }}
-                                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,214,107,0.1)'}
+                                onMouseOver={e => e.currentTarget.style.background = '#f9f9f9'}
                                 onMouseOut={e => {
-                                    if(location.pathname !== '/mi-perfil') e.currentTarget.style.background = 'transparent';
+                                    if(!menuOpen) e.currentTarget.style.background = 'white';
                                 }}
                             >
+                                <Menu size={20} color="var(--text-gray)" />
                                 <div style={{ 
                                     width: '32px', height: '32px', borderRadius: '50%', 
                                     background: 'var(--primary)', color: 'white', 
@@ -161,27 +182,67 @@ const Navbar = () => {
                                 </div>
                                 <span>Hola, {userName}</span>
                             </div>
-                            
-                            <button 
-                                onClick={handleLogout} 
-                                title="Cerrar Sesión"
-                                style={{ 
-                                    color: '#d32f2f', 
-                                    background: 'rgba(211, 47, 47, 0.05)', 
-                                    border: 'none', 
-                                    padding: '10px', 
-                                    borderRadius: '12px', 
-                                    cursor: 'pointer', 
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'background 0.2s'
-                                }}
-                                onMouseOver={e => e.currentTarget.style.background = 'rgba(211, 47, 47, 0.15)'}
-                                onMouseOut={e => e.currentTarget.style.background = 'rgba(211, 47, 47, 0.05)'}
-                            >
-                                <LogOut size={20} />
-                            </button>
+
+                            {/* DROPDOWN MENU HAMBURGUESA */}
+                            {menuOpen && (
+                                <div style={{ 
+                                    position: 'absolute', top: '100%', right: 0, marginTop: '12px', 
+                                    background: 'white', borderRadius: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', 
+                                    padding: '10px', width: '240px', border: '1px solid rgba(0,0,0,0.05)',
+                                    display: 'flex', flexDirection: 'column', gap: '4px'
+                                }}>
+                                    {user.user_metadata?.rol === 'empresa' ? (
+                                        <>
+                                            <div 
+                                                onClick={() => { navigate('/dashboard-empresa'); setMenuOpen(false); }}
+                                                style={dropdownItemStyle}
+                                                onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <Briefcase size={18} color="var(--primary)"/> Mis Búsquedas
+                                            </div>
+                                            <div 
+                                                onClick={() => { navigate('/crear-oferta'); setMenuOpen(false); }}
+                                                style={dropdownItemStyle}
+                                                onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <PlusCircle size={18} color="var(--primary)"/> Crear Oferta
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div 
+                                                onClick={() => { navigate('/mi-perfil'); setMenuOpen(false); }}
+                                                style={dropdownItemStyle}
+                                                onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <User size={18} color="var(--primary)"/> Mi Perfil Profesional
+                                            </div>
+                                            <div 
+                                                onClick={() => { navigate('/ofertas'); setMenuOpen(false); }}
+                                                style={dropdownItemStyle}
+                                                onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <Search size={18} color="var(--primary)"/> Encontrar Trabajo
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div style={{ height: '1px', background: 'rgba(0,0,0,0.05)', margin: '8px 0' }}></div>
+                                    
+                                    <div 
+                                        onClick={() => { handleLogout(); setMenuOpen(false); }}
+                                        style={{...dropdownItemStyle, color: '#d32f2f'}}
+                                        onMouseOver={e => e.currentTarget.style.background = 'rgba(211,47,47,0.05)'}
+                                        onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                    >
+                                        <LogOut size={18} /> Cerrar Sesión
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div style={{ display: 'flex', gap: '15px' }}>

@@ -11,6 +11,7 @@ import EmpresaDashboard from './pages/EmpresaDashboard';
 import CrearOferta from './pages/CrearOferta';
 import OfertaDetalleEmpresa from './pages/OfertaDetalleEmpresa';
 import ListaOfertas from './pages/ListaOfertas';
+import EditarOferta from './pages/EditarOferta';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="/ofertas" element={<ListaOfertas />}/>
           <Route path="/dashboard-empresa" element={<EmpresaDashboard/>}/>
           <Route path="/crear-oferta" element={<CrearOferta/>}/>
+          <Route path="/editar-oferta/:id" element={<EditarOferta/>}/>
           <Route path="/oferta-empresa/:id" element={<OfertaDetalleEmpresa/>}/>
         </Routes>
       </div>
