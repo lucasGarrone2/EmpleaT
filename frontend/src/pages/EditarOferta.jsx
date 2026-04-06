@@ -113,7 +113,8 @@ export default function EditarOferta() {
                     estado: formData.estado,
                     limite_postulaciones: formData.limite_postulaciones ? parseInt(formData.limite_postulaciones) : null,
                 })
-                .eq('id', ofertaId);
+                .eq('id', ofertaId)
+                .eq('empresa_id', empresaId);
 
             if (ofertaError) throw new Error("Error actualizando oferta base: " + ofertaError.message);
 
@@ -155,29 +156,16 @@ export default function EditarOferta() {
                 const unmatchedWords = skillsList.filter(s => !matchedNamesLower.has(s.toLowerCase()));
 
                 if (unmatchedWords.length > 0) {
-                    const newSkillsToInsert = unmatchedWords.map(s => ({
-                        nombre_skill: s
-                    }));
-
-                    const { data: newDictionarySkills, error: dictErr } = await supabase
-                        .from('diccionario_skills')
-                        .insert(newSkillsToInsert)
-                        .select();
-
-                    if (dictErr) {
-                        throw new Error("Permiso denegado al diccionario_skills: " + dictErr.message);
-                    } else if (newDictionarySkills) {
-                        newDictionarySkills.forEach(ns => {
-                            if (!uniqueSkillsMap.has(ns.id)) {
-                                uniqueSkillsMap.set(ns.id, {
-                                    oferta_id: ofertaId,
-                                    skill_id: ns.id,
-                                    nivel_requerido: 3,
-                                    nombre_original: ns.nombre_skill
-                                });
-                            }
+                    // Security fix: No inyectamos palabras desconocidas al diccionario global para evitar poisoning.
+                    // Las guardamos directamente en oferta_skills con skill_id nulo para mantener el diccionario de ESCO intacto.
+                    unmatchedWords.forEach((word, idx) => {
+                        uniqueSkillsMap.set(`unmatched_${idx}`, {
+                            oferta_id: ofertaId,
+                            skill_id: null,
+                            nivel_requerido: 3,
+                            nombre_original: word
                         });
-                    }
+                    });
                 }
 
                 // Insert final list of skills to the offer

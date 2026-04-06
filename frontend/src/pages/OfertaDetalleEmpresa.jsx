@@ -9,6 +9,7 @@ export default function OfertaDetalleEmpresa() {
     const { user } = useAuth();
     const navigate = useNavigate();
 
+    const [empresaId, setEmpresaId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [oferta, setOferta] = useState(null);
     const [postulantes, setPostulantes] = useState([]);
@@ -33,6 +34,7 @@ export default function OfertaDetalleEmpresa() {
                     .single();
                 
                 if (!empData) throw new Error("Perfil de empresa no encontrado");
+                setEmpresaId(empData.id);
 
                 // Obtener datos de la oferta
                 const { data: ofData, error: ofError } = await supabase
@@ -95,7 +97,8 @@ export default function OfertaDetalleEmpresa() {
             const { error: updErr } = await supabase
                 .from('ofertas')
                 .update({ estado: nuevoEstado })
-                .eq('id', id);
+                .eq('id', id)
+                .eq('empresa_id', empresaId);
 
             if (updErr) throw updErr;
             setOferta({ ...oferta, estado: nuevoEstado });
@@ -113,7 +116,8 @@ export default function OfertaDetalleEmpresa() {
             const { error: delErr } = await supabase
                 .from('ofertas')
                 .delete()
-                .eq('id', id);
+                .eq('id', id)
+                .eq('empresa_id', empresaId);
 
             if (delErr) throw delErr;
             navigate('/dashboard-empresa');

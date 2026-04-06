@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import { Filter, Star, MapPin, DollarSign, Briefcase } from 'lucide-react';
@@ -16,8 +16,13 @@ export default function ListaOfertas() {
     const [applyingTo, setApplyingTo] = useState(null);
     const [expandedOferta, setExpandedOferta] = useState(null);
 
+    const locationRouter = useLocation();
+    const queryParams = new URLSearchParams(locationRouter.search);
+
     // Filter states
     const [filtros, setFiltros] = useState({
+        palabraClave: queryParams.get('q') || '',
+        ubicacionTexto: queryParams.get('loc') || '',
         ubicacion: 'Todas',
         modalidad: { Remoto: false, Híbrido: false, Presencial: false },
         experiencia: 'Todos',
@@ -166,6 +171,35 @@ export default function ListaOfertas() {
 
     // Aplicar filtros
     const ofertasZ = ofertas.filter(o => {
+        // Keyword filter
+        if (filtros.palabraClave) {
+            const qw = filtros.palabraClave.toLowerCase().trim();
+            const title = (o.titulo || '').toLowerCase();
+            const desc = (o.descripcion || '').toLowerCase();
+            const empName = (o.empresas?.nombre || '').toLowerCase();
+            const mod = (o.modalidad || '').toLowerCase();
+            const loc = (o.empresas?.ubicacion || '').toLowerCase();
+            
+            const hasSkillMatch = (o.oferta_skills || []).some(sk => {
+                const skName = (sk.nombre_original || sk.diccionario_skills?.nombre_skill || '').toLowerCase();
+                return skName.includes(qw);
+            });
+
+            if (!title.includes(qw) && !desc.includes(qw) && !empName.includes(qw) && !mod.includes(qw) && !loc.includes(qw) && !hasSkillMatch) {
+                return false;
+            }
+        }
+
+        // Location text filter from Landing Page
+        if (filtros.ubicacionTexto) {
+             const locText = filtros.ubicacionTexto.toLowerCase().trim();
+             const empLoc = (o.empresas?.ubicacion || '').toLowerCase();
+             const modalidad = (o.modalidad || '').toLowerCase();
+             if (!empLoc.includes(locText) && !modalidad.includes(locText)) {
+                 return false;
+             }
+        }
+
         if (filtros.ubicacion !== 'Todas' && o.empresas?.ubicacion !== filtros.ubicacion) return false;
         
         const isCualquierModalidadFalse = !filtros.modalidad.Remoto && !filtros.modalidad.Híbrido && !filtros.modalidad.Presencial;
@@ -190,10 +224,23 @@ export default function ListaOfertas() {
                 
                 {/* SIDEBAR FILTROS */}
                 <aside style={{ flex: '0 0 280px', width: '280px', background: 'white', borderRadius: '12px', padding: '1.5rem', border: '1px solid #EAEAEA' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
                         <Filter size={20} color="#555" />
                         <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#333' }}>Filtros</h3>
                     </div>
+
+                    {(filtros.palabraClave || filtros.ubicacionTexto) && (
+                        <div style={{ marginBottom: '1.5rem', background: '#F0F9F4', padding: '10px', borderRadius: '8px', border: '1px solid #c2e8d4' }}>
+                            <div style={{ fontSize: '0.85rem', color: '#00B159', fontWeight: 'bold', marginBottom: '5px' }}>Búsqueda Activa:</div>
+                            {filtros.palabraClave && <div style={{ fontSize: '0.9rem', color: '#333' }}>Puesto: <strong>{filtros.palabraClave}</strong></div>}
+                            {filtros.ubicacionTexto && <div style={{ fontSize: '0.9rem', color: '#333' }}>Lugar: <strong>{filtros.ubicacionTexto}</strong></div>}
+                            <button 
+                                onClick={() => setFiltros({...filtros, palabraClave: '', ubicacionTexto: ''})} 
+                                style={{ marginTop: '8px', fontSize: '0.8rem', color: '#0084FF', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>
+                                Limpiar Búsqueda
+                            </button>
+                        </div>
+                    )}
 
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', fontSize: '0.9rem', color: '#666', fontWeight: 'bold', marginBottom: '10px' }}>Ubicación</label>
@@ -286,7 +333,12 @@ export default function ListaOfertas() {
                                                 <div style={{ color: '#666', fontSize: '0.95rem', marginBottom: '8px' }}>{oferta.empresas?.nombre}</div>
                                                 
                                                 <div style={{ display: 'flex', gap: '10px', fontSize: '0.85rem', flexWrap: 'wrap' }}>
-                                                    {oferta.empresas?.ubicacion && <span style={{ background: '#F5F6F8', color: '#555', padding: '4px 10px', borderRadius: '6px' }}>{oferta.empresas.ubicacion}</span>}
+                                                    {(oferta.modalidad === 'Presencial' || oferta.modalidad === 'Híbrido') && (
+                                                        <span style={{ background: '#F5F6F8', color: '#555', padding: '4px 10px', borderRadius: '6px' }}>
+                                                            <MapPin size={12} style={{ display: 'inline', marginRight: '4px', position: 'relative', top: '1px' }} />
+                                                            {oferta.empresas?.ubicacion || 'Ubicación a acordar'}
+                                                        </span>
+                                                    )}
                                                     <span style={{ background: '#EAF9F1', color: '#00B159', padding: '4px 10px', borderRadius: '6px' }}>{oferta.modalidad}</span>
                                                     {(oferta.salario_min_usd > 0) && (
                                                         <span style={{ background: '#E6F7FF', color: '#0084FF', padding: '4px 10px', borderRadius: '6px', fontWeight: '500' }}>

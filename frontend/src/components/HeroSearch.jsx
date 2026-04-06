@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Leaf, Search, MapPin, ArrowRight, TrendingUp, BrainCircuit, HeartHandshake, ShieldCheck } from 'lucide-react';
 import './HeroSearch.css';
 
 const HeroSearch = () => {
+  const navigate = useNavigate();
+  const [keyword, setKeyword] = useState('');
+  const [location, setLocation] = useState('');
+
+  const handleSearch = () => {
+    navigate(`/ofertas?q=${encodeURIComponent(keyword)}&loc=${encodeURIComponent(location)}`);
+  };
+
   return (
     <section className="hero-section">
       <div className="hero-badge">
@@ -22,14 +31,26 @@ const HeroSearch = () => {
       <div className="search-container">
         <div className="search-input-group">
           <Search size={20} className="search-icon" />
-          <input type="text" placeholder="Puesto o palabra clave" />
+          <input 
+            type="text" 
+            placeholder="Puesto o palabra clave" 
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
         </div>
         <div className="divider"></div>
         <div className="search-input-group">
           <MapPin size={20} className="search-icon" />
-          <input type="text" placeholder="Ubicación (remoto o ciudad)" />
+          <input 
+            type="text" 
+            placeholder="Ubicación (remoto o ciudad)" 
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
         </div>
-        <button className="btn-search">
+        <button className="btn-search" onClick={handleSearch}>
           Buscar <ArrowRight size={18} />
         </button>
       </div>

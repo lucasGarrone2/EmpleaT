@@ -102,12 +102,13 @@ const Navbar = () => {
                 position: 'sticky', 
                 top: 0, 
                 zIndex: 1000, 
-                background: scrolled ? 'rgba(255, 255, 255, 0.85)' : 'white',
+                background: scrolled ? 'rgba(230, 247, 236, 0.90)' : 'var(--bg-color)',
                 backdropFilter: scrolled ? 'blur(12px)' : 'none',
                 WebkitBackdropFilter: scrolled ? 'blur(12px)' : 'none',
-                boxShadow: scrolled ? '0 4px 30px rgba(0, 0, 0, 0.05)' : '0 1px 0px rgba(0,0,0,0.05)',
+                boxShadow: scrolled ? '0 4px 30px rgba(0, 214, 107, 0.08)' : '0 1px 0px rgba(0,0,0,0.03)',
                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                padding: scrolled ? '0.8rem 2rem' : '1.2rem 2rem'
+                padding: scrolled ? '0.8rem 2rem' : '1.2rem 2rem',
+                borderBottom: scrolled ? '1px solid rgba(0,214,107,0.1)' : '1px solid transparent'
             }}
         >
             <div className="header-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '1200px', margin: '0 auto' }}>
@@ -159,16 +160,16 @@ const Navbar = () => {
                                     cursor: 'pointer', 
                                     padding: '8px 16px', 
                                     borderRadius: '12px',
-                                    border: '1px solid rgba(0,0,0,0.1)',
-                                    background: menuOpen ? '#f9f9f9' : 'white',
+                                    border: '1px solid rgba(0,214,107,0.15)',
+                                    background: menuOpen ? 'rgba(0,214,107,0.08)' : 'rgba(0,214,107,0)',
                                     transition: 'all 0.2s',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '12px'
                                 }}
-                                onMouseOver={e => e.currentTarget.style.background = '#f9f9f9'}
+                                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,214,107,0.08)'}
                                 onMouseOut={e => {
-                                    if(!menuOpen) e.currentTarget.style.background = 'white';
+                                    if(!menuOpen) e.currentTarget.style.background = 'rgba(0,214,107,0)';
                                 }}
                             >
                                 <Menu size={20} color="var(--text-gray)" />
@@ -250,7 +251,7 @@ const Navbar = () => {
                                 onClick={() => navigate('/login')}
                                 style={{ 
                                     background: 'transparent', 
-                                    border: '1px solid rgba(0,0,0,0.1)', 
+                                    border: '1px solid rgba(0,214,107,0.3)', 
                                     color: 'var(--text-dark)', 
                                     fontWeight: '600', 
                                     cursor: 'pointer', 
@@ -258,8 +259,14 @@ const Navbar = () => {
                                     borderRadius: '12px',
                                     transition: 'all 0.2s'
                                 }}
-                                onMouseOver={e => e.currentTarget.style.borderColor = 'var(--text-gray)'}
-                                onMouseOut={e => e.currentTarget.style.borderColor = 'rgba(0,0,0,0.1)'}
+                                onMouseOver={e => {
+                                    e.currentTarget.style.borderColor = 'var(--primary)';
+                                    e.currentTarget.style.background = 'rgba(0,214,107,0.05)';
+                                }}
+                                onMouseOut={e => {
+                                    e.currentTarget.style.borderColor = 'rgba(0,214,107,0.3)';
+                                    e.currentTarget.style.background = 'transparent';
+                                }}
                             >
                                 Iniciar Sesión
                             </button>
@@ -271,18 +278,18 @@ const Navbar = () => {
                                     border: 'none', 
                                     borderRadius: '12px', 
                                     padding: '10px 24px', 
-                                    fontWeight: '600', 
+                                    fontWeight: '700', 
                                     cursor: 'pointer',
-                                    boxShadow: '0 6px 15px rgba(0, 214, 107, 0.3)',
+                                    boxShadow: '0 4px 15px rgba(0, 214, 107, 0.2)',
                                     transition: 'transform 0.2s, box-shadow 0.2s'
                                 }}
                                 onMouseOver={e => {
                                     e.currentTarget.style.transform = 'translateY(-2px)';
-                                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(0, 214, 107, 0.4)';
+                                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(0, 214, 107, 0.4)';
                                 }}
                                 onMouseOut={e => {
                                     e.currentTarget.style.transform = 'translateY(0)';
-                                    e.currentTarget.style.boxShadow = '0 6px 15px rgba(0, 214, 107, 0.3)';
+                                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 214, 107, 0.2)';
                                 }}
                             >
                                 Registrarse

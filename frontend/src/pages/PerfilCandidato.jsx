@@ -15,6 +15,7 @@ export default function PerfilCandidato() {
 
     // Nuevo estado opcional escrito por el usuario
     const [bio, setBio] = useState("");
+    const [aceptoTerminos, setAceptoTerminos] = useState(false);
 
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -234,11 +235,24 @@ export default function PerfilCandidato() {
                                 />
                             </div>
 
+                            <div style={{ marginBottom: '1.5rem', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                <input 
+                                    type="checkbox" 
+                                    id="terminos" 
+                                    checked={aceptoTerminos} 
+                                    onChange={(e) => setAceptoTerminos(e.target.checked)} 
+                                    style={{ marginTop: '5px', width: '18px', height: '18px', cursor: 'pointer' }}
+                                />
+                                <label htmlFor="terminos" style={{ fontSize: '0.9rem', color: 'var(--text-gray)', lineHeight: '1.4', cursor: 'pointer' }}>
+                                    Acepto que mi currículum sea procesado usando inteligencia artificial de terceros (Google Gemini) para la extracción de mis habilidades, y reconozco el flujo de datos fuera de mi jurisdicción con fines exclusivos de contratación laboral.
+                                </label>
+                            </div>
+
                             <button
                                 type="submit"
                                 className="submit-btn"
-                                disabled={loading || !archivoPDF}
-                                style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', padding: '18px', fontSize: '1.2rem', boxShadow: '0 8px 25px rgba(0,214,107,0.25)' }}
+                                disabled={loading || !archivoPDF || !aceptoTerminos}
+                                style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', padding: '18px', fontSize: '1.2rem', boxShadow: '0 8px 25px rgba(0,214,107,0.25)', opacity: (!archivoPDF || !aceptoTerminos) ? 0.6 : 1, cursor: (!archivoPDF || !aceptoTerminos) ? 'not-allowed' : 'pointer' }}
                             >
                                 {loading ? 'Analizando PDF con IA...' : 'Extraer Perfil Mágico'}
                             </button>
