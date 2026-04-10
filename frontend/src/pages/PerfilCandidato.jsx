@@ -254,7 +254,7 @@ export default function PerfilCandidato() {
                                 disabled={loading || !archivoPDF || !aceptoTerminos}
                                 style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', padding: '18px', fontSize: '1.2rem', boxShadow: '0 8px 25px rgba(0,214,107,0.25)', opacity: (!archivoPDF || !aceptoTerminos) ? 0.6 : 1, cursor: (!archivoPDF || !aceptoTerminos) ? 'not-allowed' : 'pointer' }}
                             >
-                                {loading ? 'Analizando PDF con IA...' : 'Extraer Perfil Mágico'}
+                                {loading ? 'Analizando PDF con IA... Esto puede tardar unos segundos' : 'Extraer Perfil Mágico'}
                             </button>
                         </form>
 

@@ -11,7 +11,10 @@ export default function Register() {
     // Company States
     const [companyEmail, setCompanyEmail] = useState('');
     const [companyPassword, setCompanyPassword] = useState('');
-    // You could add more company-specific fields if needed, e.g. companyName
+    
+    // Legal Checkboxes
+    const [candidatoTerminos, setCandidatoTerminos] = useState(false);
+    const [empresaTerminos, setEmpresaTerminos] = useState(false);
 
     const [rol, setRol] = useState('candidato'); // 'candidato' or 'empresa'
     const [error, setError] = useState(null);
@@ -40,13 +43,29 @@ export default function Register() {
             password,
             options: {
                 data: {
-                    rol: rol 
+                    rol: rol,
+                    terminos_aceptados: true,
+                    consentimiento_ia_aceptado: rol === 'candidato' ? true : null
                 }
             }
         });
 
         if (error) {
-            setError(error.message);
+            let msg = error.message;
+            if (msg.includes("User already registered")) {
+                msg = "Este correo electrónico ya se encuentra registrado.";
+            } else if (msg.toLowerCase().includes("password should contain at least one character of each")) {
+                msg = "La contraseña debe incluir al menos una mayúscula, una minúscula, un número y un símbolo.";
+            } else if (msg.toLowerCase().includes("password should be at least")) {
+                msg = "La contraseña debe tener al menos 6 caracteres.";
+            } else if (msg.includes("security purposes")) {
+                msg = "Por razones de seguridad, espera un momento antes de volver a intentarlo.";
+            }
+            setError(msg);
+        } else if (data?.user?.identities && data.user.identities.length === 0) {
+            // Truco de Supabase: Si la enumeración está prevenida pero el correo existe,
+            // Supabase devuelve un usuario sin identidades (array vacío).
+            setError("Este correo electrónico ya se encuentra registrado.");
         } else {
             setMensaje("¡Registro exitoso! Revisa tu correo para confirmar la cuenta.");
             // Clear fields on success
@@ -60,6 +79,17 @@ export default function Register() {
         }
         setLoading(false);
     }
+
+    const handleGoogleRegister = async () => {
+        setError(null);
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin + '/auth/callback',
+            }
+        });
+        if (error) setError('Error al continuar con Google. Intentá de nuevo.');
+    };
 
     const isFlipped = rol === 'empresa';
 
@@ -124,12 +154,54 @@ export default function Register() {
                                 />
                             </div>
 
+                            <div style={{ marginBottom: '1.5rem', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                <input 
+                                    type="checkbox" 
+                                    id="candidatoTerminos" 
+                                    checked={candidatoTerminos} 
+                                    onChange={(e) => setCandidatoTerminos(e.target.checked)} 
+                                    style={{ marginTop: '5px', width: '18px', height: '18px', cursor: 'pointer' }}
+                                />
+                                <label htmlFor="candidatoTerminos" style={{ fontSize: '0.85rem', color: 'var(--text-gray)', lineHeight: '1.4', cursor: 'pointer' }}>
+                                    He leído y acepto los <a href="/terminos-legales" target="_blank" rel="noopener noreferrer" style={{color: 'var(--primary)'}}>Términos y Condiciones</a> y la <a href="/terminos-legales" target="_blank" rel="noopener noreferrer" style={{color: 'var(--primary)'}}>Política de Privacidad</a>, incluyendo el procesamiento automatizado por IA.
+                                </label>
+                            </div>
+
                             <button 
-                                type="submit" 
+                                type="submit"  
                                 className="submit-btn"
-                                disabled={loading}
+                                disabled={loading || !candidatoTerminos}
+                                style={{ opacity: (!candidatoTerminos) ? 0.6 : 1, cursor: (!candidatoTerminos) ? 'not-allowed' : 'pointer' }}
                             >
                                 {loading ? 'Creando cuenta...' : 'Crear Cuenta de Candidato'}
+                            </button>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '0.8rem 0 0.5rem' }}>
+                                <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #E0E0E0' }} />
+                                <span style={{ color: '#999', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>o continuá con</span>
+                                <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #E0E0E0' }} />
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleGoogleRegister}
+                                style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                    width: '100%', padding: '12px', borderRadius: '10px',
+                                    border: '1px solid #E0E0E0', background: 'white',
+                                    cursor: 'pointer', fontSize: '1rem', fontWeight: '600', color: '#333',
+                                    transition: 'box-shadow 0.2s, border-color 0.2s'
+                                }}
+                                onMouseOver={e => { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.1)'; e.currentTarget.style.borderColor = '#ccc'; }}
+                                onMouseOut={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#E0E0E0'; }}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 48 48">
+                                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                                </svg>
+                                Continuar con Google
                             </button>
                             
                         </form>
@@ -184,12 +256,54 @@ export default function Register() {
                                 />
                             </div>
 
+                            <div style={{ marginBottom: '1.5rem', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                                <input 
+                                    type="checkbox" 
+                                    id="empresaTerminos" 
+                                    checked={empresaTerminos} 
+                                    onChange={(e) => setEmpresaTerminos(e.target.checked)} 
+                                    style={{ marginTop: '5px', width: '18px', height: '18px', cursor: 'pointer' }}
+                                />
+                                <label htmlFor="empresaTerminos" style={{ fontSize: '0.85rem', color: 'var(--text-gray)', lineHeight: '1.4', cursor: 'pointer' }}>
+                                    Acepto los <a href="/terminos-legales" target="_blank" rel="noopener noreferrer" style={{color: 'var(--primary)'}}>Términos para Empresas</a> y me comprometo al tratamiento legal y no discriminatorio de los datos de los candidatos.
+                                </label>
+                            </div>
+
                             <button 
                                 type="submit" 
                                 className="submit-btn"
-                                disabled={loading}
+                                disabled={loading || !empresaTerminos}
+                                style={{ opacity: (!empresaTerminos) ? 0.6 : 1, cursor: (!empresaTerminos) ? 'not-allowed' : 'pointer' }}
                             >
                                 {loading ? 'Creando cuenta...' : 'Crear Cuenta de Empresa'}
+                            </button>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '0.5rem 0' }}>
+                                <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #E0E0E0' }} />
+                                <span style={{ color: '#999', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>o continuá con</span>
+                                <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #E0E0E0' }} />
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleGoogleRegister}
+                                style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                    width: '100%', padding: '12px', borderRadius: '10px',
+                                    border: '1px solid #E0E0E0', background: 'white',
+                                    cursor: 'pointer', fontSize: '1rem', fontWeight: '600', color: '#333',
+                                    transition: 'box-shadow 0.2s, border-color 0.2s'
+                                }}
+                                onMouseOver={e => { e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.1)'; e.currentTarget.style.borderColor = '#ccc'; }}
+                                onMouseOut={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = '#E0E0E0'; }}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 48 48">
+                                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                                </svg>
+                                Continuar con Google
                             </button>
                         </form>
                     </div>

@@ -94,7 +94,8 @@ const LandingPage = () => {
             <p>© 2024 EmpleaT. Growing Careers Naturally.</p>
           </div>
           <div className="footer-links">
-            <a href="#">Privacy Policy</a>
+            <a href="/terminos-legales">Terminos Legales</a>
+            
             <a href="#">Terms of Service</a>
             <a href="#">Cookies</a>
             <a href="#">Contact Us</a>

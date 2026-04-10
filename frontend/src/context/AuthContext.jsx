@@ -16,7 +16,17 @@ export function AuthProvider({children}){
         });
 
         //Queda escuchando si el usuario hace login o logout en tiempo real
-        const {data: {subscription}} = supabase.auth.onAuthStateChange((_event, session)=>{
+        const {data: {subscription}} = supabase.auth.onAuthStateChange((event, session)=>{
+            // Si el token de sesion expiro o es invalido, limpiar y forzar login
+            if (event === 'TOKEN_REFRESH_FAILED' || event === 'SIGNED_OUT') {
+                setUser(null);
+                setLoading(false);
+                // Limpiar tokens viejos del localStorage
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('sb-')) localStorage.removeItem(key);
+                });
+                return;
+            }
             setUser(session?.user ?? null);
             setLoading(false);
         });
@@ -28,7 +38,8 @@ export function AuthProvider({children}){
         //Todo lo que pongamos en el value podra ser usado en cualquier pantalla
 
         const value={
-            user, //todo el resto
+            user,
+            loading, // Necesario para que ProtectedRoute muestre spinner durante validación
         };
 
     return (

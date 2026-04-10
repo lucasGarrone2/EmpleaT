@@ -59,22 +59,21 @@ export default function MiPerfil() {
                             skill_id,
                             nivel_estimado,
                             nombre_original,
-                            diccionario_skills ( preferred_label, concept_uri, nombre_skill )
+                            diccionario_skills ( concept_uri, nombre_skill )
                         `)
                         .eq('candidato_id', candData.id);
                         
                     if (!skillsError && skillsData) {
                         setSkills(skillsData);
                     } else {
-                        console.warn("Could not fetch skills joining diccionario_skills", skillsError);
-                        // fallback if dictionary uses different column names like 'nombre_skill'
+                        console.warn("Error buscando skills con relaciones ESCO:", skillsError);
+                        // Fallback absoluto por si falla la relación de FK con diccionario
                         const { data: altSkillsData } = await supabase
                             .from('candidato_skills')
                             .select(`
                                 skill_id,
                                 nivel_estimado,
-                                nombre_original,
-                                diccionario_skills ( nombre_skill )
+                                nombre_original
                             `)
                             .eq('candidato_id', candData.id);
                         if (altSkillsData) setSkills(altSkillsData);
@@ -202,31 +201,33 @@ export default function MiPerfil() {
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem', borderBottom: '2px solid rgba(0,214,107,0.1)', paddingBottom: '1.5rem' }}>
                     <h2 className="brand-title" style={{ fontSize: '2.5rem', margin: 0 }}>Mi Perfil</h2>
-                    {!editMode ? (
-                        <button 
-                            onClick={() => setEditMode(true)}
-                            className="submit-btn"
-                            style={{ padding: '10px 20px', width: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem', boxShadow: 'none' }}
-                        >
-                            <Edit2 size={18} /> Editar Perfil
-                        </button>
-                    ) : (
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                    {candidato && (
+                        !editMode ? (
                             <button 
-                                onClick={() => setEditMode(false)}
-                                style={{ padding: '10px 20px', background: 'transparent', border: '1px solid var(--text-gray)', color: 'var(--text-gray)', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}
-                            >
-                                <X size={18} /> Cancelar
-                            </button>
-                            <button 
-                                onClick={handleSave}
-                                disabled={guardando}
+                                onClick={() => setEditMode(true)}
                                 className="submit-btn"
-                                style={{ padding: '10px 20px', width: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem', boxShadow: '0 5px 15px rgba(0,214,107,0.2)' }}
+                                style={{ padding: '10px 20px', width: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem', boxShadow: 'none' }}
                             >
-                                <Save size={18} /> {guardando ? 'Guardando...' : 'Guardar'}
+                                <Edit2 size={18} /> Editar Perfil
                             </button>
-                        </div>
+                        ) : (
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button 
+                                    onClick={() => setEditMode(false)}
+                                    style={{ padding: '10px 20px', background: 'transparent', border: '1px solid var(--text-gray)', color: 'var(--text-gray)', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}
+                                >
+                                    <X size={18} /> Cancelar
+                                </button>
+                                <button 
+                                    onClick={handleSave}
+                                    disabled={guardando}
+                                    className="submit-btn"
+                                    style={{ padding: '10px 20px', width: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem', boxShadow: '0 5px 15px rgba(0,214,107,0.2)' }}
+                                >
+                                    <Save size={18} /> {guardando ? 'Guardando...' : 'Guardar'}
+                                </button>
+                            </div>
+                        )
                     )}
                 </div>
 
@@ -257,6 +258,11 @@ export default function MiPerfil() {
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
                         
+                        <div style={{ background: 'rgba(255, 193, 7, 0.1)', color: '#b28900', padding: '15px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', border: '1px solid rgba(255, 193, 7, 0.3)' }}>
+                            <BrainCircuit size={20} />
+                            <strong>Aviso Importante:</strong> Tu perfil fue completado y estructurado con asistencia de Inteligencia Artificial. Por favor, verifica tus datos regularmente para evitar errores técnicos de interpretación o inferencia.
+                        </div>
+
                         {/* Fila Principal: Datos Generales */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
                             {/* Información Básica */}
@@ -270,7 +276,7 @@ export default function MiPerfil() {
                                         <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.9rem', marginBottom: '0.3rem' }}>Nombre Completo</label>
                                         {editMode ? (
                                             <input 
-                                                type="text" 
+                                                type="text" maxLength={200}
                                                 name="nombre_completo" 
                                                 value={formData.nombre_completo} 
                                                 onChange={handleInputChange}
@@ -285,7 +291,7 @@ export default function MiPerfil() {
                                         <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.9rem', marginBottom: '0.3rem' }}>Profesión</label>
                                         {editMode ? (
                                             <input 
-                                                type="text" 
+                                                type="text" maxLength={200}
                                                 name="titulo_profesional" 
                                                 value={formData.titulo_profesional} 
                                                 onChange={handleInputChange}
@@ -345,7 +351,7 @@ export default function MiPerfil() {
                             
                             {editMode ? (
                                 <textarea 
-                                    name="sobre_mi"
+                                    name="sobre_mi" maxLength={3000}
                                     value={formData.sobre_mi} 
                                     onChange={handleInputChange}
                                     placeholder="Cuenta un poco más sobre ti, tu historia y lo que buscas..."

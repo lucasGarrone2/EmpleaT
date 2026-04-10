@@ -70,6 +70,13 @@ export default function CrearOferta() {
         setSaving(true);
         setError(null);
 
+        // Bug 007: Validar que el salario máximo no sea inferior al mínimo
+        if (formData.salario_max_usd && parseInt(formData.salario_max_usd) < parseInt(formData.salario_min_usd)) {
+            setError('El salario máximo no puede ser menor al salario mínimo.');
+            setSaving(false);
+            return;
+        }
+
         try {
             // 1. Crear la Oferta
             const { data: ofertaData, error: ofertaError } = await supabase
@@ -200,7 +207,7 @@ export default function CrearOferta() {
                     <div style={{ flex: '2 1 300px' }}>
                         <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', marginBottom: '8px' }}>Título del Puesto *</label>
                         <input 
-                            type="text" required
+                            type="text" required maxLength={200}
                             value={formData.titulo}
                             onChange={e => setFormData({...formData, titulo: e.target.value})}
                             placeholder="Ej: Desarrollador Fullstack React/Node"
@@ -281,7 +288,7 @@ export default function CrearOferta() {
                             </div>
                         ))}
                         <input 
-                            type="text"
+                            type="text" maxLength={200}
                             value={skillInput}
                             onChange={(e) => setSkillInput(e.target.value)}
                             onKeyDown={handleKeyDown}
@@ -297,7 +304,7 @@ export default function CrearOferta() {
                 <div>
                     <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', marginBottom: '8px' }}>Descripción del Puesto</label>
                     <textarea 
-                        value={formData.descripcion}
+                        value={formData.descripcion} maxLength={3000}
                         onChange={e => setFormData({...formData, descripcion: e.target.value})}
                         placeholder="Describe las responsabilidades, beneficios, la cultura de la empresa..."
                         style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1.05rem', outline: 'none', minHeight: '150px', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}

@@ -278,19 +278,48 @@ export default function OfertaDetalleEmpresa() {
                         const candSkills = cant.candidato_skills || [];
                         
                         if (reqSkills.length > 0) {
+                            
+                            // Base de conocimiento semántica para relacionar conceptos amplios
+                            const synonymMap = {
+                                'sql': ['mysql', 'postgresql', 'sql server', 'oracle', 'pl/sql'],
+                                'mysql': ['sql', 'base de datos', 'mariadb'],
+                                'postgresql': ['sql', 'base de datos'],
+                                'cloud': ['aws', 'azure', 'gcp', 'google cloud', 'nube'],
+                                'aws': ['cloud', 'nube', 'amazon web services'],
+                                'azure': ['cloud', 'nube', 'microsoft azure'],
+                                'gcp': ['cloud', 'nube', 'google cloud'],
+                                'frontend': ['react', 'vue', 'angular', 'html', 'css', 'javascript', 'js'],
+                                'backend': ['node', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'express'],
+                                'javascript': ['js', 'typescript', 'react', 'node', 'vue', 'angular', 'frontend'],
+                                'js': ['javascript', 'typescript', 'frontend'],
+                                'react': ['javascript', 'frontend', 'reactjs', 'react.js'],
+                                'java': ['spring', 'backend', 'java ee', 'springboot'],
+                                'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi']
+                            };
+
                             reqSkills.forEach(req => {
                                 const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
                                 const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
                                 
                                 const matchTarget = candSkills.find(cs => {
-                                    if (cs.skill_id === req.skill_id) return true;
+                                    if (cs.skill_id && cs.skill_id === req.skill_id) return true;
                                     const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
                                     
                                     if (!csStr || !reqStr) return false;
                                     if (csStr === reqStr) return true;
                                     
+                                    // 1. Ampliación pedida por el usuario: overlap de 3 caracteres (ej: sql / mysql)
+                                    // Reducimos de 4 a 3 para permitir abreviaturas muy comunes.
                                     const minLen = Math.min(csStr.length, reqStr.length);
-                                    if (minLen >= 4 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
+                                    if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
+
+                                    // 2. Mapas de sinónimos: Si "cloud" requiere "aws", validamos
+                                    const reqSynonyms = synonymMap[reqStr] || [];
+                                    const csSynonyms = synonymMap[csStr] || [];
+
+                                    if (reqSynonyms.some(syn => csStr.includes(syn) || syn.includes(csStr))) return true;
+                                    if (csSynonyms.some(syn => reqStr.includes(syn) || syn.includes(reqStr))) return true;
+
                                     return false;
                                 });
                                 
@@ -308,18 +337,32 @@ export default function OfertaDetalleEmpresa() {
                         const isTop = index === 0;
 
                         return (
-                            <div key={post.id} style={{ 
-                                background: 'white', 
-                                padding: '1.5rem 2rem', 
-                                borderRadius: '16px', 
-                                border: isTop ? '2px solid rgba(0,214,107,0.4)' : '1px solid rgba(0,0,0,0.05)',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                boxShadow: isTop ? '0 8px 25px rgba(0,214,107,0.1)' : '0 2px 10px rgba(0,0,0,0.02)',
-                                position: 'relative',
-                                overflow: 'hidden'
-                            }}>
+                            <div 
+                                key={post.id} 
+                                onClick={() => navigate(`/oferta-empresa/${id}/candidato/${cant.id}`)}
+                                style={{ 
+                                    background: 'white', 
+                                    padding: '1.5rem 2rem', 
+                                    borderRadius: '16px', 
+                                    border: isTop ? '2px solid rgba(0,214,107,0.4)' : '1px solid rgba(0,0,0,0.05)',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    boxShadow: isTop ? '0 8px 25px rgba(0,214,107,0.1)' : '0 2px 10px rgba(0,0,0,0.02)',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.2s, box-shadow 0.2s'
+                                }}
+                                onMouseOver={e => {
+                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.06)';
+                                }}
+                                onMouseOut={e => {
+                                    e.currentTarget.style.transform = 'translateY(0)';
+                                    e.currentTarget.style.boxShadow = isTop ? '0 8px 25px rgba(0,214,107,0.1)' : '0 2px 10px rgba(0,0,0,0.02)';
+                                }}
+                            >
                                 {isTop && (
                                     <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '6px', background: 'var(--primary)' }}></div>
                                 )}
@@ -360,11 +403,16 @@ export default function OfertaDetalleEmpresa() {
                                     </div>
                                 </div>
 
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(0,214,107,0.05)', padding: '15px 25px', borderRadius: '16px' }}>
-                                    <span style={{ color: 'var(--text-gray)', fontSize: '0.85rem', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>Afinidad</span>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)', fontWeight: '900', fontSize: '1.8rem' }}>
-                                        <Zap size={24} fill="currentColor" /> {recalculatedMatch}%
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '15px' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: 'rgba(0,214,107,0.05)', padding: '15px 25px', borderRadius: '16px' }}>
+                                        <span style={{ color: 'var(--text-gray)', fontSize: '0.85rem', fontWeight: 'bold', textTransform: 'uppercase', marginBottom: '4px' }}>Afinidad</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)', fontWeight: '900', fontSize: '1.8rem' }}>
+                                            <Zap size={24} fill="currentColor" /> {recalculatedMatch}%
+                                        </div>
                                     </div>
+                                    <span style={{ color: 'var(--primary)', fontWeight: '600', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        Ver Perfil →
+                                    </span>
                                 </div>
                             </div>
                         )

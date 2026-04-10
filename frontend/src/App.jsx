@@ -12,6 +12,11 @@ import CrearOferta from './pages/CrearOferta';
 import OfertaDetalleEmpresa from './pages/OfertaDetalleEmpresa';
 import ListaOfertas from './pages/ListaOfertas';
 import EditarOferta from './pages/EditarOferta';
+import PerfilCandidatoParaEmpresa from './pages/PerfilCandidatoParaEmpresa';
+import GoogleCallback from './pages/GoogleCallback';
+import ProtectedRoute from './components/ProtectedRoute';
+import NotFound from './pages/NotFound';
+import TerminosLegales from './pages/TerminosLegales';
 
 function App() {
   return (
@@ -19,16 +24,35 @@ function App() {
       <div className="App">
         <Navbar />
         <Routes>
+          {/* Rutas públicas */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/perfil" element={<PerfilCandidato/>}/>
-          <Route path="/mi-perfil" element={<MiPerfil/>}/>
-          <Route path="/ofertas" element={<ListaOfertas />}/>
-          <Route path="/dashboard-empresa" element={<EmpresaDashboard/>}/>
-          <Route path="/crear-oferta" element={<CrearOferta/>}/>
-          <Route path="/editar-oferta/:id" element={<EditarOferta/>}/>
-          <Route path="/oferta-empresa/:id" element={<OfertaDetalleEmpresa/>}/>
+          <Route path="/auth/callback" element={<GoogleCallback/>} />
+          <Route path="/terminos-legales" element={<TerminosLegales/>} />
+
+          {/* Rutas protegidas: cualquier usuario autenticado */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/ofertas" element={<ListaOfertas />} />
+          </Route>
+
+          {/* Rutas protegidas: solo candidatos */}
+          <Route element={<ProtectedRoute requiredRole="candidato" />}>
+            <Route path="/perfil" element={<PerfilCandidato />} />
+            <Route path="/mi-perfil" element={<MiPerfil />} />
+          </Route>
+
+          {/* Rutas protegidas: solo empresas */}
+          <Route element={<ProtectedRoute requiredRole="empresa" />}>
+            <Route path="/dashboard-empresa" element={<EmpresaDashboard />} />
+            <Route path="/crear-oferta" element={<CrearOferta />} />
+            <Route path="/editar-oferta/:id" element={<EditarOferta />} />
+            <Route path="/oferta-empresa/:id" element={<OfertaDetalleEmpresa />} />
+            <Route path="/oferta-empresa/:ofertaId/candidato/:candidatoId" element={<PerfilCandidatoParaEmpresa />} />
+          </Route>
+
+          {/* Ruta 404: cualquier path no reconocido */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
     </Router>

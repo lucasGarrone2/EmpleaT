@@ -3,14 +3,28 @@ import cors from 'cors';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { PDFParse as pdfParse } from 'pdf-parse';
+import { fileTypeFromBuffer } from 'file-type';
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 dotenv.config();
 
 const app = express(); //Inicializa servidor y permisos
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Permite requests sin origin (ej: Postman, curl) y los origins de la lista
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS bloqueado para origin: ${origin}`));
+    }
+  },
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions)); //Permite la comunicacion segura de react con el backend
@@ -35,7 +49,11 @@ app.post('/api/analyze-cv', analyzeLimiter, upload.single('cv'), async (req, res
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No enviaste ningun Archivo PDF" });
+    }
 
+    const type = await fileTypeFromBuffer(req.file.buffer);
+    if (!type || type.mime !== 'application/pdf') {
+       return res.status(400).json({ error: "El archivo no es un PDF válido (Firma Mágica Inválida detectada)." });
     }
     console.log("PDF recibido, extrayendo informacion");
 
@@ -104,12 +122,54 @@ ${cvText}
 </cv>
 `;
 
-    //Aca llamas a gemini
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      generationConfig: { responseMimeType: "application/json" }
-    });
-    const result = await model.generateContent(prompt);
+    // Modelo principal (thinking, mejor calidad) con fallback al modelo estable
+    const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
+    let result;
+    let modelUsed = "";
+
+    for (const modelName of MODELS) {
+        try {
+            console.log(`Intentando con modelo: ${modelName}`);
+            const currentModel = genAI.getGenerativeModel({
+                model: modelName,
+                generationConfig: { responseMimeType: "application/json" }
+            });
+
+            const generatePromise = currentModel.generateContent(prompt);
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error("TimeoutExceeded")), 90000);
+            });
+
+            result = await Promise.race([generatePromise, timeoutPromise]);
+            modelUsed = modelName;
+            console.log(`Análisis completado con: ${modelName}`);
+            break; // Éxito, salir del loop
+
+        } catch (e) {
+            const errMsg = e.message || "";
+
+            if (errMsg === "TimeoutExceeded") {
+                return res.status(504).json({ error: "El análisis está tardando demasiado (>90s). El CV puede ser muy extenso o la IA está ocupada. Intenta de nuevo." });
+            }
+            if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("Too Many Requests")) {
+                // Distinguir si es limite por minuto (esperar 1 min) o diario (esperar hasta mañana)
+                const isPerMinute = errMsg.includes("PerMinute") || errMsg.includes("per_minute");
+                const msgRateLimit = isPerMinute
+                    ? "Demasiadas solicitudes en poco tiempo. Esperá 1 minuto e intentá de nuevo."
+                    : "Cuota diaria de la API de Google agotada. Podrás analizar CVs nuevamente mañana.";
+                return res.status(429).json({ error: msgRateLimit });
+            }
+            if ((errMsg.includes("503") || errMsg.includes("Service Unavailable") || errMsg.includes("UNAVAILABLE")) && modelName !== MODELS[MODELS.length - 1]) {
+                console.warn(`Modelo ${modelName} dio 503. Intentando con el siguiente modelo...`);
+                continue; // Intentar con el siguiente modelo
+            }
+            if (errMsg.includes("503") || errMsg.includes("Service Unavailable") || errMsg.includes("UNAVAILABLE")) {
+                return res.status(503).json({ error: "Los servidores de IA de Google están temporalmente saturados. Intenta de nuevo en un par de minutos." });
+            }
+            throw e;
+        }
+    }
+    
     let textResponse = result.response.text();
 
     console.log("Respuesta cruda de Gemini:", textResponse);
@@ -131,7 +191,7 @@ ${cvText}
 
   }
   catch (error) {
-    console.log("Error en el servidor: ", error.message);
+    console.error("Error en el servidor: ", error.message);
     res.status(500).json({ error: "Error del servidor: " + error.message });
   }
 
