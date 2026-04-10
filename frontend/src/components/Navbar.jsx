@@ -9,6 +9,7 @@ const Navbar = () => {
     const location = useLocation();
     const { user } = useAuth();
     const [userName, setUserName] = useState('');
+    const [userAvatar, setUserAvatar] = useState(null);
     const [scrolled, setScrolled] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
 
@@ -39,12 +40,13 @@ const Navbar = () => {
                 if (rol === 'empresa') {
                     const { data } = await supabase
                         .from('empresas')
-                        .select('nombre')
+                        .select('nombre, logo_url')
                         .eq('auth_id', user.id)
                         .maybeSingle();
 
                     if (data && data.nombre) {
                         setUserName(data.nombre.split(' ')[0]);
+                        setUserAvatar(data.logo_url);
                     } else {
                         const emailName = user.email.split('@')[0];
                         setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
@@ -52,12 +54,13 @@ const Navbar = () => {
                 } else {
                     const { data } = await supabase
                         .from('candidatos')
-                        .select('nombre_completo')
+                        .select('nombre_completo, foto_url')
                         .eq('auth_id', user.id)
                         .maybeSingle();
 
                     if (data && data.nombre_completo) {
                         setUserName(data.nombre_completo.split(' ')[0]);
+                        setUserAvatar(data.foto_url);
                     } else {
                         const emailName = user.email.split('@')[0];
                         setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
@@ -177,9 +180,13 @@ const Navbar = () => {
                                     width: '32px', height: '32px', borderRadius: '50%', 
                                     background: 'var(--primary)', color: 'white', 
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                                    fontSize: '0.9rem', fontWeight: 'bold' 
+                                    fontSize: '0.9rem', fontWeight: 'bold', overflow: 'hidden'
                                 }}>
-                                    {userName.charAt(0)}
+                                    {userAvatar ? (
+                                        <img src={userAvatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                        userName.charAt(0)
+                                    )}
                                 </div>
                                 <span>Hola, {userName}</span>
                             </div>

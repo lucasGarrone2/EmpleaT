@@ -96,6 +96,12 @@ export default function Login() {
                                 {loading ? 'Iniciando sesión...' : 'Ingresar'}
                             </button>
 
+                            <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+                                <Link to="/forgot-password" style={{ color: 'var(--text-gray)', fontSize: '0.9rem', textDecoration: 'none' }} onMouseOver={e => e.target.style.color = 'var(--primary)'} onMouseOut={e => e.target.style.color = 'var(--text-gray)'}>
+                                    ¿Olvidaste tu contraseña?
+                                </Link>
+                            </div>
+
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '0.5rem 0' }}>
                                 <hr style={{ flex: 1, border: 'none', borderTop: '1px solid #E0E0E0' }} />
                                 <span style={{ color: '#999', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>o continuá con</span>

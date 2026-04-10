@@ -64,7 +64,7 @@ export default function OfertaDetalleEmpresa() {
                     .select(`
                         id, estado, fecha_postulacion, porcentaje_match_calculado,
                         candidatos (
-                            id, nombre_completo, ubicacion, modalidad_preferida, score_proactividad, titulo_profesional, anios_experiencia,
+                            id, nombre_completo, ubicacion, modalidad_preferida, score_proactividad, titulo_profesional, anios_experiencia, foto_url,
                             candidato_skills(
                                 skill_id,
                                 nombre_original,
@@ -372,9 +372,13 @@ export default function OfertaDetalleEmpresa() {
                                         width: '60px', height: '60px', borderRadius: '50%', 
                                         background: 'linear-gradient(135deg, rgba(0,214,107,0.1) 0%, rgba(0,153,77,0.1) 100%)',
                                         color: 'var(--primary)', display: 'flex', justifyContent: 'center', alignItems: 'center',
-                                        fontSize: '1.5rem', fontWeight: 'bold'
+                                        fontSize: '1.5rem', fontWeight: 'bold', overflow: 'hidden'
                                     }}>
-                                        {cant.nombre_completo.charAt(0).toUpperCase()}
+                                        {cant.foto_url ? (
+                                            <img src={cant.foto_url} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        ) : (
+                                            cant.nombre_completo.charAt(0).toUpperCase()
+                                        )}
                                     </div>
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>

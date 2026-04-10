@@ -8,6 +8,7 @@ import './Register.css';
 export default function PerfilCandidato() {
     const [archivoPDF, setArchivoPDF] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [loadingText, setLoadingText] = useState("");
     const [datosExtraidos, setDatosExtraidos] = useState(null);
     const [error, setError] = useState(null);
     const [guardando, setGuardando] = useState(false);
@@ -35,13 +36,41 @@ export default function PerfilCandidato() {
             setError("Por favor, selecciona un archivo PDF primero");
             return;
         }
+        if (!user) {
+            setError("Debes iniciar sesión para subir tu CV");
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
         const formData = new FormData();
         formData.append('cv', archivoPDF);
+        formData.append('auth_id', user.id);
 
         try {
+            // Obtener token
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+            if (!token) throw new Error("Sesión expirada. Por favor, vuelve a iniciar sesión.");
+
+            // 1. Subir a Supabase Storage
+            setLoadingText("⏳ Subiendo PDF a la nube...");
+            const resUpload = await fetch("http://localhost:3000/api/upload-cv", {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!resUpload.ok) {
+                const errData = await resUpload.json().catch(() => ({}));
+                throw new Error(errData.error || "Error al subir el CV al servidor");
+            }
+
+            // 2. Analizar con Gemini
+            setLoadingText("⏳ Analizando con IA... puede tardar hasta 90 segundos");
             const respuesta = await fetch("http://localhost:3000/api/analyze-cv", {
                 method: 'POST',
                 body: formData
@@ -60,6 +89,7 @@ export default function PerfilCandidato() {
         }
         finally {
             setLoading(false);
+            setLoadingText("");
         }
     };
 
@@ -90,14 +120,20 @@ export default function PerfilCandidato() {
 
             const candidatoId = candidatoData.id;
 
-            // Paso B: Procesar Skills (Migrado a ESCO con Fuzzy Match)
+            // Paso B: Procesar Skills (Migrado a ESCO con Fuzzy Match) - PROCESO POR LOTES (BATCHING)
             const nombresSkillsGemini = datosExtraidos.skills.map(s => s.nombre);
+            let matchedSkills = [];
+            const BATCH_SIZE = 5;
 
-            // Llamar al RPC en Supabase para hacer match difuso con las skills de ESCO
-            const { data: matchedSkills, error: rpcError } = await supabase
-                .rpc('match_skills', { skill_names: nombresSkillsGemini });
+            // Procesamos las habilidades en grupos pequeños para evitar el Error 500 / Timeout de Supabase
+            for (let i = 0; i < nombresSkillsGemini.length; i += BATCH_SIZE) {
+                const batch = nombresSkillsGemini.slice(i, i + BATCH_SIZE);
+                const { data: batchResult, error: rpcError } = await supabase
+                    .rpc('match_skills', { skill_names: batch });
 
-            if (rpcError) throw new Error("Error en el emparejamiento con el diccionario ESCO: " + rpcError.message);
+                if (rpcError) throw new Error(`Error en el emparejamiento ESCO (Lote ${i/BATCH_SIZE + 1}): ` + rpcError.message);
+                if (batchResult) matchedSkills = [...matchedSkills, ...batchResult];
+            }
 
             // Siempre eliminamos las skills anteriores del candidato para reflejar el nuevo CV y evitar duplicados
             const { error: deleteError } = await supabase
@@ -236,11 +272,11 @@ export default function PerfilCandidato() {
                             </div>
 
                             <div style={{ marginBottom: '1.5rem', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                                <input 
-                                    type="checkbox" 
-                                    id="terminos" 
-                                    checked={aceptoTerminos} 
-                                    onChange={(e) => setAceptoTerminos(e.target.checked)} 
+                                <input
+                                    type="checkbox"
+                                    id="terminos"
+                                    checked={aceptoTerminos}
+                                    onChange={(e) => setAceptoTerminos(e.target.checked)}
                                     style={{ marginTop: '5px', width: '18px', height: '18px', cursor: 'pointer' }}
                                 />
                                 <label htmlFor="terminos" style={{ fontSize: '0.9rem', color: 'var(--text-gray)', lineHeight: '1.4', cursor: 'pointer' }}>
@@ -254,12 +290,17 @@ export default function PerfilCandidato() {
                                 disabled={loading || !archivoPDF || !aceptoTerminos}
                                 style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', padding: '18px', fontSize: '1.2rem', boxShadow: '0 8px 25px rgba(0,214,107,0.25)', opacity: (!archivoPDF || !aceptoTerminos) ? 0.6 : 1, cursor: (!archivoPDF || !aceptoTerminos) ? 'not-allowed' : 'pointer' }}
                             >
-                                {loading ? 'Analizando PDF con IA... Esto puede tardar unos segundos' : 'Extraer Perfil Mágico'}
+                                {loading ? (loadingText || '⏳ Cargando...') : 'Extraer Perfil Mágico'}
                             </button>
                         </form>
 
-                        {error && <div className="message error" style={{ marginTop: '25px', borderRadius: '12px', fontSize: '1.1rem' }}>{error}</div>}
+                        {error && (
+                            <div className="message error" style={{ marginTop: '25px', borderRadius: '12px', fontSize: '1.05rem', lineHeight: '1.5' }}>
+                                {error}
+                            </div>
+                        )}
                     </div>
+
                 </div>
 
                 {/* 🌟 SECCIÓN INFERIOR: Resultados y Toque Personal (Opcional) */}
@@ -281,33 +322,40 @@ export default function PerfilCandidato() {
                                     </div>
 
                                     <h4 style={{ marginTop: '0', marginBottom: '20px', color: 'var(--text-dark)', fontSize: '1.2rem' }}>Skills Detectadas y Niveladas:</h4>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                                    <div style={{ 
+                                        display: 'flex', 
+                                        flexWrap: 'wrap',
+                                        gap: '10px' 
+                                    }}>
                                         {datosExtraidos.skills.map((skill, index) => (
-                                            <span key={index} style={{
+                                            <div key={index} style={{
                                                 backgroundColor: 'white',
-                                                padding: '10px 18px',
-                                                borderRadius: '30px',
-                                                fontSize: '1rem',
+                                                padding: '8px 14px',
+                                                borderRadius: '12px',
+                                                fontSize: '0.9rem',
                                                 fontWeight: '600',
                                                 color: 'var(--primary)',
-                                                border: '1px solid rgba(0,214,107,0.3)',
-                                                boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
-                                                display: 'flex',
+                                                border: '1px solid rgba(0,214,107,0.25)',
+                                                boxShadow: '0 3px 8px rgba(0,0,0,0.02)',
+                                                display: 'inline-flex',
                                                 alignItems: 'center',
-                                                gap: '10px'
+                                                gap: '8px',
+                                                transition: 'all 0.2s ease'
                                             }}>
-                                                {skill.nombre}
+                                                <span style={{ whiteSpace: 'normal' }}>{skill.nombre}</span>
                                                 <span style={{
-                                                    backgroundColor: 'var(--primary)',
-                                                    color: 'white',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '12px',
-                                                    fontSize: '0.85rem',
-                                                    fontWeight: 'bold'
+                                                    backgroundColor: 'rgba(0,214,107,0.1)',
+                                                    color: 'var(--primary)',
+                                                    padding: '2px 8px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 'bold',
+                                                    flexShrink: 0,
+                                                    border: '1px solid rgba(0,214,107,0.1)'
                                                 }}>
                                                     Lvl {skill.nivel}
                                                 </span>
-                                            </span>
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
@@ -320,12 +368,25 @@ export default function PerfilCandidato() {
                                     La IA ya hizo el trabajo pesado descifrando tu trayectoria, pero nadie habla tan bien de ti como tú mismo. Escribe algo extra para destacarte ante los reclutadores.
                                 </p>
 
-                                <textarea maxLength="200"
-                                    value={bio}
-                                    onChange={(e) => setBio(e.target.value)}
-                                    placeholder="Ej: Hola! Soy un desarrollador backend apasionado por construir arquitecturas escalables. Disfruto trabajar en equipo y enfrentar proyectos desafiantes... (Max 200 caracteres)"
-                                    style={{ width: '100%', padding: '1.5rem', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.1)', resize: 'vertical', fontFamily: 'inherit', fontSize: '1.1rem', boxSizing: 'border-box', flexGrow: 1, minHeight: '150px' }}
-                                ></textarea>
+                                <div style={{ width: '100%', maxWidth: '700px' }}>
+                                    <textarea maxLength="2500"
+                                        value={bio}
+                                        onChange={(e) => setBio(e.target.value)}
+                                        placeholder="Ej: Hola! Soy un desarrollador backend apasionado por construir arquitecturas escalables. Disfruto trabajar en equipo y enfrentar proyectos desafiantes..."
+                                        style={{ 
+                                            width: '100%', 
+                                            padding: '1.5rem', 
+                                            borderRadius: '20px', 
+                                            border: '1px solid rgba(0,0,0,0.1)', 
+                                            resize: 'vertical', 
+                                            fontFamily: 'inherit', 
+                                            fontSize: '1.1rem', 
+                                            boxSizing: 'border-box', 
+                                            minHeight: '200px',
+                                            display: 'block'
+                                        }}
+                                    ></textarea>
+                                </div>
 
                                 <button
                                     type="button"

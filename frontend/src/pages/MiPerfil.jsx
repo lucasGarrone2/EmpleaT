@@ -24,6 +24,20 @@ export default function MiPerfil() {
     const [guardando, setGuardando] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState('');
+    const [fotoFile, setFotoFile] = useState(null);
+    const [fotoPreview, setFotoPreview] = useState(null);
+
+    const handleFotoChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 2000000) {
+                setError("La foto no puede pesar más de 2MB.");
+                return;
+            }
+            setFotoFile(file);
+            setFotoPreview(URL.createObjectURL(file));
+        }
+    };
 
     useEffect(() => {
         if (!user) {
@@ -142,13 +156,38 @@ export default function MiPerfil() {
         setSuccessMessage('');
         
         try {
+            let finalFotoUrl = candidato?.foto_url;
+
+            if (fotoFile) {
+                const formData = new FormData();
+                formData.append('image', fotoFile);
+                formData.append('auth_id', user.id);
+                formData.append('role', 'candidato');
+
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                const upRes = await fetch("http://localhost:3000/api/upload-image", {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${session.access_token}` },
+                    body: formData
+                });
+                
+                if (!upRes.ok) {
+                    const err = await upRes.json().catch(()=>({}));
+                    throw new Error(err.error || "Error al subir foto de perfil");
+                }
+                const upData = await upRes.json();
+                finalFotoUrl = upData.publicUrl;
+            }
+
             const { error: updateError } = await supabase
                 .from('candidatos')
                 .update({
                     nombre_completo: formData.nombre_completo,
                     titulo_profesional: formData.titulo_profesional,
                     anios_experiencia: formData.anios_experiencia,
-                    sobre_mi: formData.sobre_mi
+                    sobre_mi: formData.sobre_mi,
+                    foto_url: finalFotoUrl
                 })
                 .eq('auth_id', user.id);
                 
@@ -156,14 +195,15 @@ export default function MiPerfil() {
             
             setCandidato({
                 ...candidato,
-                ...formData
+                ...formData,
+                foto_url: finalFotoUrl
             });
             setEditMode(false);
             setSuccessMessage("¡Perfil actualizado con éxito!");
             setTimeout(() => setSuccessMessage(''), 3000);
         } catch (err) {
             console.error("Error al guardar:", err);
-            setError("Error al guardar los cambios.");
+            setError(err.message || "Error al guardar los cambios.");
         } finally {
             setGuardando(false);
         }
@@ -267,9 +307,33 @@ export default function MiPerfil() {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
                             {/* Información Básica */}
                             <div style={{ background: 'var(--bg-white)', padding: '2rem', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
-                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', marginBottom: '1.5rem', fontSize: '1.3rem' }}>
-                                    <User size={24} /> Datos Personales
-                                </h3>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', margin: 0, fontSize: '1.3rem' }}>
+                                        <User size={24} /> Datos Personales
+                                    </h3>
+                                    
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                        <div style={{ 
+                                            width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden', background: '#f0f0f0', border: '3px solid var(--primary)', display: 'flex', justifyContent: 'center', alignItems: 'center'
+                                        }}>
+                                            {fotoPreview ? (
+                                                <img src={fotoPreview} alt="Foto Prev" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : candidato.foto_url ? (
+                                                <img src={candidato.foto_url} alt="Mi Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <User size={40} color="#999" />
+                                            )}
+                                        </div>
+                                        {editMode && (
+                                            <div style={{ marginTop: '8px', textAlign: 'center' }}>
+                                                <label style={{ color: 'var(--primary)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                                    Cambiar Foto
+                                                    <input type="file" accept="image/jpeg, image/png, image/webp" onChange={handleFotoChange} style={{ display: 'none' }} />
+                                                </label>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                                 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                                     <div>
@@ -330,13 +394,45 @@ export default function MiPerfil() {
                                     
                                     <div>
                                         <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.9rem', marginBottom: '0.3rem' }}>Currículum Vitae</label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,214,107,0.05)', padding: '12px 15px', borderRadius: '10px', border: '1px dashed var(--primary)' }}>
-                                            <FileText size={20} color="var(--primary)" />
-                                            <span style={{ fontWeight: '500', color: 'var(--text-dark)' }}>Mi_CV_Actualizado.pdf</span>
-                                            {/* Mockup icon, persistence will be added later */}
-                                        </div>
+                                        {candidato.cv_url ? (
+                                            <div 
+                                                onClick={async () => {
+                                                    try {
+                                                        const { data, error } = await supabase.storage.from('cv_files').download(candidato.cv_url);
+                                                        if (error) throw error;
+                                                        const url = URL.createObjectURL(data);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = candidato.cv_url.split('/').pop() || 'curriculum.pdf';
+                                                        a.click();
+                                                        URL.revokeObjectURL(url);
+                                                    } catch (err) {
+                                                        console.error('Error al descargar CV:', err);
+                                                        alert("No se pudo descargar el archivo.");
+                                                    }
+                                                }}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,214,107,0.05)', padding: '12px 15px', borderRadius: '10px', border: '1px dashed var(--primary)', cursor: 'pointer', transition: 'background 0.2s' }}
+                                                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,214,107,0.1)'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'rgba(0,214,107,0.05)'}
+                                                title="Descargar mi CV"
+                                            >
+                                                <FileText size={20} color="var(--primary)" />
+                                                <span style={{ fontWeight: '500', color: 'var(--text-dark)' }}>
+                                                    {(() => {
+                                                        const filename = candidato.cv_url.split('/').pop();
+                                                        const parts = filename.split('_');
+                                                        return (parts.length >= 3 && parts[0] === 'cv') ? parts.slice(2).join('_') : filename;
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f5f5f5', padding: '12px 15px', borderRadius: '10px', border: '1px dashed #ccc' }}>
+                                                <FileText size={20} color="#999" />
+                                                <span style={{ fontWeight: '500', color: '#999' }}>Ningún CV cargado</span>
+                                            </div>
+                                        )}
                                         <div style={{ fontSize: '0.85rem', color: 'var(--text-gray)', marginTop: '8px' }}>
-                                            <Link to="/perfil" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 'bold' }}>¿Quieres re-analizar un nuevo CV?</Link>
+                                            <Link to="/perfil" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 'bold' }}>{candidato.cv_url ? '¿Quieres re-analizar un nuevo CV?' : 'Subir y analizar tu CV ahora'}</Link>
                                         </div>
                                     </div>
                                 </div>

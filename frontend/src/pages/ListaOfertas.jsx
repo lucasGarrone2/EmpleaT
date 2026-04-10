@@ -74,7 +74,7 @@ export default function ListaOfertas() {
                     .from('ofertas')
                     .select(`
                         id, titulo, modalidad, descripcion, salario_min_usd, salario_max_usd, creada_en,
-                        empresas (nombre, ubicacion),
+                        empresas (nombre, ubicacion, logo_url),
                         oferta_skills (
                             skill_id,
                             nombre_original,
@@ -323,8 +323,12 @@ export default function ListaOfertas() {
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', flex: 1 }}>
                                             {/* Circulo Inicial de Empresa */}
-                                            <div style={{ width: '56px', height: '56px', background: '#F0F9F4', color: '#00B159', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', flexShrink: 0 }}>
-                                                {empLetra}
+                                            <div style={{ width: '56px', height: '56px', background: '#F0F9F4', color: '#00B159', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', flexShrink: 0, overflow: 'hidden' }}>
+                                                {oferta.empresas?.logo_url ? (
+                                                    <img src={oferta.empresas.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    empLetra
+                                                )}
                                             </div>
                                             
                                             {/* Info Basica */}

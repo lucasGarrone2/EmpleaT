@@ -6,6 +6,8 @@ import { PDFParse as pdfParse } from 'pdf-parse';
 import { fileTypeFromBuffer } from 'file-type';
 import dotenv from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createClient } from '@supabase/supabase-js';
+import sharp from 'sharp';
 
 dotenv.config();
 
@@ -40,11 +42,189 @@ const upload = multer({
 
 const analyzeLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
-  max: 5, // Limita cada IP a 5 peticiones por hora
-  message: { error: "Has alcanzado el límite de 5 análisis de CV por hora. Por favor, intenta de nuevo más tarde." }
+  max: 20, // Límite: 20 análisis por IP por hora
+  message: { error: "Límite de análisis alcanzado (20/hora). Esperá un momento e intentá de nuevo." }
 });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// -------------------------------------------------------------
+// NUEVO ENDPOINT: Subida de CV a Supabase Storage
+// -------------------------------------------------------------
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { error: "Límite de subida alcanzado (20/hora). Esperá un momento e intentá de nuevo." }
+});
+
+const uploadCVStorage = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2000000 } // Límite máximo: 2MB (pedido por usuario)
+});
+
+app.post('/api/upload-cv', uploadLimiter, uploadCVStorage.single('cv'), async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: "No autorizado. Se requiere token JWT en el header Authorization." });
+    }
+    const token = authHeader.split(' ')[1];
+    
+    // Auth_id proveniente del cliente en form-data (o decodificable del token jwt, se pide auth_id del front)
+    const authId = req.body.auth_id;
+    if (!authId) {
+       return res.status(400).json({ error: "El auth_id es requerido." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No enviaste ningún archivo." });
+    }
+    
+    const type = await fileTypeFromBuffer(req.file.buffer);
+    if (!type || type.mime !== 'application/pdf') {
+       return res.status(400).json({ error: "El archivo no es un PDF válido." });
+    }
+    
+    // Crear cliente de Supabase usando el access_token del usuario para respetar RLS
+    const supabaseClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+    
+    // Requisito de seguridad: path único para evitar colisiones usando UUID y auth_id: authId/123912948-archivo.pdf
+    const safeOriginalName = req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const filename = `${authId}/cv_${Date.now()}_${safeOriginalName}`;
+    
+    // Subir al bucket 'cv_files'
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from('cv_files')
+      .upload(filename, req.file.buffer, {
+        contentType: 'application/pdf',
+        upsert: true
+      });
+      
+    if (uploadError) {
+      console.error("Error subiendo a Supabase Storage:", uploadError);
+      return res.status(500).json({ error: "Error subiendo archivo a Supabase Storage: " + uploadError.message });
+    }
+    
+    const filePath = uploadData.path;
+    
+    // Update de la tabla candidatos con la URL del CV
+    const { error: dbError } = await supabaseClient
+      .from('candidatos')
+      .update({ cv_url: filePath })
+      .eq('auth_id', authId);
+      
+    if (dbError) {
+        console.error("Error actualizando candidato:", dbError);
+        // Si no existe, Supabase update no genera error pero modifica 0 columnas.
+        // Como el PerfilCandidato hace un "upsert" al final del formulario y nosotros también lo necesitamos antes o durante,
+        // no pasa nada si el update afecta 0 files. La DB guarda consistencia y el front mandará la path luego tal vez o cuando se cree.
+    }
+    
+    res.json({ message: "Upload exitoso", path: filePath });
+
+  } catch (error) {
+    console.error("Error en /api/upload-cv: ", error.message);
+    res.status(500).json({ error: "Error en el servidor: " + error.message });
+  }
+});
+
+// -------------------------------------------------------------
+// NUEVO ENDPOINT: Subida de imágenes públicas (Fotos de perfil y Logos)
+// -------------------------------------------------------------
+const uploadImageLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30, // 30 imágenes por hora
+  message: { error: "Límite de subida de imágenes alcanzado." }
+});
+
+const uploadImageStorage = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2000000 } // Filtro inicial en memoria (2MB) para frenar abusos antes de sharp
+});
+
+app.post('/api/upload-image', uploadImageLimiter, uploadImageStorage.single('image'), async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: "No autorizado." });
+    }
+    const token = authHeader.split(' ')[1];
+    
+    // Obtenemos los campos del body
+    const { auth_id, role } = req.body;
+    if (!auth_id || !role || (role !== 'candidato' && role !== 'empresa')) {
+       return res.status(400).json({ error: "Faltan datos o el role es inválido." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No enviaste ninguna imagen." });
+    }
+    
+    // Validar MIME type de imagen estandar
+    const type = await fileTypeFromBuffer(req.file.buffer);
+    if (!type || !type.mime.startsWith('image/')) {
+       return res.status(400).json({ error: "El archivo no es una imagen válida." });
+    }
+    
+    // Compresión Mágica usando sharp
+    // Lo convertimos a WebP, calidad 80 y limitamos las dimensiones a 400x400
+    const compressedBuffer = await sharp(req.file.buffer)
+        .resize(400, 400, { fit: 'cover', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
+
+    console.log(`Imagen procesada. Tamaño original: ${req.file.size} bytes. Nuevo tamaño: ${compressedBuffer.length} bytes.`);
+
+    const supabaseClient = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } }
+    });
+    
+    // Nombramos el archivo (obligamos extensión .webp)
+    const filename = `${auth_id}/avatar_${Date.now()}.webp`;
+    
+    // Subir a 'profile_pics'
+    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+      .from('profile_pics')
+      .upload(filename, compressedBuffer, {
+        contentType: 'image/webp',
+        upsert: true
+      });
+      
+    if (uploadError) {
+      console.error("Error subiendo imagen a Storage:", uploadError);
+      return res.status(500).json({ error: "Error en Storage: " + uploadError.message });
+    }
+    
+    const filePath = uploadData.path;
+    const publicUrlData = supabaseClient.storage.from('profile_pics').getPublicUrl(filePath);
+    const publicUrl = publicUrlData.data.publicUrl;
+    
+    // Actualizar BBDD según el rol
+    const table = role === 'candidato' ? 'candidatos' : 'empresas';
+    const column = role === 'candidato' ? 'foto_url' : 'logo_url';
+
+    const { error: dbError } = await supabaseClient
+      .from(table)
+      .update({ [column]: publicUrl })
+      .eq('auth_id', auth_id);
+      
+    if (dbError) {
+        console.error(`Error actualizando ${table}:`, dbError);
+    }
+    
+    res.json({ message: "Imagen subida", publicUrl });
+
+  } catch (error) {
+    console.error("Error /upload-image: ", error.message);
+    res.status(500).json({ error: "Error interno: " + error.message });
+  }
+});
+
+// -------------------------------------------------------------
+// ENDPOINT EXISTENTE: Análisis del CV con Gemini
+// -------------------------------------------------------------
 app.post('/api/analyze-cv', analyzeLimiter, upload.single('cv'), async (req, res) => {
   try {
     if (!req.file) {
@@ -122,52 +302,31 @@ ${cvText}
 </cv>
 `;
 
-    // Modelo principal (thinking, mejor calidad) con fallback al modelo estable
-    const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
+    const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        generationConfig: { responseMimeType: "application/json" }
+    });
+
     let result;
-    let modelUsed = "";
+    try {
+        const generatePromise = model.generateContent(prompt);
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("TimeoutExceeded")), 90000);
+        });
+        result = await Promise.race([generatePromise, timeoutPromise]);
+    } catch (e) {
+        const errMsg = e.message || "";
 
-    for (const modelName of MODELS) {
-        try {
-            console.log(`Intentando con modelo: ${modelName}`);
-            const currentModel = genAI.getGenerativeModel({
-                model: modelName,
-                generationConfig: { responseMimeType: "application/json" }
-            });
-
-            const generatePromise = currentModel.generateContent(prompt);
-            const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error("TimeoutExceeded")), 90000);
-            });
-
-            result = await Promise.race([generatePromise, timeoutPromise]);
-            modelUsed = modelName;
-            console.log(`Análisis completado con: ${modelName}`);
-            break; // Éxito, salir del loop
-
-        } catch (e) {
-            const errMsg = e.message || "";
-
-            if (errMsg === "TimeoutExceeded") {
-                return res.status(504).json({ error: "El análisis está tardando demasiado (>90s). El CV puede ser muy extenso o la IA está ocupada. Intenta de nuevo." });
-            }
-            if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("Too Many Requests")) {
-                // Distinguir si es limite por minuto (esperar 1 min) o diario (esperar hasta mañana)
-                const isPerMinute = errMsg.includes("PerMinute") || errMsg.includes("per_minute");
-                const msgRateLimit = isPerMinute
-                    ? "Demasiadas solicitudes en poco tiempo. Esperá 1 minuto e intentá de nuevo."
-                    : "Cuota diaria de la API de Google agotada. Podrás analizar CVs nuevamente mañana.";
-                return res.status(429).json({ error: msgRateLimit });
-            }
-            if ((errMsg.includes("503") || errMsg.includes("Service Unavailable") || errMsg.includes("UNAVAILABLE")) && modelName !== MODELS[MODELS.length - 1]) {
-                console.warn(`Modelo ${modelName} dio 503. Intentando con el siguiente modelo...`);
-                continue; // Intentar con el siguiente modelo
-            }
-            if (errMsg.includes("503") || errMsg.includes("Service Unavailable") || errMsg.includes("UNAVAILABLE")) {
-                return res.status(503).json({ error: "Los servidores de IA de Google están temporalmente saturados. Intenta de nuevo en un par de minutos." });
-            }
-            throw e;
+        if (errMsg === "TimeoutExceeded") {
+            return res.status(504).json({ error: "El análisis tardó demasiado (>90s). Intenta de nuevo." });
         }
+        if (errMsg.includes("429") || errMsg.includes("quota") || errMsg.includes("Too Many Requests")) {
+            return res.status(429).json({ error: "Cuota de la API de Google superada. Esperá unos minutos e intentá de nuevo." });
+        }
+        if (errMsg.includes("503") || errMsg.includes("Service Unavailable") || errMsg.includes("UNAVAILABLE")) {
+            return res.status(503).json({ error: "Los servidores de Google están temporalmente saturados. Esperá 1-2 minutos e intentá de nuevo." });
+        }
+        throw e;
     }
     
     let textResponse = result.response.text();

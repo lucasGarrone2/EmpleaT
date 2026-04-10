@@ -21,6 +21,8 @@ export default function EmpresaDashboard() {
         sector: '',
         ubicacion: ''
     });
+    const [logoFile, setLogoFile] = useState(null);
+    const [logoPreview, setLogoPreview] = useState(null);
     const [guardando, setGuardando] = useState(false);
 
     useEffect(() => {
@@ -68,20 +70,58 @@ export default function EmpresaDashboard() {
         fetchDashboardData();
     }, [user, navigate]);
 
+    const handleLogoChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 2000000) {
+                setError("El logo no puede pesar más de 2MB.");
+                return;
+            }
+            setLogoFile(file);
+            setLogoPreview(URL.createObjectURL(file));
+        }
+    };
+
     const handleOnboardSubmit = async (e) => {
         e.preventDefault();
         setGuardando(true);
         setError(null);
 
         try {
+            let finalLogoUrl = null;
+
+            if (logoFile) {
+                const formData = new FormData();
+                formData.append('image', logoFile);
+                formData.append('auth_id', user.id);
+                formData.append('role', 'empresa');
+
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                const upRes = await fetch("http://localhost:3000/api/upload-image", {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${session.access_token}` },
+                    body: formData
+                });
+                if (!upRes.ok) {
+                    const err = await upRes.json().catch(()=>({}));
+                    throw new Error(err.error || "Error al subir logo corporativo");
+                }
+                const upData = await upRes.json();
+                finalLogoUrl = upData.publicUrl;
+            }
+
+            const insertPayload = {
+                auth_id: user.id,
+                nombre: onboardData.nombre,
+                sector: onboardData.sector,
+                ubicacion: onboardData.ubicacion
+            };
+            if (finalLogoUrl) insertPayload.logo_url = finalLogoUrl;
+
             const { data, error: insertError } = await supabase
                 .from('empresas')
-                .insert({
-                    auth_id: user.id,
-                    nombre: onboardData.nombre,
-                    sector: onboardData.sector,
-                    ubicacion: onboardData.ubicacion
-                })
+                .insert(insertPayload)
                 .select()
                 .single();
 
@@ -128,9 +168,13 @@ export default function EmpresaDashboard() {
                 
                 <div style={{ position: 'relative', width: '100%', maxWidth: '600px', backgroundColor: 'var(--bg-white)', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', padding: '3.5rem', zIndex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '1rem' }}>
-                        <div style={{ background: 'rgba(0,214,107,0.1)', padding: '15px', borderRadius: '18px' }}>
-                            <Building2 size={32} color="var(--primary)" />
-                        </div>
+                        {logoPreview ? (
+                            <img src={logoPreview} alt="Logo Prev" style={{ width: '64px', height: '64px', borderRadius: '18px', objectFit: 'cover', border: '1px solid rgba(0,214,107,0.3)' }} />
+                        ) : (
+                            <div style={{ background: 'rgba(0,214,107,0.1)', padding: '15px', borderRadius: '18px' }}>
+                                <Building2 size={32} color="var(--primary)" />
+                            </div>
+                        )}
                         <h2 className="brand-title" style={{ fontSize: '2.2rem', margin: 0 }}>Perfil Corporativo</h2>
                     </div>
                     <p style={{ color: 'var(--text-gray)', fontSize: '1.1rem', marginBottom: '2.5rem' }}>
@@ -140,6 +184,18 @@ export default function EmpresaDashboard() {
                     {error && <div className="message error" style={{marginBottom: '2rem'}}>{error}</div>}
 
                     <form onSubmit={handleOnboardSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        
+                        <div>
+                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Logo de la Empresa (Opcional)</label>
+                            <input 
+                                type="file" 
+                                accept="image/jpeg, image/png, image/webp"
+                                onChange={handleLogoChange}
+                                style={{ width: '100%', padding: '10px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', background: '#f9fdfa', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}
+                            />
+                            <small style={{ color: 'var(--text-gray)', marginTop: '4px', display: 'block' }}>Formatos aceptados: JPG, PNG, WEBP. Max 2MB.</small>
+                        </div>
+
                         <div>
                             <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Nombre de la Empresa</label>
                             <input 
@@ -176,9 +232,9 @@ export default function EmpresaDashboard() {
                             type="submit" 
                             disabled={guardando}
                             className="submit-btn"
-                            style={{ padding: '16px', fontSize: '1.2rem', marginTop: '1rem', boxShadow: '0 8px 25px rgba(0,214,107,0.25)' }}
+                            style={{ padding: '16px', fontSize: '1.2rem', marginTop: '1rem', boxShadow: '0 8px 25px rgba(0,214,107,0.25)', opacity: guardando ? 0.7 : 1 }}
                         >
-                            {guardando ? 'Guardando...' : 'Comenzar a Reclutar'}
+                            {guardando ? 'Guardando Perfil...' : 'Comenzar a Reclutar'}
                         </button>
                     </form>
                 </div>

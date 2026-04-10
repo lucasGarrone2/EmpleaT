@@ -195,9 +195,13 @@ export default function PerfilCandidatoParaEmpresa() {
                         width: '90px', height: '90px', borderRadius: '50%', 
                         background: 'linear-gradient(135deg, rgba(0,214,107,0.1) 0%, rgba(0,153,77,0.1) 100%)',
                         color: 'var(--primary)', display: 'flex', justifyContent: 'center', alignItems: 'center',
-                        fontSize: '2.5rem', fontWeight: 'bold'
+                        fontSize: '2.5rem', fontWeight: 'bold', overflow: 'hidden'
                     }}>
-                        {candidato.nombre_completo.charAt(0).toUpperCase()}
+                        {candidato.foto_url ? (
+                            <img src={candidato.foto_url} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                            candidato.nombre_completo.charAt(0).toUpperCase()
+                        )}
                     </div>
                     <div>
                         <h1 style={{ margin: '0 0 5px 0', fontSize: '2rem', color: 'var(--text-dark)' }}>{candidato.nombre_completo}</h1>
