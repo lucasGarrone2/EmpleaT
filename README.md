@@ -44,7 +44,7 @@ Para ejecutar el proyecto en tu entorno local necesitas:
 
 ### 1. Clonar el repositorio
 ```bash
-git clone https://github.com/TU_USUARIO/EmpleaT.git
+git clone https://github.com/lucasGarrone2/EmpleaT.git
 cd EmpleaT
 ```
 
