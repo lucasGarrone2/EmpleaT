@@ -143,13 +143,12 @@ export default function PerfilCandidato() {
 
             if (deleteError) throw new Error("Error limpiando skills anteriores: " + deleteError.message);
 
-            // Filtrar skills válidas (similitud > 0.3)
-            const validSkills = (matchedSkills || []).filter(m => m.similitud > 0.3);
+            // Filtrar skills válidas (similitud estricta > 0.65 para evitar "versiones" -> "infecciones")
+            const validSkills = (matchedSkills || []).filter(m => m.similitud > 0.65);
+
+            const skillsMap = new Map();
 
             if (validSkills.length > 0) {
-                // Preparamos el array de inserción a candidato_skills (sin duplicados)
-                const skillsMap = new Map();
-
                 validSkills.forEach(match => {
                     if (!skillsMap.has(match.esco_id)) {
                         const skillExtraida = datosExtraidos.skills.find(s => s.nombre === match.original_skill);
@@ -161,7 +160,37 @@ export default function PerfilCandidato() {
                         });
                     }
                 });
+            }
 
+            // Rescatar las palabras que ESCO no reconoció (ej. frameworks nuevos o "desarrollo web")
+            const matchedNamesLower = new Set(validSkills.map(m => m.original_skill.toLowerCase()));
+            const unmatchedWords = datosExtraidos.skills.filter(s => !matchedNamesLower.has(s.nombre.toLowerCase()));
+
+            if (unmatchedWords.length > 0) {
+                const skillsAInsertar = unmatchedWords.map(s => ({
+                    nombre_skill: s.nombre,
+                    tipo: 'Personalizado'
+                }));
+
+                const { data: nuevasSkills, error: insertError } = await supabase
+                    .from('diccionario_skills')
+                    .insert(skillsAInsertar)
+                    .select('id, nombre_skill');
+
+                if (!insertError && nuevasSkills) {
+                    nuevasSkills.forEach(newSkill => {
+                        const skillExtraida = unmatchedWords.find(s => s.nombre.toLowerCase() === newSkill.nombre_skill.toLowerCase());
+                        skillsMap.set(newSkill.id, {
+                            candidato_id: candidatoId,
+                            skill_id: newSkill.id,
+                            nivel_estimado: skillExtraida ? skillExtraida.nivel : 3,
+                            nombre_original: newSkill.nombre_skill
+                        });
+                    });
+                }
+            }
+
+            if (skillsMap.size > 0) {
                 const candidatoSkillsInsert = Array.from(skillsMap.values());
 
                 // Relacionar candidato con las skills en lote utilizando upsert

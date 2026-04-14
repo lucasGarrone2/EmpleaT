@@ -42,6 +42,7 @@ export default function OfertaDetalleEmpresa() {
                     .select(`
                         id, empresa_id, titulo, modalidad, descripcion, estado, creada_en,
                         oferta_skills (
+                            skill_id,
                             nombre_original,
                             diccionario_skills (nombre_skill)
                         )
@@ -289,12 +290,15 @@ export default function OfertaDetalleEmpresa() {
                                 'azure': ['cloud', 'nube', 'microsoft azure'],
                                 'gcp': ['cloud', 'nube', 'google cloud'],
                                 'frontend': ['react', 'vue', 'angular', 'html', 'css', 'javascript', 'js'],
-                                'backend': ['node', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'express'],
+                                'backend': ['node', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'express', 'desarrollo web'],
                                 'javascript': ['js', 'typescript', 'react', 'node', 'vue', 'angular', 'frontend'],
                                 'js': ['javascript', 'typescript', 'frontend'],
                                 'react': ['javascript', 'frontend', 'reactjs', 'react.js'],
                                 'java': ['spring', 'backend', 'java ee', 'springboot'],
-                                'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi']
+                                'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi'],
+                                'desarrollo web': ['html', 'css', 'javascript', 'frontend', 'backend', 'web', 'php', 'diseño web'],
+                                'html': ['html5', 'frontend', 'desarrollo web', 'css', 'diseño web'],
+                                'css': ['css3', 'frontend', 'desarrollo web', 'html', 'diseño web']
                             };
 
                             reqSkills.forEach(req => {
@@ -332,7 +336,7 @@ export default function OfertaDetalleEmpresa() {
                         
                         const recalculatedMatch = reqSkills.length > 0 
                             ? Math.round((confidenciasReales / reqSkills.length) * 100) 
-                            : 100;
+                            : 0;
 
                         const isTop = index === 0;
 

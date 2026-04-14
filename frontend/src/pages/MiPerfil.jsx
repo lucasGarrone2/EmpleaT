@@ -27,6 +27,10 @@ export default function MiPerfil() {
     const [fotoFile, setFotoFile] = useState(null);
     const [fotoPreview, setFotoPreview] = useState(null);
 
+    const [newSkillName, setNewSkillName] = useState('');
+    const [newSkillLevel, setNewSkillLevel] = useState(3);
+    const [addingSkill, setAddingSkill] = useState(false);
+
     const handleFotoChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -139,6 +143,78 @@ export default function MiPerfil() {
             console.error("Error borrando cuenta", err);
             setError("No se pudo borrar la cuenta. Asegúrate de haber ejecutado el script SQL en Supabase.");
             setGuardando(false);
+        }
+    };
+
+    const handleAddSkill = async () => {
+        if (!newSkillName.trim() || !candidato) return;
+        setAddingSkill(true);
+        setError(null);
+        
+        try {
+            const val = newSkillName.trim();
+            const { data: matchedSkills, error: rpcError } = await supabase
+                .rpc('match_skills', { skill_names: [val] });
+                
+            if (rpcError) throw new Error("Error consultando la base de habilidades");
+            
+            let skillId;
+            let finalName = val;
+            
+            const validMatch = (matchedSkills || []).find(m => m.similitud > 0.65);
+            
+            if (validMatch) {
+                skillId = validMatch.esco_id;
+                finalName = validMatch.original_skill; // Usar el nombre encontrado como base
+            } else {
+                // Agregar al diccionario si no existe
+                const { data: nuevaSkill, error: insertError } = await supabase
+                    .from('diccionario_skills')
+                    .insert({ nombre_skill: val, tipo: 'Personalizado' })
+                    .select('id, nombre_skill')
+                    .single();
+                    
+                if (insertError) throw new Error("Error agregando nueva habilidad al diccionario");
+                skillId = nuevaSkill.id;
+            }
+
+            // Chequeo de duplicados local
+            if (skills.some(s => s.skill_id === skillId)) {
+                setError("Ya tienes agregada esta habilidad técnica en tu perfil.");
+                setAddingSkill(false);
+                return;
+            }
+
+            // Insertar relación con el candidato
+            const { error: relError } = await supabase
+                .from('candidato_skills')
+                .upsert({
+                    candidato_id: candidato.id,
+                    skill_id: skillId,
+                    nivel_estimado: newSkillLevel,
+                    nombre_original: val
+                });
+                
+            if (relError) throw new Error("Error guardando la habilidad en tu perfil");
+
+            // Actualizar estado local UI
+            setSkills([...skills, {
+                skill_id: skillId,
+                nivel_estimado: newSkillLevel,
+                nombre_original: val,
+                diccionario_skills: { nombre_skill: val } // visual mock prevent reload
+            }]);
+
+            setNewSkillName('');
+            setNewSkillLevel(3);
+            setSuccessMessage("Habilidad agregada a tu perfil.");
+            setTimeout(() => setSuccessMessage(''), 3000);
+            
+        } catch (err) {
+            console.error("Error agregando skill", err);
+            setError(err.message);
+        } finally {
+            setAddingSkill(false);
         }
     };
 
@@ -460,17 +536,60 @@ export default function MiPerfil() {
                             )}
                         </div>
 
-                        {/* Fila Terciaria: Skills (Read-Only for now as they are AI generated) */}
+                        {/* Fila Terciaria: Skills */}
                         <div style={{ background: 'var(--bg-white)', padding: '2rem', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', margin: 0, fontSize: '1.3rem' }}>
                                     <BrainCircuit size={24} /> Mis Habilidades (ESCO)
                                 </h3>
                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-gray)', background: 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '12px' }}>
-                                    Extraídas vía IA
+                                    Extraídas o Agregadas Manualmente
                                 </span>
                             </div>
                             
+                            {editMode && (
+                                <div style={{ marginBottom: '2rem', background: '#F0F9F4', padding: '1.5rem', borderRadius: '16px', border: '1px solid rgba(0,214,107,0.2)' }}>
+                                    <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-dark)' }}>Agregar Nueva Habilidad</h4>
+                                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                                        <div style={{ flex: '2 1 200px' }}>
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ej. MongoDB, Docker, Inglés Bilingüe..." 
+                                                value={newSkillName}
+                                                onChange={e => setNewSkillName(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleAddSkill()}
+                                                maxLength={100}
+                                                style={{ width: '100%', padding: '12px', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '10px', fontSize: '1rem', outline: 'none' }}
+                                            />
+                                        </div>
+                                        <div style={{ flex: '1 1 120px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <label style={{ color: 'var(--text-gray)', fontSize: '0.9rem', fontWeight: 'bold' }}>Nivel (1-5)</label>
+                                            <select 
+                                                value={newSkillLevel}
+                                                onChange={e => setNewSkillLevel(parseInt(e.target.value))}
+                                                style={{ padding: '12px', border: '1px solid rgba(0,0,0,0.1)', borderRadius: '10px', fontSize: '1rem', outline: 'none', background: 'white' }}
+                                            >
+                                                <option value={1}>1 - Básico</option>
+                                                <option value={2}>2 - Junior</option>
+                                                <option value={3}>3 - Intermedio</option>
+                                                <option value={4}>4 - Avanzado</option>
+                                                <option value={5}>5 - Experto</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <button 
+                                                onClick={handleAddSkill}
+                                                disabled={addingSkill || !newSkillName.trim()}
+                                                style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '12px 20px', borderRadius: '10px', fontWeight: 'bold', fontSize: '1rem', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,214,107,0.2)' }}
+                                            >
+                                                {addingSkill ? 'Agregando...' : 'Añadir'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p style={{ margin: '10px 0 0 0', fontSize: '0.85rem', color: '#666' }}>Las habilidades ingresadas son pasadas por el escáner universal para buscar sinónimos o crear nuevas categorías de ser necesario.</p>
+                                </div>
+                            )}
+
                             {skills.length > 0 ? (
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                                     {skills.map((skillItem, index) => {
@@ -526,7 +645,7 @@ export default function MiPerfil() {
                                 </div>
                             ) : (
                                 <p style={{ color: 'var(--text-gray)', fontSize: '1.05rem', fontStyle: 'italic' }}>
-                                    No se encontraron habilidades. Asegúrate de haber completado la carga de CV.
+                                    No se encontraron habilidades en tu perfil. Agrega habilidades activando el Modo Edición.
                                 </p>
                             )}
                         </div>

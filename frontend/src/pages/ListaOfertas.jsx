@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { Filter, Star, MapPin, DollarSign, Briefcase } from 'lucide-react';
+import { Filter, Star, MapPin, Briefcase, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function ListaOfertas() {
     const { user } = useAuth();
@@ -25,9 +25,11 @@ export default function ListaOfertas() {
         ubicacionTexto: queryParams.get('loc') || '',
         ubicacion: 'Todas',
         modalidad: { Remoto: false, Híbrido: false, Presencial: false },
-        experiencia: 'Todos',
         rubro: 'Todos'
     });
+
+    const [ordenamiento, setOrdenamiento] = useState('Mejor Match');
+    const [paginaActual, setPaginaActual] = useState(1);
 
     useEffect(() => {
         if (!user || user.user_metadata?.rol === 'empresa') {
@@ -88,34 +90,58 @@ export default function ListaOfertas() {
                 const ofertasConMatch = (ofertasData || []).map(oferta => {
                     const skillsRequeridas = oferta.oferta_skills || [];
                     const totalRequeridas = skillsRequeridas.length;
-                    let coincidencias = 0;
+                    let confidenciasReales = 0;
 
                     if (totalRequeridas > 0) {
+                        const synonymMap = {
+                            'sql': ['mysql', 'postgresql', 'sql server', 'oracle', 'pl/sql'],
+                            'mysql': ['sql', 'base de datos', 'mariadb'],
+                            'postgresql': ['sql', 'base de datos'],
+                            'cloud': ['aws', 'azure', 'gcp', 'google cloud', 'nube'],
+                            'aws': ['cloud', 'nube', 'amazon web services'],
+                            'azure': ['cloud', 'nube', 'microsoft azure'],
+                            'gcp': ['cloud', 'nube', 'google cloud'],
+                            'frontend': ['react', 'vue', 'angular', 'html', 'css', 'javascript', 'js'],
+                            'backend': ['node', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'express', 'desarrollo web'],
+                            'javascript': ['js', 'typescript', 'react', 'node', 'vue', 'angular', 'frontend'],
+                            'js': ['javascript', 'typescript', 'frontend'],
+                            'react': ['javascript', 'frontend', 'reactjs', 'react.js'],
+                            'java': ['spring', 'backend', 'java ee', 'springboot'],
+                            'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi'],
+                            'desarrollo web': ['html', 'css', 'javascript', 'frontend', 'backend', 'web', 'php', 'diseño web'],
+                            'html': ['html5', 'frontend', 'desarrollo web', 'css', 'diseño web'],
+                            'css': ['css3', 'frontend', 'desarrollo web', 'html', 'diseño web']
+                        };
+
                         skillsRequeridas.forEach(req => {
                             const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
                             const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
                             
-                            // Lenient Match: Same skill_id OR string overlap
                             const hasMatch = arraySkillsCandidato.some(cs => {
-                                if (cs.skill_id === req.skill_id) return true;
+                                if (cs.skill_id && cs.skill_id === req.skill_id) return true;
                                 const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
                                 
                                 if (!csStr || !reqStr) return false;
                                 if (csStr === reqStr) return true;
                                 
-                                // Prevent false positives like "c" inside "teacher"
                                 const minLen = Math.min(csStr.length, reqStr.length);
-                                if (minLen >= 4 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
-                                
+                                if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
+
+                                const reqSynonyms = synonymMap[reqStr] || [];
+                                const csSynonyms = synonymMap[csStr] || [];
+
+                                if (reqSynonyms.some(syn => csStr.includes(syn) || syn.includes(csStr))) return true;
+                                if (csSynonyms.some(syn => reqStr.includes(syn) || syn.includes(reqStr))) return true;
+
                                 return false;
                             });
 
                             req.isMatch = hasMatch;
-                            if (hasMatch) coincidencias++;
+                            if (hasMatch) confidenciasReales++;
                         });
                     }
 
-                    const porcentajeMatch = totalRequeridas > 0 ? Math.round((coincidencias / totalRequeridas) * 100) : 100;
+                    const porcentajeMatch = totalRequeridas > 0 ? Math.round((confidenciasReales / totalRequeridas) * 100) : 0;
                     return { ...oferta, porcentajeMatch };
                 });
 
@@ -210,6 +236,24 @@ export default function ListaOfertas() {
         return true;
     });
 
+    // Paginación y Ordenamiento seguros
+    const ofertasOrdenadas = [...ofertasZ].sort((a, b) => {
+        if (ordenamiento === 'Mejor Match') return b.porcentajeMatch - a.porcentajeMatch;
+        if (ordenamiento === 'Más recientes') return new Date(b.creada_en) - new Date(a.creada_en);
+        if (ordenamiento === 'Más antiguas') return new Date(a.creada_en) - new Date(b.creada_en);
+        return 0;
+    });
+
+    const ITEMS_PER_PAGE = 12;
+    const totalPages = Math.ceil(ofertasOrdenadas.length / ITEMS_PER_PAGE) || 1;
+    const paginaSegura = paginaActual > totalPages ? totalPages : paginaActual;
+    const ofertasPaginadas = ofertasOrdenadas.slice((paginaSegura - 1) * ITEMS_PER_PAGE, paginaSegura * ITEMS_PER_PAGE);
+
+    // Cuando cambia un filtro o el ordenamiento, volvemos a la pagina 1
+    useEffect(() => {
+        setPaginaActual(1);
+    }, [filtros, ordenamiento]);
+
     if (loading) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#FAFAFB' }}>
@@ -264,21 +308,23 @@ export default function ListaOfertas() {
                     </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', fontSize: '0.9rem', color: '#666', fontWeight: 'bold', marginBottom: '10px' }}>Ordenar por</label>
+                        <select 
+                            value={ordenamiento}
+                            onChange={(e) => setOrdenamiento(e.target.value)}
+                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', background: 'white' }}
+                        >
+                            <option>Mejor Match</option>
+                            <option>Más recientes</option>
+                            <option>Más antiguas</option>
+                        </select>
+                    </div>
+
+                    <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', fontSize: '0.9rem', color: '#666', fontWeight: 'bold', marginBottom: '10px' }}>Rating de empresa</label>
                         <div style={{ display: 'flex', gap: '4px' }}>
                             {[1, 2, 3, 4, 5].map(i => <Star key={i} size={18} fill="#e0e0e0" color="#e0e0e0" />)}
                         </div>
-                    </div>
-
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.9rem', color: '#666', fontWeight: 'bold', marginBottom: '10px' }}>Años de experiencia</label>
-                        <select style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', background: 'white' }}>
-                            <option>Todos</option>
-                            <option>Sin experiencia</option>
-                            <option>1-2 años</option>
-                            <option>3-5 años</option>
-                            <option>+5 años</option>
-                        </select>
                     </div>
 
                     <div>
@@ -294,12 +340,12 @@ export default function ListaOfertas() {
                 {/* LISTA DE OFERTAS */}
                 <main style={{ flex: 1, minWidth: '0' }}>
                     <div style={{ marginBottom: '1.5rem', color: '#888', fontSize: '0.95rem' }}>
-                        {ofertasZ.length} empleos encontrados
+                        {ofertasOrdenadas.length} empleos encontrados
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {ofertasZ.map(oferta => {
-                            const matchColor = oferta.porcentajeMatch >= 75 ? '#00d66b' : (oferta.porcentajeMatch >= 40 ? '#FFB020' : '#888');
+                        {ofertasPaginadas.map(oferta => {
+                            const matchColor = oferta.porcentajeMatch >= 75 ? '#00d66b' : (oferta.porcentajeMatch >= 40 ? '#FFB020' : '#d32f2f');
                             const isExpanded = expandedOferta === oferta.id;
                             const yaPostulado = postulacionesIds.has(oferta.id);
                             
@@ -429,6 +475,47 @@ export default function ListaOfertas() {
                                 </div>
                             )
                         })}
+
+                        {ofertasPaginadas.length === 0 && (
+                            <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#888', background: 'white', borderRadius: '12px', border: '1px dashed #ddd' }}>
+                                No hay resultados con los filtros actuales.
+                            </div>
+                        )}
+                        
+                        {/* Controles de Paginación */}
+                        {totalPages > 1 && (
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '2rem', gap: '15px' }}>
+                                <button 
+                                    onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+                                    disabled={paginaSegura === 1}
+                                    style={{ 
+                                        display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '8px',
+                                        background: paginaSegura === 1 ? '#f5f5f5' : 'white', 
+                                        border: '1px solid #ddd', color: paginaSegura === 1 ? '#aaa' : '#333',
+                                        cursor: paginaSegura === 1 ? 'not-allowed' : 'pointer', transition: '0.2s', fontWeight: 'bold'
+                                    }}
+                                >
+                                    <ChevronLeft size={18} style={{ marginRight: '5px' }} /> Anterior
+                                </button>
+                                
+                                <span style={{ fontWeight: 'bold', color: '#555' }}>
+                                    Página {paginaSegura} de {totalPages}
+                                </span>
+                                
+                                <button 
+                                    onClick={() => setPaginaActual(p => Math.min(totalPages, p + 1))}
+                                    disabled={paginaSegura === totalPages}
+                                    style={{ 
+                                        display: 'flex', alignItems: 'center', padding: '8px 16px', borderRadius: '8px',
+                                        background: paginaSegura === totalPages ? '#f5f5f5' : 'white', 
+                                        border: '1px solid #ddd', color: paginaSegura === totalPages ? '#aaa' : '#333',
+                                        cursor: paginaSegura === totalPages ? 'not-allowed' : 'pointer', transition: '0.2s', fontWeight: 'bold'
+                                    }}
+                                >
+                                    Siguiente <ChevronRight size={18} style={{ marginLeft: '5px' }} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </main>
             </div>

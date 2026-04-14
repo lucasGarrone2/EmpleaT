@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { Briefcase, ArrowLeft, CheckCircle2, X } from 'lucide-react';
+import { Briefcase, ArrowLeft, CheckCircle2, X, FileSearch } from 'lucide-react';
 
 export default function CrearOferta() {
     const { user } = useAuth();
@@ -65,6 +65,72 @@ export default function CrearOferta() {
         setSkillsList(skillsList.filter(s => s !== skillToRemove));
     };
 
+    const sugerirSkills = () => {
+        if (!formData.descripcion.trim()) {
+            setError('Escribe una descripción primero para poder extraer las habilidades.');
+            setTimeout(() => setError(null), 4000);
+            return;
+        }
+
+        const COMMON_SKILLS = [
+            // CÓDIGO Y DESARROLLO
+            'React', 'React.js', 'Node', 'Node.js', 'Python', 'Java', 'C#', 'C++', 'C', 'PHP', 'Ruby', 'Go', 'Golang', 'Swift', 'Kotlin', 'TypeScript', 'Javascript', 'JS', 'HTML', 'HTML5', 'CSS', 'CSS3', 'Sass', 'Less',
+            'Angular', 'Vue', 'Vue.js', 'Svelte', 'Spring Boot', 'Django', 'Flask', 'FastAPI', 'Laravel', 'Express.js', 'Next.js', 'Nuxt.js', 'NestJS',
+            'Desarrollo Web', 'Frontend', 'Backend', 'Fullstack', 'Full Stack', 'Programación', 'Software', 'Arquitectura de Software', 'Microservicios',
+
+            // BASES DE DATOS Y DATOS
+            'SQL', 'MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'Cassandra', 'Elasticsearch', 'GraphQL', 'REST API', 'API', 'Oracle', 'MariaDB', 'SQLite',
+            'Machine Learning', 'Inteligencia Artificial', 'Data Science', 'Data Engineering', 'Big Data', 'Hadoop', 'Spark', 'Kafka', 'TensorFlow', 'PyTorch', 'Pandas',
+
+            // CLOUD, DEVOPS E INFRAESTRUCTURA
+            'AWS', 'Amazon Web Services', 'Azure', 'GCP', 'Google Cloud', 'Cloud', 'Nube', 'Docker', 'Kubernetes', 'Terraform', 'Ansible', 'Jenkins', 
+            'Git', 'GitHub', 'GitLab', 'Bitbucket', 'CI/CD', 'DevOps', 'Linux', 'Ubuntu', 'Windows Server', 'Bash', 'PowerShell', 'SysAdmin', 'Seguridad Informática', 'Ciberseguridad',
+
+            // QA Y TESTING
+            'QA', 'Testing', 'Selenium', 'Cypress', 'Jest', 'Mocha', 'Postman', 'Pruebas Unitarias', 'TDD', 'BDD',
+
+            // METODOLOGÍAS Y SOFT SKILLS
+            'Scrum', 'Agile', 'Ágil', 'Kanban', 'Jira', 'Trello', 'Confluence', 'Gestión de Proyectos', 'Project Management', 'Product Manager', 'Product Owner', 'Scrum Master',
+            'Liderazgo', 'Team Lead', 'Gestión de Equipos', 'Comunicación', 'Resolución de Problemas',
+
+            // DISEÑO Y UX/UI
+            'Figma', 'Adobe XD', 'Sketch', 'Photoshop', 'Illustrator', 'InDesign', 'Premiere', 'After Effects', 'Lightroom', 'UI', 'UX', 'Diseño Web', 'Diseño Gráfico', 
+            'Edición de Video', 'Animación', '3D', 'Blender', 'Cinema 4D', 'Fotografía', 'UX Research',
+
+            // MARKETING, VENTAS Y SEO
+            'Marketing', 'Marketing Digital', 'SEO', 'SEM', 'Google Ads', 'Facebook Ads', 'Meta Ads', 'Social Media', 'Redes Sociales', 'Community Manager',
+            'Copywriting', 'Redacción', 'Inbound Marketing', 'Email Marketing', 'Mailchimp', 'HubSpot', 'Salesforce', 'CRM', 'Ventas', 'B2B', 'B2C', 'Atención al Cliente', 'Soporte',
+
+            // NEGOCIOS, FINANZAS Y RRHH
+            'Recursos Humanos', 'RRHH', 'Selección de Personal', 'IT Recruiter', 'Headhunting', 'Contabilidad', 'Finanzas', 'Auditoría', 'Facturación', 'Nóminas', 'SAP', 'ERP', 'Excel', 'Power BI', 'Tableau', 'Data Analytics',
+
+            // INGENIERÍA TRADICIONAL Y OTROS
+            'AutoCAD', 'SolidWorks', 'Revit', 'Ingeniería Civil', 'Ingeniería Industrial', 'Ingeniería Mecánica', 'Logística', 'Supply Chain', 'Traducción', 'Inglés Avanzado', 'Inglés Bilingüe'
+        ];
+
+        const extracted = [];
+        const descLower = formData.descripcion.toLowerCase();
+        
+        COMMON_SKILLS.forEach(skill => {
+            const skillLower = skill.toLowerCase();
+            const safeSkill = skillLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+            const regex = new RegExp(`(?:^|\\s|_|[.,;!/?()])${safeSkill}(?:$|\\s|_|[.,;!/?()])`, 'i');
+            
+            if (regex.test(descLower)) {
+                if (!skillsList.some(s => s.toLowerCase() === skillLower)) {
+                    extracted.push(skill);
+                }
+            }
+        });
+
+        if (extracted.length > 0) {
+            setSkillsList(prev => [...prev, ...extracted]);
+        } else {
+            setError('No se detectaron habilidades técnicas estándar en tu descripción.');
+            setTimeout(() => setError(null), 4000);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
@@ -105,7 +171,7 @@ export default function CrearOferta() {
 
                 const bestMatchPerSkill = new Map();
                 if (matchedSkills) {
-                    const validSkills = matchedSkills.filter(m => m.similitud > 0.3);
+                    const validSkills = matchedSkills.filter(m => m.similitud > 0.65);
                     validSkills.forEach(match => {
                         const currentBest = bestMatchPerSkill.get(match.original_skill);
                         if (!currentBest || currentBest.similitud < match.similitud) {
@@ -120,8 +186,7 @@ export default function CrearOferta() {
                         uniqueSkillsMap.set(match.esco_id, {
                             oferta_id: ofertaData.id,
                             skill_id: match.esco_id,
-                            nivel_requerido: 3,
-                            nombre_original: match.original_skill 
+                            nivel_requerido: 3
                         });
                     }
                 });
@@ -131,16 +196,27 @@ export default function CrearOferta() {
                 const unmatchedWords = skillsList.filter(s => !matchedNamesLower.has(s.toLowerCase()));
 
                 if (unmatchedWords.length > 0) {
-                    // Security fix: No inyectamos palabras desconocidas al diccionario global para evitar poisoning.
-                    // Las guardamos directamente en oferta_skills con skill_id nulo para mantener el diccionario de ESCO intacto.
-                    unmatchedWords.forEach((word, idx) => {
-                        uniqueSkillsMap.set(`unmatched_${idx}`, {
-                            oferta_id: ofertaData.id,
-                            skill_id: null,
-                            nivel_requerido: 3,
-                            nombre_original: word
+                    // Si las empresas escriben tecnologías nuevas que ESCO aún no mapea (ej: Next.js),
+                    // las insertamos en diccionario_skills para ampliar nuestro vocabulario y obtener un ID real.
+                    const skillsAInsertar = unmatchedWords.map(word => ({
+                        nombre_skill: word,
+                        tipo: 'Personalizado'
+                    }));
+
+                    const { data: nuevasSkills, error: insertError } = await supabase
+                        .from('diccionario_skills')
+                        .insert(skillsAInsertar)
+                        .select('id, nombre_skill');
+
+                    if (!insertError && nuevasSkills) {
+                        nuevasSkills.forEach(newSkill => {
+                            uniqueSkillsMap.set(newSkill.id, {
+                                oferta_id: ofertaData.id,
+                                skill_id: newSkill.id,
+                                nivel_requerido: 3
+                            });
                         });
-                    });
+                    }
                 }
 
                 // Insert final list of skills to the offer
@@ -253,11 +329,35 @@ export default function CrearOferta() {
                     </div>
                 </div>
 
+                <div>
+                    <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', marginBottom: '8px' }}>Descripción del Puesto *</label>
+                    <textarea required
+                        value={formData.descripcion} maxLength={3000}
+                        onChange={e => setFormData({...formData, descripcion: e.target.value})}
+                        placeholder="Escribe todo el detalle del anuncio..."
+                        style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1.05rem', outline: 'none', minHeight: '150px', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    />
+                </div>
+
                 {/* TAG INPUT COMPONENT */}
                 <div>
-                    <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', marginBottom: '8px' }}>Habilidades Requeridas (Skills) *</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', margin: '0' }}>Habilidades Requeridas (Skills) *</label>
+                        <button 
+                            type="button" 
+                            onClick={sugerirSkills}
+                            style={{ 
+                                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', 
+                                background: '#EAF9F1', color: 'var(--primary)', border: '1px solid #c2e8d4', 
+                                borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' 
+                            }}
+                        >
+                            <FileSearch size={16} /> Extraer de la Descripción
+                        </button>
+                    </div>
+                    
                     <p style={{ fontSize: '0.85rem', color: '#666', marginTop: 0, marginBottom: '12px' }}>
-                        Escribe una tecnología o habilidad y presiona <strong>ENTER</strong> para agregarla.
+                        ¡Escribe tu anuncio arriba y usa el botón para extraer las tecnologías requeridas, o escríbelas y presiona <strong>ENTER</strong>!
                     </p>
                     
                     <div style={{ 
@@ -299,16 +399,6 @@ export default function CrearOferta() {
                             }}
                         />
                     </div>
-                </div>
-
-                <div>
-                    <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', marginBottom: '8px' }}>Descripción del Puesto</label>
-                    <textarea 
-                        value={formData.descripcion} maxLength={3000}
-                        onChange={e => setFormData({...formData, descripcion: e.target.value})}
-                        placeholder="Describe las responsabilidades, beneficios, la cultura de la empresa..."
-                        style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1.05rem', outline: 'none', minHeight: '150px', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                    />
                 </div>
 
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
