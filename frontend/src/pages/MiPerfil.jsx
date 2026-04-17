@@ -242,7 +242,7 @@ export default function MiPerfil() {
 
                 const { data: { session } } = await supabase.auth.getSession();
                 
-                const upRes = await fetch("http://localhost:3000/api/upload-image", {
+                const upRes = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/upload-image`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${session.access_token}` },
                     body: formData

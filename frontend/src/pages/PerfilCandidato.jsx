@@ -56,7 +56,7 @@ export default function PerfilCandidato() {
 
             // 1. Subir a Supabase Storage
             setLoadingText("⏳ Subiendo PDF a la nube...");
-            const resUpload = await fetch("http://localhost:3000/api/upload-cv", {
+            const resUpload = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/upload-cv`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -71,7 +71,7 @@ export default function PerfilCandidato() {
 
             // 2. Analizar con Gemini
             setLoadingText("⏳ Analizando con IA... puede tardar hasta 90 segundos");
-            const respuesta = await fetch("http://localhost:3000/api/analyze-cv", {
+            const respuesta = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/analyze-cv`, {
                 method: 'POST',
                 body: formData
             });
