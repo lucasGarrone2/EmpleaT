@@ -210,7 +210,7 @@ export default function OfertaDetalleEmpresa() {
                         >
                             {oferta.estado === 'Publicada' ? 
                                 <><PauseCircle size={18} /> Pausar</> : 
-                                <><PlayCircle size={18} color="var(--primary)" /> Reanudar</>
+                                <><PlayCircle size={18} color="var(--primary)" /> {oferta.estado === 'Borrador' ? 'Publicar' : 'Reanudar'}</>
                             }
                         </button>
                         
@@ -436,12 +436,12 @@ export default function OfertaDetalleEmpresa() {
                             {oferta.estado === 'Publicada' ? <PauseCircle size={48} /> : <PlayCircle size={48} />}
                         </div>
                         <h3 style={{ textAlign: 'center', fontSize: '1.5rem', margin: '0 0 1rem 0', color: 'var(--text-dark)' }}>
-                            {oferta.estado === 'Publicada' ? '¿Pausar Oferta?' : '¿Reanudar Oferta?'}
+                            {oferta.estado === 'Publicada' ? '¿Pausar Oferta?' : (oferta.estado === 'Borrador' ? '¿Publicar Oferta?' : '¿Reanudar Oferta?')}
                         </h3>
                         <p style={{ textAlign: 'center', color: 'var(--text-gray)', marginBottom: '2rem', lineHeight: '1.5' }}>
                             {oferta.estado === 'Publicada' 
                                 ? 'La oferta ya no será visible para nuevos candidatos. Podrás reactivarla más tarde.' 
-                                : 'La oferta volverá a ser visible en el buscador público para recibir nuevas postulaciones.'}
+                                : (oferta.estado === 'Borrador' ? 'La oferta finalmente será publicada en el buscador público para recibir nuevas postulaciones.' : 'La oferta volverá a ser visible en el buscador público para recibir nuevas postulaciones.')}
                         </p>
                         <div style={{ display: 'flex', gap: '1rem' }}>
                             <button 

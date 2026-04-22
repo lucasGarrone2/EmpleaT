@@ -51,6 +51,18 @@ export default function PerfilCandidatoParaEmpresa() {
                     throw new Error("No tienes permiso para ver esta información");
                 }
 
+                // VALIDACIÓN IDOR: ¿El candidato realmente se postuló a esta oferta?
+                const { data: postulacionValida, error: postErr } = await supabase
+                    .from('postulaciones')
+                    .select('id')
+                    .eq('oferta_id', ofertaId)
+                    .eq('candidato_id', candidatoId)
+                    .maybeSingle();
+
+                if (postErr || !postulacionValida) {
+                    throw new Error("Acceso Denegado: Este perfil es privado porque el candidato no aplicó a tu oferta.");
+                }
+
                 setOfertaSkills(ofData.oferta_skills || []);
 
                 // 2. Obtener la info general del candidato
@@ -211,6 +223,54 @@ export default function PerfilCandidatoParaEmpresa() {
                             {candidato.ubicacion && <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={18}/> {candidato.ubicacion}</span>}
                         </div>
                     </div>
+
+               
+
+                                <div>
+                                        <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.9rem', marginBottom: '0.3rem' }}>Currículum Vitae</label>
+                                        {candidato.cv_url ? (
+                                            <div 
+                                                onClick={async () => {
+                                                    try {
+                                                        const { data, error } = await supabase.storage.from('cv_files').download(candidato.cv_url);
+                                                        if (error) throw error;
+                                                        const url = URL.createObjectURL(data);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = candidato.cv_url.split('/').pop() || 'curriculum.pdf';
+                                                        a.click();
+                                                        URL.revokeObjectURL(url);
+                                                    } catch (err) {
+                                                        console.error('Error al descargar CV:', err);
+                                                        alert("No se pudo descargar el archivo.");
+                                                    }
+                                                }}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,214,107,0.05)', padding: '12px 15px', borderRadius: '10px', border: '1px dashed var(--primary)', cursor: 'pointer', transition: 'background 0.2s' }}
+                                                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,214,107,0.1)'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'rgba(0,214,107,0.05)'}
+                                                title="Descargar mi CV"
+                                            >
+                                                <FileText size={20} color="var(--primary)" />
+                                                <span style={{ fontWeight: '500', color: 'var(--text-dark)' }}>
+                                                    {(() => {
+                                                        const filename = candidato.cv_url.split('/').pop();
+                                                        const parts = filename.split('_');
+                                                        return (parts.length >= 3 && parts[0] === 'cv') ? parts.slice(2).join('_') : filename;
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f5f5f5', padding: '12px 15px', borderRadius: '10px', border: '1px dashed #ccc' }}>
+                                                <FileText size={20} color="#999" />
+                                                <span style={{ fontWeight: '500', color: '#999' }}>Ningún CV cargado</span>
+                                            </div>
+                                        )}
+                                        
+                                 </div>
+
+                
+
+
                 </div>
 
                 {/* Sobre Mí */}

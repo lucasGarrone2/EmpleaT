@@ -16,10 +16,10 @@ export default function CrearOferta() {
     const [formData, setFormData] = useState({
         titulo: '',
         descripcion: '',
-        modalidad: 'Remoto',
         salario_min_usd: '',
         salario_max_usd: '',
         limite_postulaciones: '',
+        porcentaje_match_minimo: '',
         estado: 'Publicada'
     });
 
@@ -156,6 +156,7 @@ export default function CrearOferta() {
                     salario_max_usd: formData.salario_max_usd ? parseInt(formData.salario_max_usd) : null,
                     estado: formData.estado,
                     limite_postulaciones: formData.limite_postulaciones ? parseInt(formData.limite_postulaciones) : null,
+                    porcentaje_match_minimo: formData.porcentaje_match_minimo ? parseInt(formData.porcentaje_match_minimo) : 0,
                 })
                 .select()
                 .single();
@@ -186,7 +187,8 @@ export default function CrearOferta() {
                         uniqueSkillsMap.set(match.esco_id, {
                             oferta_id: ofertaData.id,
                             skill_id: match.esco_id,
-                            nivel_requerido: 3
+                            nivel_requerido: 3,
+                            nombre_original: match.original_skill
                         });
                     }
                 });
@@ -213,7 +215,8 @@ export default function CrearOferta() {
                             uniqueSkillsMap.set(newSkill.id, {
                                 oferta_id: ofertaData.id,
                                 skill_id: newSkill.id,
-                                nivel_requerido: 3
+                                nivel_requerido: 3,
+                                nombre_original: newSkill.nombre_skill
                             });
                         });
                     }
@@ -409,6 +412,16 @@ export default function CrearOferta() {
                             value={formData.limite_postulaciones}
                             onChange={e => setFormData({...formData, limite_postulaciones: e.target.value})}
                             placeholder="Ej: 50 (Opcional)"
+                            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+                        />
+                    </div>
+                    <div style={{ flex: '1 1 150px' }}>
+                        <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', marginBottom: '8px' }}>Match Mínimo Requerido (%)</label>
+                        <input 
+                            type="number" min="0" max="100"
+                            value={formData.porcentaje_match_minimo}
+                            onChange={e => setFormData({...formData, porcentaje_match_minimo: e.target.value})}
+                            placeholder="Ej: 60 (Oculta perfiles < 60%)"
                             style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
                         />
                     </div>

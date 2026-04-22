@@ -35,13 +35,13 @@ function App() {
           <Route path="/auth/callback" element={<GoogleCallback/>} />
           <Route path="/terminos-legales" element={<TerminosLegales/>} />
 
-          {/* Rutas protegidas: cualquier usuario autenticado */}
+          {/* Rutas para cualquier autenticado. Eliminada /ofertas hacia rutas especificas */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/ofertas" element={<ListaOfertas />} />
           </Route>
 
           {/* Rutas protegidas: solo candidatos */}
           <Route element={<ProtectedRoute requiredRole="candidato" />}>
+            <Route path="/ofertas" element={<ListaOfertas />} />
             <Route path="/perfil" element={<PerfilCandidato />} />
             <Route path="/mi-perfil" element={<MiPerfil />} />
           </Route>

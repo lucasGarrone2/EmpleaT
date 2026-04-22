@@ -32,8 +32,12 @@ export default function ListaOfertas() {
     const [paginaActual, setPaginaActual] = useState(1);
 
     useEffect(() => {
-        if (!user || user.user_metadata?.rol === 'empresa') {
+        if (!user) {
             navigate('/login');
+            return;
+        }
+        if (user.user_metadata?.rol === 'empresa') {
+            navigate('/dashboard-empresa');
             return;
         }
 
@@ -75,7 +79,7 @@ export default function ListaOfertas() {
                 const { data: ofertasData, error: ofError } = await supabase
                     .from('ofertas')
                     .select(`
-                        id, titulo, modalidad, descripcion, salario_min_usd, salario_max_usd, creada_en,
+                        id, titulo, modalidad, descripcion, salario_min_usd, salario_max_usd, creada_en, porcentaje_match_minimo,
                         empresas (nombre, ubicacion, logo_url),
                         oferta_skills (
                             skill_id,
@@ -145,8 +149,13 @@ export default function ListaOfertas() {
                     return { ...oferta, porcentajeMatch };
                 });
 
-                ofertasConMatch.sort((a, b) => b.porcentajeMatch - a.porcentajeMatch);
-                setOfertas(ofertasConMatch);
+                const ofertasConMatchFiltradas = ofertasConMatch.filter(oferta => {
+                    if (!oferta.porcentaje_match_minimo || oferta.porcentaje_match_minimo === 0) return true;
+                    return oferta.porcentajeMatch >= oferta.porcentaje_match_minimo;
+                });
+
+                ofertasConMatchFiltradas.sort((a, b) => b.porcentajeMatch - a.porcentajeMatch);
+                setOfertas(ofertasConMatchFiltradas);
 
             } catch (err) {
                 console.error("Error obteniendo ofertas", err);
@@ -163,6 +172,26 @@ export default function ListaOfertas() {
         e.stopPropagation();
         setApplyingTo(ofertaId);
         try {
+            // VERIFICACIÓN JUST-IN-TIME DE LÍMITE DE POSTULACIONES
+            const { data: ofertaInfo } = await supabase
+                .from('ofertas')
+                .select('limite_postulaciones')
+                .eq('id', ofertaId)
+                .single();
+
+            if (ofertaInfo?.limite_postulaciones) {
+                const { count } = await supabase
+                    .from('postulaciones')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('oferta_id', ofertaId);
+                    
+                if (count >= ofertaInfo.limite_postulaciones) {
+                    alert("Lo sentimos. Esta oferta ha alcanzado su cupo máximo de postulantes.");
+                    setApplyingTo(null);
+                    return;
+                }
+            }
+
             const { error: postError } = await supabase
                 .from('postulaciones')
                 .insert({
@@ -172,7 +201,14 @@ export default function ListaOfertas() {
                     estado: 'Postulado'
                 });
 
-            if (postError) throw postError;
+            if (postError) {
+                if (postError.code === '23505') {
+                   // Ignoramos silenciosamente si la UI envió un spam click doble
+                   console.warn("Intento de postulacion duplicada bloqueada.");
+                } else {
+                   throw postError;
+                }
+            }
 
             setPostulacionesIds(prev => {
                 const updated = new Set(prev);
@@ -180,7 +216,7 @@ export default function ListaOfertas() {
                 return updated;
             });
         } catch (err) {
-            alert("Error al postularse: " + err.message);
+            alert("Error del servidor: No pudimos procesar tu solicitud.");
         } finally {
             setApplyingTo(null);
         }
@@ -382,7 +418,7 @@ export default function ListaOfertas() {
                                                 <h3 style={{ margin: '0 0 5px 0', fontSize: '1.15rem', color: '#222' }}>{oferta.titulo}</h3>
                                                 <div style={{ color: '#666', fontSize: '0.95rem', marginBottom: '8px' }}>{oferta.empresas?.nombre}</div>
                                                 
-                                                <div style={{ display: 'flex', gap: '10px', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+                                                <div style={{ display: 'flex', gap: '10px', fontSize: '0.85rem', flexWrap: 'wrap', marginBottom: '8px' }}>
                                                     {(oferta.modalidad === 'Presencial' || oferta.modalidad === 'Híbrido') && (
                                                         <span style={{ background: '#F5F6F8', color: '#555', padding: '4px 10px', borderRadius: '6px' }}>
                                                             <MapPin size={12} style={{ display: 'inline', marginRight: '4px', position: 'relative', top: '1px' }} />
@@ -396,6 +432,13 @@ export default function ListaOfertas() {
                                                         </span>
                                                     )}
                                                 </div>
+
+                                                {/* Motivational Badge */}
+                                                {oferta.porcentaje_match_minimo > 0 && (
+                                                    <div style={{ display: 'inline-block', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(255, 165, 0, 0.3)' }}>
+                                                        🌟 ¡Tu perfil supera el {oferta.porcentaje_match_minimo}% exigido por la empresa!
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 

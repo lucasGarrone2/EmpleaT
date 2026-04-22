@@ -1,4 +1,5 @@
 import express from 'express';
+import helmet from 'helmet';
 import cors from 'cors';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
@@ -12,6 +13,7 @@ import sharp from 'sharp';
 dotenv.config();
 
 const app = express(); //Inicializa servidor y permisos
+app.use(helmet()); // Cabeceras de Seguridad
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
@@ -109,18 +111,8 @@ app.post('/api/upload-cv', uploadLimiter, uploadCVStorage.single('cv'), async (r
     
     const filePath = uploadData.path;
     
-    // Update de la tabla candidatos con la URL del CV
-    const { error: dbError } = await supabaseClient
-      .from('candidatos')
-      .update({ cv_url: filePath })
-      .eq('auth_id', authId);
-      
-    if (dbError) {
-        console.error("Error actualizando candidato:", dbError);
-        // Si no existe, Supabase update no genera error pero modifica 0 columnas.
-        // Como el PerfilCandidato hace un "upsert" al final del formulario y nosotros también lo necesitamos antes o durante,
-        // no pasa nada si el update afecta 0 files. La DB guarda consistencia y el front mandará la path luego tal vez o cuando se cree.
-    }
+    // El front-end se encargará de actualizar la fila del candidato al final del proceso de revisión
+// para evitar que se guarde un CV cuya extracción de datos por Gemini haya fallado.
     
     res.json({ message: "Upload exitoso", path: filePath });
 
@@ -246,6 +238,9 @@ app.post('/api/analyze-cv', analyzeLimiter, upload.single('cv'), async (req, res
       return res.status(400).json({ error: "PDF sin formato, ilegible o encriptado detectado." });
     }
 
+    // SANITIZACIÓN: Evitar Prompt Injection por Breakout Tags
+    const safeCVText = cvText.replace(/<\/?cv[^>]*>/gi, "");
+
     console.log("Texto extraido, analizando...");
 
    const prompt = `
@@ -298,7 +293,7 @@ REGLAS ESTRICTAS DE EXTRACCIÓN:
 
 Texto del CV:
 <cv>
-${cvText}
+${safeCVText}
 </cv>
 `;
 

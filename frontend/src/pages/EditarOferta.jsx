@@ -17,10 +17,10 @@ export default function EditarOferta() {
     const [formData, setFormData] = useState({
         titulo: '',
         descripcion: '',
-        modalidad: 'Remoto',
         salario_min_usd: '',
         salario_max_usd: '',
         limite_postulaciones: '',
+        porcentaje_match_minimo: '',
         estado: 'Publicada'
     });
 
@@ -49,7 +49,7 @@ export default function EditarOferta() {
             // Cargar datos de la oferta
             const { data: ofData, error: ofErr } = await supabase
                 .from('ofertas')
-                .select('*, oferta_skills(skill_id, nombre_original)')
+                .select('*, oferta_skills(skill_id, nombre_original, diccionario_skills(nombre_skill))')
                 .eq('id', ofertaId)
                 .eq('empresa_id', empresaData.id)
                 .single();
@@ -66,11 +66,12 @@ export default function EditarOferta() {
                 salario_min_usd: ofData.salario_min_usd || '',
                 salario_max_usd: ofData.salario_max_usd || '',
                 limite_postulaciones: ofData.limite_postulaciones || '',
+                porcentaje_match_minimo: ofData.porcentaje_match_minimo || '',
                 estado: ofData.estado || 'Publicada'
             });
 
             if (ofData.oferta_skills && ofData.oferta_skills.length > 0) {
-                const loadedSkills = ofData.oferta_skills.map(s => s.nombre_original).filter(Boolean);
+                const loadedSkills = ofData.oferta_skills.map(s => s.nombre_original || s.diccionario_skills?.nombre_skill).filter(Boolean);
                 setSkillsList(loadedSkills);
             }
 
@@ -185,6 +186,7 @@ export default function EditarOferta() {
                     salario_max_usd: formData.salario_max_usd ? parseInt(formData.salario_max_usd) : null,
                     estado: formData.estado,
                     limite_postulaciones: formData.limite_postulaciones ? parseInt(formData.limite_postulaciones) : null,
+                    porcentaje_match_minimo: formData.porcentaje_match_minimo ? parseInt(formData.porcentaje_match_minimo) : 0,
                 })
                 .eq('id', ofertaId)
                 .eq('empresa_id', empresaId);
@@ -218,7 +220,8 @@ export default function EditarOferta() {
                         uniqueSkillsMap.set(match.esco_id, {
                             oferta_id: ofertaId,
                             skill_id: match.esco_id,
-                            nivel_requerido: 3
+                            nivel_requerido: 3,
+                            nombre_original: match.original_skill
                         });
                     }
                 });
@@ -245,7 +248,8 @@ export default function EditarOferta() {
                             uniqueSkillsMap.set(newSkill.id, {
                                 oferta_id: ofertaId,
                                 skill_id: newSkill.id,
-                                nivel_requerido: 3
+                                nivel_requerido: 3,
+                                nombre_original: newSkill.nombre_skill
                             });
                         });
                     }
@@ -441,6 +445,16 @@ export default function EditarOferta() {
                             value={formData.limite_postulaciones}
                             onChange={e => setFormData({...formData, limite_postulaciones: e.target.value})}
                             placeholder="Ej: 50 (Opcional)"
+                            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+                        />
+                    </div>
+                    <div style={{ flex: '1 1 150px' }}>
+                        <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', marginBottom: '8px' }}>Match Mínimo Requerido (%)</label>
+                        <input 
+                            type="number" min="0" max="100"
+                            value={formData.porcentaje_match_minimo}
+                            onChange={e => setFormData({...formData, porcentaje_match_minimo: e.target.value})}
+                            placeholder="Ej: 60 (Oculta perfiles < 60%)"
                             style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
                         />
                     </div>

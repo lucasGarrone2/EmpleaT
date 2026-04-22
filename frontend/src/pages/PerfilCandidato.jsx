@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { Info, FileText, BrainCircuit, Target } from 'lucide-react';
+import { Info, FileText, BrainCircuit, Target, X, Edit3 } from 'lucide-react';
 import './Register.css';
 
 export default function PerfilCandidato() {
@@ -10,9 +10,20 @@ export default function PerfilCandidato() {
     const [loading, setLoading] = useState(false);
     const [loadingText, setLoadingText] = useState("");
     const [datosExtraidos, setDatosExtraidos] = useState(null);
+    const [pdfPath, setPdfPath] = useState(null);
     const [error, setError] = useState(null);
     const [guardando, setGuardando] = useState(false);
     const [guardadoExito, setGuardadoExito] = useState(false);
+
+    const handleExtraidoChange = (campo, valor) => {
+        setDatosExtraidos({ ...datosExtraidos, [campo]: valor });
+    };
+
+    const handleEliminarSkill = (index) => {
+        const nuevasSkills = [...datosExtraidos.skills];
+        nuevasSkills.splice(index, 1);
+        setDatosExtraidos({ ...datosExtraidos, skills: nuevasSkills });
+    };
 
     // Nuevo estado opcional escrito por el usuario
     const [bio, setBio] = useState("");
@@ -68,6 +79,9 @@ export default function PerfilCandidato() {
                 const errData = await resUpload.json().catch(() => ({}));
                 throw new Error(errData.error || "Error al subir el CV al servidor");
             }
+            
+            const uploadJSON = await resUpload.json();
+            setPdfPath(uploadJSON.path);
 
             // 2. Analizar con Gemini
             setLoadingText("⏳ Analizando con IA... puede tardar hasta 90 segundos");
@@ -111,7 +125,8 @@ export default function PerfilCandidato() {
                     nombre_completo: datosExtraidos.nombre,
                     titulo_profesional: datosExtraidos.profesion,
                     anios_experiencia: datosExtraidos.experiencia_anios,
-                    sobre_mi: bio // Este campo se carga desde el textarea manual
+                    sobre_mi: bio, // Este campo se carga desde el textarea manual
+                    ...(pdfPath ? { cv_url: pdfPath } : {})
                 }, { onConflict: 'auth_id' })
                 .select('id')
                 .single();
@@ -341,16 +356,31 @@ export default function PerfilCandidato() {
 
                             {/* Bloque Izquierdo: Lo que extrajo Gemini */}
                             <div style={{ flex: '1 1 450px' }}>
-                                <h3 style={{ color: 'var(--secondary)', marginBottom: '1.5rem', fontSize: '1.5rem' }}>Información Extraída</h3>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                    <h3 style={{ color: 'var(--secondary)', margin: 0, fontSize: '1.5rem' }}>Información Extraída</h3>
+                                    <span style={{ fontSize: '0.85rem', color: 'var(--primary)', background: 'rgba(0,214,107,0.1)', padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <Edit3 size={14} /> Verifica y Edita
+                                    </span>
+                                </div>
                                 <div style={{ background: 'rgba(0,214,107,0.03)', padding: '2.5rem', borderRadius: '20px', border: '1px solid rgba(0,214,107,0.1)' }}>
 
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', color: 'var(--text-gray)', fontSize: '1.15rem', marginBottom: '2.5rem' }}>
-                                        <p style={{ margin: 0 }}><strong style={{ color: 'var(--text-dark)', display: 'inline-block', width: '140px' }}>Nombre:</strong> <span style={{ color: 'var(--primary)', fontWeight: '600' }}>{datosExtraidos.nombre}</span></p>
-                                        <p style={{ margin: 0 }}><strong style={{ color: 'var(--text-dark)', display: 'inline-block', width: '140px' }}>Profesión:</strong> {datosExtraidos.profesion}</p>
-                                        <p style={{ margin: 0 }}><strong style={{ color: 'var(--text-dark)', display: 'inline-block', width: '140px' }}>Experiencia:</strong> {datosExtraidos.experiencia_anios} años conformados</p>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <strong style={{ color: 'var(--text-dark)', width: '120px' }}>Nombre:</strong> 
+                                            <input type="text" value={datosExtraidos.nombre} onChange={(e) => handleExtraidoChange('nombre', e.target.value)} style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1rem', outline: 'none' }} />
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <strong style={{ color: 'var(--text-dark)', width: '120px' }}>Profesión:</strong> 
+                                            <input type="text" value={datosExtraidos.profesion} onChange={(e) => handleExtraidoChange('profesion', e.target.value)} style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1rem', outline: 'none' }} />
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <strong style={{ color: 'var(--text-dark)', width: '120px' }}>Experiencia:</strong> 
+                                            <input type="number" min="0" value={datosExtraidos.experiencia_anios} onChange={(e) => handleExtraidoChange('experiencia_anios', parseInt(e.target.value) || 0)} style={{ width: '80px', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1rem', outline: 'none' }} />
+                                            <span style={{ fontSize: '0.95rem' }}>años</span>
+                                        </div>
                                     </div>
 
-                                    <h4 style={{ marginTop: '0', marginBottom: '20px', color: 'var(--text-dark)', fontSize: '1.2rem' }}>Skills Detectadas y Niveladas:</h4>
+                                    <h4 style={{ marginTop: '0', marginBottom: '20px', color: 'var(--text-dark)', fontSize: '1.2rem' }}>Skills Detectadas (Elimina posibles errores):</h4>
                                     <div style={{ 
                                         display: 'flex', 
                                         flexWrap: 'wrap',
@@ -359,7 +389,7 @@ export default function PerfilCandidato() {
                                         {datosExtraidos.skills.map((skill, index) => (
                                             <div key={index} style={{
                                                 backgroundColor: 'white',
-                                                padding: '8px 14px',
+                                                padding: '8px 8px 8px 14px',
                                                 borderRadius: '12px',
                                                 fontSize: '0.9rem',
                                                 fontWeight: '600',
@@ -384,9 +414,18 @@ export default function PerfilCandidato() {
                                                 }}>
                                                     Lvl {skill.nivel}
                                                 </span>
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => handleEliminarSkill(index)}
+                                                    style={{ background: 'rgba(255,0,0,0.05)', color: '#d32f2f', border: 'none', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', marginLeft: '4px' }}
+                                                    title="Eliminar esta habilidad detectada por error"
+                                                >
+                                                    <X size={14} />
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
+                                    {datosExtraidos.skills.length === 0 && <p style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9rem', margin: 0 }}>Sin habilidades cargadas.</p>}
                                 </div>
                             </div>
 
