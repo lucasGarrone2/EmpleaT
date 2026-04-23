@@ -61,6 +61,7 @@ export default function ListaOfertas() {
                     .select(`
                         skill_id,
                         nombre_original,
+                        nivel_estimado,
                         diccionario_skills(nombre_skill)
                     `)
                     .eq('candidato_id', candData.id);
@@ -84,6 +85,7 @@ export default function ListaOfertas() {
                         oferta_skills (
                             skill_id,
                             nombre_original,
+                            nivel_requerido,
                             diccionario_skills (nombre_skill)
                         )
                     `)
@@ -120,28 +122,35 @@ export default function ListaOfertas() {
                         skillsRequeridas.forEach(req => {
                             const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
                             const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
-                            
-                            const hasMatch = arraySkillsCandidato.some(cs => {
+                            const nivelReq = req.nivel_requerido ?? null;
+
+                            const matchTarget = arraySkillsCandidato.find(cs => {
                                 if (cs.skill_id && cs.skill_id === req.skill_id) return true;
                                 const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
-                                
                                 if (!csStr || !reqStr) return false;
                                 if (csStr === reqStr) return true;
-                                
                                 const minLen = Math.min(csStr.length, reqStr.length);
                                 if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
-
                                 const reqSynonyms = synonymMap[reqStr] || [];
                                 const csSynonyms = synonymMap[csStr] || [];
-
                                 if (reqSynonyms.some(syn => csStr.includes(syn) || syn.includes(csStr))) return true;
                                 if (csSynonyms.some(syn => reqStr.includes(syn) || syn.includes(reqStr))) return true;
-
                                 return false;
                             });
 
-                            req.isMatch = hasMatch;
-                            if (hasMatch) confidenciasReales++;
+                            req.isMatch = !!matchTarget;
+                            if (matchTarget) {
+                                if (!nivelReq) {
+                                    confidenciasReales += 1.0;
+                                } else {
+                                    const nivelCand = matchTarget.nivel_estimado || 3;
+                                    const diff = nivelReq - nivelCand;
+                                    if (diff <= 0) confidenciasReales += 1.0;
+                                    else if (diff === 1) confidenciasReales += 0.75;
+                                    else if (diff === 2) confidenciasReales += 0.50;
+                                    else confidenciasReales += 0.10;
+                                }
+                            }
                         });
                     }
 

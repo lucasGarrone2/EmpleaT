@@ -24,8 +24,9 @@ export default function EditarOferta() {
         estado: 'Publicada'
     });
 
-    const [skillsList, setSkillsList] = useState([]);
+    const [skillsList, setSkillsList] = useState([]); // [{nombre, nivel}]
     const [skillInput, setSkillInput] = useState('');
+    const [skillNivel, setSkillNivel] = useState(3);
 
     useEffect(() => {
         if (!user || user.user_metadata?.rol !== 'empresa') {
@@ -71,7 +72,10 @@ export default function EditarOferta() {
             });
 
             if (ofData.oferta_skills && ofData.oferta_skills.length > 0) {
-                const loadedSkills = ofData.oferta_skills.map(s => s.nombre_original || s.diccionario_skills?.nombre_skill).filter(Boolean);
+                const loadedSkills = ofData.oferta_skills.map(s => ({
+                    nombre: s.nombre_original || s.diccionario_skills?.nombre_skill || '',
+                    nivel: s.nivel_requerido || 3
+                })).filter(s => s.nombre);
                 setSkillsList(loadedSkills);
             }
 
@@ -85,15 +89,19 @@ export default function EditarOferta() {
         if (e.key === 'Enter' || e.key === ',') {
             e.preventDefault();
             const val = skillInput.trim();
-            if (val && !skillsList.map(s => s.toLowerCase()).includes(val.toLowerCase())) {
-                setSkillsList([...skillsList, val]);
+            if (val && !skillsList.map(s => s.nombre.toLowerCase()).includes(val.toLowerCase())) {
+                setSkillsList([...skillsList, { nombre: val, nivel: skillNivel }]);
             }
             setSkillInput('');
         }
     };
 
-    const removeSkill = (skillToRemove) => {
-        setSkillsList(skillsList.filter(s => s !== skillToRemove));
+    const removeSkill = (nombreToRemove) => {
+        setSkillsList(skillsList.filter(s => s.nombre !== nombreToRemove));
+    };
+
+    const updateSkillNivel = (nombre, nuevoNivel) => {
+        setSkillsList(skillsList.map(s => s.nombre === nombre ? { ...s, nivel: nuevoNivel } : s));
     };
 
     const sugerirSkills = () => {
@@ -155,7 +163,10 @@ export default function EditarOferta() {
         });
 
         if (extracted.length > 0) {
-            setSkillsList(prev => [...prev, ...extracted]);
+            setSkillsList(prev => [...prev, ...extracted
+                .filter(e => !prev.some(p => p.nombre.toLowerCase() === e.toLowerCase()))
+                .map(e => ({ nombre: e, nivel: skillNivel }))
+            ]);
         } else {
             setError('No se detectaron habilidades técnicas estándar en tu descripción.');
             setTimeout(() => setError(null), 4000);
@@ -199,7 +210,7 @@ export default function EditarOferta() {
             // 2. Procesar las nuevas Skills
             if (skillsList.length > 0) {
                 const { data: matchedSkills, error: rpcError } = await supabase
-                    .rpc('match_skills', { skill_names: skillsList });
+                    .rpc('match_skills', { skill_names: skillsList.map(s => s.nombre) });
 
                 if (rpcError) throw new Error("Error consultando ESCO: " + rpcError.message);
 
@@ -217,10 +228,11 @@ export default function EditarOferta() {
                 const uniqueSkillsMap = new Map();
                 Array.from(bestMatchPerSkill.values()).forEach(match => {
                     if (!uniqueSkillsMap.has(match.esco_id)) {
+                        const skillObj = skillsList.find(s => s.nombre.toLowerCase() === match.original_skill.toLowerCase());
                         uniqueSkillsMap.set(match.esco_id, {
                             oferta_id: ofertaId,
                             skill_id: match.esco_id,
-                            nivel_requerido: 3,
+                            nivel_requerido: skillObj?.nivel ?? 3,
                             nombre_original: match.original_skill
                         });
                     }
@@ -228,13 +240,11 @@ export default function EditarOferta() {
 
                 // Rescatar las palabras que ESCO no reconoció
                 const matchedNamesLower = new Set(Array.from(bestMatchPerSkill.keys()).map(k => k.toLowerCase()));
-                const unmatchedWords = skillsList.filter(s => !matchedNamesLower.has(s.toLowerCase()));
+                const unmatchedWords = skillsList.filter(s => !matchedNamesLower.has(s.nombre.toLowerCase()));
 
                 if (unmatchedWords.length > 0) {
-                    // Si las empresas escriben tecnologías nuevas que ESCO aún no mapea (ej: Next.js),
-                    // las insertamos en diccionario_skills para ampliar nuestro vocabulario y obtener un ID real.
-                    const skillsAInsertar = unmatchedWords.map(word => ({
-                        nombre_skill: word,
+                    const skillsAInsertar = unmatchedWords.map(s => ({
+                        nombre_skill: s.nombre,
                         tipo: 'Personalizado'
                     }));
 
@@ -245,10 +255,11 @@ export default function EditarOferta() {
 
                     if (!insertError && nuevasSkills) {
                         nuevasSkills.forEach(newSkill => {
+                            const skillObj = unmatchedWords.find(s => s.nombre.toLowerCase() === newSkill.nombre_skill.toLowerCase());
                             uniqueSkillsMap.set(newSkill.id, {
                                 oferta_id: ofertaId,
                                 skill_id: newSkill.id,
-                                nivel_requerido: 3,
+                                nivel_requerido: skillObj?.nivel ?? 3,
                                 nombre_original: newSkill.nombre_skill
                             });
                         });
@@ -411,30 +422,66 @@ export default function EditarOferta() {
                         {skillsList.map((skill, index) => (
                             <div key={index} style={{ 
                                 display: 'flex', alignItems: 'center', gap: '6px',
-                                background: 'rgba(0,214,107,0.1)', color: 'var(--primary)',
-                                padding: '6px 14px', borderRadius: '20px', fontSize: '0.95rem', fontWeight: 'bold'
+                                background: 'rgba(0,214,107,0.08)', color: 'var(--primary)',
+                                padding: '5px 8px 5px 14px', borderRadius: '20px', fontSize: '0.95rem', fontWeight: 'bold',
+                                border: '1px solid rgba(0,214,107,0.2)'
                             }}>
-                                {skill}
+                                <span>{skill.nombre}</span>
+                                <select
+                                    value={skill.nivel}
+                                    onChange={e => updateSkillNivel(skill.nombre, Number(e.target.value))}
+                                    title="Nivel requerido"
+                                    style={{ 
+                                        border: 'none', background: 'rgba(0,214,107,0.15)', color: 'var(--secondary)',
+                                        borderRadius: '10px', padding: '2px 6px', fontSize: '0.8rem', fontWeight: 'bold',
+                                        cursor: 'pointer', outline: 'none'
+                                    }}
+                                >
+                                    <option value={1}>Lvl 1</option>
+                                    <option value={2}>Lvl 2</option>
+                                    <option value={3}>Lvl 3</option>
+                                    <option value={4}>Lvl 4</option>
+                                    <option value={5}>Lvl 5</option>
+                                </select>
                                 <X 
-                                    size={16} 
-                                    style={{ cursor: 'pointer', opacity: 0.7 }} 
-                                    onClick={() => removeSkill(skill)}
+                                    size={14} 
+                                    style={{ cursor: 'pointer', opacity: 0.6 }} 
+                                    onClick={() => removeSkill(skill.nombre)}
                                     title="Quitar"
                                 />
                             </div>
                         ))}
-                        <input 
-                            type="text" maxLength={200}
-                            value={skillInput}
-                            onChange={(e) => setSkillInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder={skillsList.length === 0 ? "Ej: React, Node, SQL Server..." : "Agregar otra..."}
-                            style={{ 
-                                flex: '1', minWidth: '150px', border: 'none', outline: 'none', 
-                                padding: '6px', fontSize: '1.05rem', background: 'transparent'
-                            }}
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1', minWidth: '200px' }}>
+                            <input 
+                                type="text" maxLength={200}
+                                value={skillInput}
+                                onChange={(e) => setSkillInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder={skillsList.length === 0 ? "Ej: React, Node, SQL..." : "Agregar otra..."}
+                                style={{ 
+                                    flex: '1', border: 'none', outline: 'none', 
+                                    padding: '6px', fontSize: '1.05rem', background: 'transparent'
+                                }}
+                            />
+                            <select
+                                value={skillNivel}
+                                onChange={e => setSkillNivel(Number(e.target.value))}
+                                title="Nivel para la próxima skill"
+                                style={{ 
+                                    border: '1px solid rgba(0,0,0,0.1)', background: 'white', color: 'var(--text-gray)',
+                                    borderRadius: '8px', padding: '4px 8px', fontSize: '0.85rem',
+                                    cursor: 'pointer', outline: 'none'
+                                }}
+                            >
+                                <option value={1}>Lvl 1</option>
+                                <option value={2}>Lvl 2</option>
+                                <option value={3}>Lvl 3</option>
+                                <option value={4}>Lvl 4</option>
+                                <option value={5}>Lvl 5</option>
+                            </select>
+                        </div>
                     </div>
+                    <p style={{ fontSize: '0.8rem', color: '#888', margin: '6px 0 0 0' }}>Seleccioná el nivel requerido antes de presionar Enter. Podés cambiarlo en cada tag.</p>
                 </div>
 
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>

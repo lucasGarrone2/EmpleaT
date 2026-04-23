@@ -32,6 +32,7 @@ export default function PerfilCandidatoParaEmpresa() {
                         oferta_skills (
                             skill_id,
                             nombre_original,
+                            nivel_requerido,
                             diccionario_skills (nombre_skill)
                         )
                     `)
@@ -143,44 +144,55 @@ export default function PerfilCandidatoParaEmpresa() {
 
     const clasificarSkills = () => {
         return candidatoSkills.map(cs => {
-            const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.preferred_label) || normalize(cs.diccionario_skills?.nombre_skill);
-            const csNameDisplay = cs.nombre_original || cs.diccionario_skills?.preferred_label || cs.diccionario_skills?.nombre_skill || 'Habilidad Desconocida';
-            
-            if (ofertaSkills.length === 0) return { ...cs, isMatch: false, displayName: csNameDisplay };
+            const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
+            const csNameDisplay = cs.nombre_original || cs.diccionario_skills?.nombre_skill || 'Habilidad Desconocida';
+            const nivelCand = cs.nivel_estimado || 3;
+
+            if (ofertaSkills.length === 0) return { ...cs, isMatch: false, contribution: 0, displayName: csNameDisplay, levelInfo: null };
 
             let isMatch = false;
+            let contribution = 0;
+            let levelInfo = null;
 
             for (const req of ofertaSkills) {
-                if (cs.skill_id && cs.skill_id === req.skill_id) {
-                    isMatch = true;
-                    break;
-                }
-                const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
-                
-                if (!csStr || !reqStr) continue;
-                if (csStr === reqStr) {
-                    isMatch = true;
-                    break;
-                }
-                
-                const minLen = Math.min(csStr.length, reqStr.length);
-                if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) {
-                    isMatch = true;
-                    break;
+                let found = false;
+                if (cs.skill_id && cs.skill_id === req.skill_id) found = true;
+                if (!found) {
+                    const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
+                    if (!csStr || !reqStr) continue;
+                    if (csStr === reqStr) found = true;
+                    if (!found) {
+                        const minLen = Math.min(csStr.length, reqStr.length);
+                        if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) found = true;
+                    }
+                    if (!found) {
+                        const reqSynonyms = synonymMap[reqStr] || [];
+                        const csSynonyms = synonymMap[csStr] || [];
+                        if (reqSynonyms.some(syn => csStr.includes(syn) || syn.includes(csStr))) found = true;
+                        if (!found && csSynonyms.some(syn => reqStr.includes(syn) || syn.includes(reqStr))) found = true;
+                    }
                 }
 
-                const reqSynonyms = synonymMap[reqStr] || [];
-                const csSynonyms = synonymMap[csStr] || [];
-
-                if (reqSynonyms.some(syn => csStr.includes(syn) || syn.includes(csStr))) {
-                    isMatch = true; break;
-                }
-                if (csSynonyms.some(syn => reqStr.includes(syn) || syn.includes(reqStr))) {
-                    isMatch = true; break;
+                if (found) {
+                    const nivelReq = req.nivel_requerido || null;
+                    let pct;
+                    if (!nivelReq) {
+                        pct = 100;
+                    } else {
+                        const diff = nivelReq - nivelCand;
+                        if (diff <= 0) pct = 100;
+                        else if (diff === 1) pct = 75;
+                        else if (diff === 2) pct = 50;
+                        else pct = 10;
+                    }
+                    contribution = pct;
+                    isMatch = true;
+                    levelInfo = nivelReq ? { candLvl: nivelCand, reqLvl: nivelReq, pct } : null;
+                    break;
                 }
             }
 
-            return { ...cs, isMatch, displayName: csNameDisplay };
+            return { ...cs, isMatch, contribution, displayName: csNameDisplay, levelInfo };
         });
     };
 
@@ -295,21 +307,33 @@ export default function PerfilCandidatoParaEmpresa() {
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                             {skillsClasificadas.map((sk, index) => {
                                 const isMatch = sk.isMatch;
+                                const li = sk.levelInfo;
                                 return (
                                     <span key={index} style={{
-                                        backgroundColor: isMatch ? 'rgba(0,214,107,0.05)' : 'rgba(0,0,0,0.02)',
+                                        backgroundColor: isMatch ? (sk.contribution >= 75 ? 'rgba(0,214,107,0.05)' : sk.contribution >= 50 ? 'rgba(255,193,7,0.08)' : 'rgba(255,152,0,0.08)') : 'rgba(0,0,0,0.02)',
                                         padding: '10px 18px',
                                         borderRadius: '30px',
-                                        fontSize: '1rem',
+                                        fontSize: '0.95rem',
                                         fontWeight: '600',
-                                        color: isMatch ? 'var(--primary)' : 'var(--text-gray)',
-                                        border: isMatch ? '1px solid rgba(0,214,107,0.3)' : '1px solid rgba(0,0,0,0.1)',
+                                        color: isMatch ? (sk.contribution >= 75 ? 'var(--primary)' : sk.contribution >= 50 ? '#b28900' : '#e65100') : 'var(--text-gray)',
+                                        border: isMatch ? (sk.contribution >= 75 ? '1px solid rgba(0,214,107,0.3)' : sk.contribution >= 50 ? '1px solid rgba(255,193,7,0.4)' : '1px solid rgba(255,152,0,0.4)') : '1px solid rgba(0,0,0,0.1)',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '8px'
+                                        gap: '8px',
+                                        flexWrap: 'wrap'
                                     }}>
-                                        {isMatch ? <CheckCircle size={16} /> : <XCircle size={16} opacity={0.5} />}
-                                        {sk.displayName}
+                                        {isMatch ? <CheckCircle size={16} /> : <XCircle size={16} opacity={0.4} />}
+                                        <span>{sk.displayName}</span>
+                                        {li ? (
+                                            <span style={{ fontSize: '0.8rem', opacity: 0.85, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                Lvl {li.candLvl} / Req {li.reqLvl}
+                                                <span style={{ background: isMatch ? (sk.contribution >= 75 ? 'var(--primary)' : sk.contribution >= 50 ? '#f0a500' : '#e65100') : '#aaa', color: 'white', padding: '1px 6px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.75rem' }}>
+                                                    {li.pct}%
+                                                </span>
+                                            </span>
+                                        ) : isMatch ? (
+                                            <span style={{ background: 'var(--primary)', color: 'white', padding: '1px 6px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.75rem' }}>✓</span>
+                                        ) : null}
                                     </span>
                                 );
                             })}

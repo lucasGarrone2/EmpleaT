@@ -389,8 +389,8 @@ export default function PerfilCandidato() {
                                         {datosExtraidos.skills.map((skill, index) => (
                                             <div key={index} style={{
                                                 backgroundColor: 'white',
-                                                padding: '8px 8px 8px 14px',
-                                                borderRadius: '12px',
+                                                padding: '8px 10px 8px 16px',
+                                                borderRadius: '30px',
                                                 fontSize: '0.9rem',
                                                 fontWeight: '600',
                                                 color: 'var(--primary)',
@@ -401,26 +401,25 @@ export default function PerfilCandidato() {
                                                 gap: '8px',
                                                 transition: 'all 0.2s ease'
                                             }}>
-                                                <span style={{ whiteSpace: 'normal' }}>{skill.nombre}</span>
+                                                <span>{skill.nombre}</span>
                                                 <span style={{
-                                                    backgroundColor: 'rgba(0,214,107,0.1)',
-                                                    color: 'var(--primary)',
-                                                    padding: '2px 8px',
-                                                    borderRadius: '6px',
-                                                    fontSize: '0.7rem',
+                                                    backgroundColor: 'var(--primary)',
+                                                    color: 'white',
+                                                    padding: '3px 10px',
+                                                    borderRadius: '12px',
+                                                    fontSize: '0.75rem',
                                                     fontWeight: 'bold',
-                                                    flexShrink: 0,
-                                                    border: '1px solid rgba(0,214,107,0.1)'
+                                                    flexShrink: 0
                                                 }}>
                                                     Lvl {skill.nivel}
                                                 </span>
                                                 <button 
                                                     type="button"
                                                     onClick={() => handleEliminarSkill(index)}
-                                                    style={{ background: 'rgba(255,0,0,0.05)', color: '#d32f2f', border: 'none', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', marginLeft: '4px' }}
-                                                    title="Eliminar esta habilidad detectada por error"
+                                                    style={{ background: 'rgba(255,0,0,0.06)', color: '#d32f2f', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}
+                                                    title="Eliminar esta habilidad"
                                                 >
-                                                    <X size={14} />
+                                                    <X size={13} />
                                                 </button>
                                             </div>
                                         ))}

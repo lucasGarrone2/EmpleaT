@@ -44,6 +44,7 @@ export default function OfertaDetalleEmpresa() {
                         oferta_skills (
                             skill_id,
                             nombre_original,
+                            nivel_requerido,
                             diccionario_skills (nombre_skill)
                         )
                     `)
@@ -69,6 +70,7 @@ export default function OfertaDetalleEmpresa() {
                             candidato_skills(
                                 skill_id,
                                 nombre_original,
+                                nivel_estimado,
                                 diccionario_skills(nombre_skill)
                             )
                         )
@@ -242,9 +244,15 @@ export default function OfertaDetalleEmpresa() {
                         {oferta.oferta_skills?.map((sk, idx) => (
                             <span key={idx} style={{
                                 padding: '6px 14px', background: 'rgba(0,0,0,0.04)', borderRadius: '8px',
-                                fontSize: '0.95rem', color: 'var(--text-dark)', border: '1px solid rgba(0,0,0,0.05)'
+                                fontSize: '0.95rem', color: 'var(--text-dark)', border: '1px solid rgba(0,0,0,0.05)',
+                                display: 'flex', alignItems: 'center', gap: '8px'
                             }}>
                                 {sk.nombre_original || sk.diccionario_skills?.nombre_skill}
+                                {sk.nivel_requerido && (
+                                    <span style={{ background: 'var(--secondary)', color: 'white', padding: '2px 8px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold' }}>
+                                        Lvl {sk.nivel_requerido}
+                                    </span>
+                                )}
                             </span>
                         ))}
                         {(!oferta.oferta_skills || oferta.oferta_skills.length === 0) && (
@@ -271,16 +279,14 @@ export default function OfertaDetalleEmpresa() {
                     postulantes.map((post, index) => {
                         const cant = post.candidatos;
                         
-                        // Recalcular match en vivo con logica indulgente
-                        let confidenciasReales = 0;
+                        // Match ponderado por nivel — mismo algoritmo que la vista del candidato
+                        let totalScore = 0;
                         const matchTags = [];
                         
                         const reqSkills = oferta.oferta_skills || [];
                         const candSkills = cant.candidato_skills || [];
-                        
+
                         if (reqSkills.length > 0) {
-                            
-                            // Base de conocimiento semántica para relacionar conceptos amplios
                             const synonymMap = {
                                 'sql': ['mysql', 'postgresql', 'sql server', 'oracle', 'pl/sql'],
                                 'mysql': ['sql', 'base de datos', 'mariadb'],
@@ -296,47 +302,49 @@ export default function OfertaDetalleEmpresa() {
                                 'react': ['javascript', 'frontend', 'reactjs', 'react.js'],
                                 'java': ['spring', 'backend', 'java ee', 'springboot'],
                                 'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi'],
-                                'desarrollo web': ['html', 'css', 'javascript', 'frontend', 'backend', 'web', 'php', 'diseño web'],
-                                'html': ['html5', 'frontend', 'desarrollo web', 'css', 'diseño web'],
-                                'css': ['css3', 'frontend', 'desarrollo web', 'html', 'diseño web']
+                                'desarrollo web': ['html', 'css', 'javascript', 'frontend', 'backend', 'web', 'php'],
+                                'html': ['html5', 'frontend', 'desarrollo web', 'css'],
+                                'css': ['css3', 'frontend', 'desarrollo web', 'html']
                             };
 
                             reqSkills.forEach(req => {
                                 const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
                                 const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
+                                const nivelReq = req.nivel_requerido ?? null;
                                 
                                 const matchTarget = candSkills.find(cs => {
                                     if (cs.skill_id && cs.skill_id === req.skill_id) return true;
                                     const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
-                                    
                                     if (!csStr || !reqStr) return false;
                                     if (csStr === reqStr) return true;
-                                    
-                                    // 1. Ampliación pedida por el usuario: overlap de 3 caracteres (ej: sql / mysql)
-                                    // Reducimos de 4 a 3 para permitir abreviaturas muy comunes.
                                     const minLen = Math.min(csStr.length, reqStr.length);
                                     if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
-
-                                    // 2. Mapas de sinónimos: Si "cloud" requiere "aws", validamos
                                     const reqSynonyms = synonymMap[reqStr] || [];
                                     const csSynonyms = synonymMap[csStr] || [];
-
                                     if (reqSynonyms.some(syn => csStr.includes(syn) || syn.includes(csStr))) return true;
                                     if (csSynonyms.some(syn => reqStr.includes(syn) || syn.includes(reqStr))) return true;
-
                                     return false;
                                 });
                                 
                                 if (matchTarget) {
-                                    confidenciasReales++;
                                     matchTags.push(req.nombre_original || req.diccionario_skills?.nombre_skill || reqStr);
+                                    if (!nivelReq) {
+                                        totalScore += 1.0;
+                                    } else {
+                                        const nivelCand = matchTarget.nivel_estimado || 3;
+                                        const diff = nivelReq - nivelCand;
+                                        if (diff <= 0) totalScore += 1.0;
+                                        else if (diff === 1) totalScore += 0.75;
+                                        else if (diff === 2) totalScore += 0.50;
+                                        else totalScore += 0.10;
+                                    }
                                 }
                             });
                         }
                         
-                        const recalculatedMatch = reqSkills.length > 0 
-                            ? Math.round((confidenciasReales / reqSkills.length) * 100) 
-                            : 0;
+                        const recalculatedMatch = reqSkills.length > 0
+                            ? Math.round((totalScore / reqSkills.length) * 100)
+                            : (post.porcentaje_match_calculado ?? 0);
 
                         const isTop = index === 0;
 
