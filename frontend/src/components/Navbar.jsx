@@ -37,7 +37,9 @@ const Navbar = () => {
             const fetchName = async () => {
                 const rol = user.user_metadata?.rol;
 
-                if (rol === 'empresa') {
+                if (rol === 'admin') {
+                    setUserName('Admin');
+                } else if (rol === 'empresa') {
                     const { data } = await supabase
                         .from('empresas')
                         .select('nombre, logo_url')
@@ -199,7 +201,18 @@ const Navbar = () => {
                                     padding: '10px', width: '240px', border: '1px solid rgba(0,0,0,0.05)',
                                     display: 'flex', flexDirection: 'column', gap: '4px'
                                 }}>
-                                    {user.user_metadata?.rol === 'empresa' ? (
+                                    {user.user_metadata?.rol === 'admin' ? (
+                                        <>
+                                            <div 
+                                                onClick={() => { navigate('/admin'); setMenuOpen(false); }}
+                                                style={dropdownItemStyle}
+                                                onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <User size={18} color="var(--primary)"/> Dashboard Admin
+                                            </div>
+                                        </>
+                                    ) : user.user_metadata?.rol === 'empresa' ? (
                                         <>
                                             <div 
                                                 onClick={() => { navigate('/dashboard-empresa'); setMenuOpen(false); }}

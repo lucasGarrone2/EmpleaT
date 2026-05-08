@@ -19,6 +19,7 @@ import NotFound from './pages/NotFound';
 import TerminosLegales from './pages/TerminosLegales';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   return (
@@ -53,6 +54,11 @@ function App() {
             <Route path="/editar-oferta/:id" element={<EditarOferta />} />
             <Route path="/oferta-empresa/:id" element={<OfertaDetalleEmpresa />} />
             <Route path="/oferta-empresa/:ofertaId/candidato/:candidatoId" element={<PerfilCandidatoParaEmpresa />} />
+          </Route>
+
+          {/* Rutas protegidas: solo administradores */}
+          <Route element={<ProtectedRoute requiredRole="admin" />}>
+            <Route path="/admin" element={<AdminDashboard />} />
           </Route>
 
           {/* Ruta 404: cualquier path no reconocido */}

@@ -80,8 +80,8 @@ export default function ListaOfertas() {
                 const { data: ofertasData, error: ofError } = await supabase
                     .from('ofertas')
                     .select(`
-                        id, titulo, modalidad, descripcion, salario_min_usd, salario_max_usd, creada_en, porcentaje_match_minimo,
-                        empresas (nombre, ubicacion, logo_url),
+                        id, titulo, modalidad, descripcion, salario_min_usd, salario_max_usd, creada_en, porcentaje_match_minimo, ciudad, nombre_empresa_custom, oculta_admin,
+                        empresas (nombre, ubicacion, logo_url, baneada),
                         oferta_skills (
                             skill_id,
                             nombre_original,
@@ -93,7 +93,9 @@ export default function ListaOfertas() {
                 
                 if (ofError) throw ofError;
 
-                const ofertasConMatch = (ofertasData || []).map(oferta => {
+                const ofertasValidas = (ofertasData || []).filter(o => !o.oculta_admin && (!o.empresas || !o.empresas.baneada));
+
+                const ofertasConMatch = ofertasValidas.map(oferta => {
                     const skillsRequeridas = oferta.oferta_skills || [];
                     const totalRequeridas = skillsRequeridas.length;
                     let confidenciasReales = 0;
@@ -425,13 +427,13 @@ export default function ListaOfertas() {
                                             {/* Info Basica */}
                                             <div>
                                                 <h3 style={{ margin: '0 0 5px 0', fontSize: '1.15rem', color: '#222' }}>{oferta.titulo}</h3>
-                                                <div style={{ color: '#666', fontSize: '0.95rem', marginBottom: '8px' }}>{oferta.empresas?.nombre}</div>
+                                                <div style={{ color: '#666', fontSize: '0.95rem', marginBottom: '8px' }}>{oferta.nombre_empresa_custom || oferta.empresas?.nombre}</div>
                                                 
                                                 <div style={{ display: 'flex', gap: '10px', fontSize: '0.85rem', flexWrap: 'wrap', marginBottom: '8px' }}>
                                                     {(oferta.modalidad === 'Presencial' || oferta.modalidad === 'Híbrido') && (
                                                         <span style={{ background: '#F5F6F8', color: '#555', padding: '4px 10px', borderRadius: '6px' }}>
                                                             <MapPin size={12} style={{ display: 'inline', marginRight: '4px', position: 'relative', top: '1px' }} />
-                                                            {oferta.empresas?.ubicacion || 'Ubicación a acordar'}
+                                                            {oferta.ciudad || oferta.empresas?.ubicacion || 'Ubicación a acordar'}
                                                         </span>
                                                     )}
                                                     <span style={{ background: '#EAF9F1', color: '#00B159', padding: '4px 10px', borderRadius: '6px' }}>{oferta.modalidad}</span>

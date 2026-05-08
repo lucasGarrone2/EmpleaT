@@ -17,6 +17,9 @@ export default function EditarOferta() {
     const [formData, setFormData] = useState({
         titulo: '',
         descripcion: '',
+        modalidad: 'Remoto',
+        ciudad: '',
+        nombre_empresa_custom: '',
         salario_min_usd: '',
         salario_max_usd: '',
         limite_postulaciones: '',
@@ -64,6 +67,8 @@ export default function EditarOferta() {
                 titulo: ofData.titulo || '',
                 descripcion: ofData.descripcion || '',
                 modalidad: ofData.modalidad || 'Remoto',
+                ciudad: ofData.ciudad || '',
+                nombre_empresa_custom: ofData.nombre_empresa_custom || '',
                 salario_min_usd: ofData.salario_min_usd || '',
                 salario_max_usd: ofData.salario_max_usd || '',
                 limite_postulaciones: ofData.limite_postulaciones || '',
@@ -193,6 +198,8 @@ export default function EditarOferta() {
                     titulo: formData.titulo,
                     descripcion: formData.descripcion,
                     modalidad: formData.modalidad,
+                    ciudad: formData.ciudad?.trim() || null,
+                    nombre_empresa_custom: formData.nombre_empresa_custom?.trim() || null,
                     salario_min_usd: parseInt(formData.salario_min_usd),
                     salario_max_usd: formData.salario_max_usd ? parseInt(formData.salario_max_usd) : null,
                     estado: formData.estado,
@@ -351,6 +358,29 @@ export default function EditarOferta() {
                             <option value="Presencial">Presencial</option>
                         </select>
                     </div>
+                    {(formData.modalidad === 'Presencial' || formData.modalidad === 'Híbrido') && (
+                        <div style={{ flex: '1 1 180px' }}>
+                            <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', marginBottom: '8px' }}>Ciudad de Referencia</label>
+                            <input 
+                                type="text" maxLength={100}
+                                value={formData.ciudad}
+                                onChange={e => setFormData({...formData, ciudad: e.target.value})}
+                                placeholder="Ej: Buenos Aires"
+                                style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                <div>
+                    <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', marginBottom: '8px' }}>Nombre de la Empresa o Cliente a Mostrar <span style={{fontWeight:'400', fontSize:'0.9rem'}}>(opcional — ideal si reclutás para un tercero o de forma confidencial)</span></label>
+                    <input 
+                        type="text" maxLength={150}
+                        value={formData.nombre_empresa_custom}
+                        onChange={e => setFormData({...formData, nombre_empresa_custom: e.target.value})}
+                        placeholder="Ej: Startup XYZ, Cliente Confidencial... (dejalo vacío para usar tu nombre registrado)"
+                        style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+                    />
                 </div>
 
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>

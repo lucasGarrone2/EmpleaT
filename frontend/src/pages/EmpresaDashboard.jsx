@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { Building2, PlusCircle, Briefcase, MapPin, Users, Settings } from 'lucide-react';
+import { Building2, PlusCircle, Briefcase, MapPin, Users, Settings, ArrowUpDown, CalendarDays, TrendingUp, TrendingDown } from 'lucide-react';
 import './Register.css'; // Reusing established styles for consistency
 
 export default function EmpresaDashboard() {
@@ -13,6 +13,8 @@ export default function EmpresaDashboard() {
     const [empresa, setEmpresa] = useState(null);
     const [ofertas, setOfertas] = useState([]);
     const [error, setError] = useState(null);
+    const [sortBy, setSortBy] = useState('newest');
+    const [filterEstado, setFilterEstado] = useState('todas');
 
     // Profile completion state
     const [isOnboarding, setIsOnboarding] = useState(false);
@@ -50,7 +52,7 @@ export default function EmpresaDashboard() {
                     const { data: ofertasData, error: ofertasError } = await supabase
                         .from('ofertas')
                         .select(`
-                            id, titulo, modalidad, estado, creada_en,
+                            id, titulo, modalidad, estado, creada_en, nombre_empresa_custom, ciudad,
                             postulaciones (count)
                         `)
                         .eq('empresa_id', empData.id)
@@ -175,10 +177,10 @@ export default function EmpresaDashboard() {
                                 <Building2 size={32} color="var(--primary)" />
                             </div>
                         )}
-                        <h2 className="brand-title" style={{ fontSize: '2.2rem', margin: 0 }}>Perfil Corporativo</h2>
+                        <h2 className="brand-title" style={{ fontSize: '2.2rem', margin: 0 }}>Perfil Corporativo / Reclutador</h2>
                     </div>
                     <p style={{ color: 'var(--text-gray)', fontSize: '1.1rem', marginBottom: '2.5rem' }}>
-                        Para comenzar a publicar búsquedas, necesitamos unos datos básicos sobre tu empresa.
+                        Para comenzar a publicar búsquedas, necesitamos algunos datos sobre tu empresa o tu perfil como reclutador independiente.
                     </p>
 
                     {error && <div className="message error" style={{marginBottom: '2rem'}}>{error}</div>}
@@ -186,7 +188,7 @@ export default function EmpresaDashboard() {
                     <form onSubmit={handleOnboardSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         
                         <div>
-                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Logo de la Empresa (Opcional)</label>
+                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Logo de la Empresa o Agencia (Opcional)</label>
                             <input 
                                 type="file" 
                                 accept="image/jpeg, image/png, image/webp"
@@ -197,28 +199,28 @@ export default function EmpresaDashboard() {
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Nombre de la Empresa</label>
+                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Nombre de la Empresa o Reclutador</label>
                             <input 
                                 type="text" 
                                 required
                                 value={onboardData.nombre}
                                 onChange={e => setOnboardData({...onboardData, nombre: e.target.value})}
                                 style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
-                                placeholder="Ej: TechCorp S.A."
+                                placeholder="Ej: TechCorp S.A. o Juan Pérez Reclutamiento"
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Rubro o Sector</label>
+                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Rubro o Sector Principal</label>
                             <input 
                                 type="text" 
                                 value={onboardData.sector}
                                 onChange={e => setOnboardData({...onboardData, sector: e.target.value})}
                                 style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
-                                placeholder="Ej: Software, Finanzas, Salud..."
+                                placeholder="Ej: IT, RRHH, Consultoría..."
                             />
                         </div>
                         <div>
-                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Ubicación Sede Central</label>
+                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Ubicación (Sede Central o Base Operativa)</label>
                             <input 
                                 type="text" 
                                 value={onboardData.ubicacion}
@@ -243,9 +245,9 @@ export default function EmpresaDashboard() {
     }
 
     return (
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '3rem 2rem' }}>
+        <div style={{ maxWidth: '1300px', margin: '0 auto', padding: '3rem 2rem' }}>
             {/* Header Dashboard */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem', flexWrap: 'wrap', gap: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '2rem' }}>
                 <div>
                     <h1 style={{ fontSize: '2.5rem', color: 'var(--text-dark)', margin: '0 0 10px 0', letterSpacing: '-0.5px' }}>
                         Mis Búsquedas Activas
@@ -282,84 +284,184 @@ export default function EmpresaDashboard() {
 
             {error && <div className="message error" style={{marginBottom: '2rem'}}>{error}</div>}
 
-            {/* Listado de Ofertas */}
-            {ofertas.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '5rem 2rem', background: 'rgba(0,0,0,0.02)', borderRadius: '24px', border: '2px dashed rgba(0,0,0,0.1)' }}>
-                    <Briefcase size={64} color="var(--primary)" style={{ opacity: 0.5, marginBottom: '1.5rem' }} />
-                    <h3 style={{ fontSize: '1.8rem', color: 'var(--text-dark)', marginBottom: '1rem' }}>Aún no tienes búsquedas publicadas</h3>
-                    <p style={{ color: 'var(--text-gray)', fontSize: '1.1rem', maxWidth: '500px', margin: '0 auto' }}>
-                        Crea tu primera oferta laboral definiendo el rol, rango salarial y las habilidades exactas que requieres de los candidatos.
-                    </p>
+            {/* Layout: sidebar izquierdo + lista */}
+            <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
+
+                {/* Sidebar de filtros */}
+                <div style={{
+                    width: '220px', flexShrink: 0,
+                    background: 'var(--bg-white)', borderRadius: '16px',
+                    padding: '1.5rem', border: '1px solid rgba(0,0,0,0.05)',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
+                    position: 'sticky', top: '2rem'
+                }}>
+                    {/* Ordenar */}
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-gray)', fontWeight: '700', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                            <ArrowUpDown size={14} /> Ordenar
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {[
+                                { key: 'newest', icon: <CalendarDays size={14}/>, label: 'Más reciente' },
+                                { key: 'oldest', icon: <CalendarDays size={14}/>, label: 'Más antigua' },
+                                { key: 'most_posts', icon: <TrendingUp size={14}/>, label: 'Más postulaciones' },
+                                { key: 'least_posts', icon: <TrendingDown size={14}/>, label: 'Menos postulaciones' },
+                            ].map(opt => (
+                                <button
+                                    key={opt.key}
+                                    onClick={() => setSortBy(opt.key)}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                        padding: '9px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                                        fontWeight: '600', fontSize: '0.88rem', transition: 'all 0.15s', textAlign: 'left',
+                                        background: sortBy === opt.key ? 'var(--primary)' : 'rgba(0,0,0,0.04)',
+                                        color: sortBy === opt.key ? 'white' : 'var(--text-gray)',
+                                    }}
+                                >
+                                    {opt.icon} {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Separador */}
+                    <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)', marginBottom: '1.5rem' }} />
+
+                    {/* Filtrar por estado */}
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-gray)', fontWeight: '700', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                            <Briefcase size={14} /> Estado
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {[
+                                { key: 'todas', label: 'Todas' },
+                                { key: 'Publicada', label: 'Publicadas' },
+                                { key: 'Borrador', label: 'Borradores' },
+                                { key: 'Cerrada', label: 'Cerradas' },
+                            ].map(est => (
+                                <button
+                                    key={est.key}
+                                    onClick={() => setFilterEstado(est.key)}
+                                    style={{
+                                        padding: '9px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                                        fontWeight: '600', fontSize: '0.88rem', transition: 'all 0.15s', textAlign: 'left',
+                                        background: filterEstado === est.key ? 'var(--secondary)' : 'rgba(0,0,0,0.04)',
+                                        color: filterEstado === est.key ? 'white' : 'var(--text-gray)',
+                                    }}
+                                >
+                                    {est.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 </div>
-            ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
-                    {ofertas.map((oferta) => {
-                        const postulantesCount = oferta.postulaciones[0]?.count || 0;
-                        return (
-                            <div 
-                                key={oferta.id}
-                                onClick={() => navigate(`/oferta-empresa/${oferta.id}`)}
-                                style={{ 
-                                    background: 'var(--bg-white)',
-                                    borderRadius: '16px',
-                                    padding: '2rem',
-                                    border: '1px solid rgba(0,0,0,0.05)',
-                                    boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease-in-out'
-                                }}
-                                onMouseOver={e => {
-                                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,214,107,0.1)';
-                                    e.currentTarget.style.borderColor = 'rgba(0,214,107,0.3)';
-                                    e.currentTarget.style.transform = 'translateY(-2px)';
-                                }}
-                                onMouseOut={e => {
-                                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.03)';
-                                    e.currentTarget.style.borderColor = 'rgba(0,0,0,0.05)';
-                                    e.currentTarget.style.transform = 'translateY(0)';
-                                }}
-                            >
-                                <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '12px' }}>
-                                        <h3 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--text-dark)' }}>{oferta.titulo}</h3>
-                                        <span style={{ 
-                                            background: oferta.estado === 'Publicada' ? 'rgba(0,214,107,0.1)' : 'rgba(0,0,0,0.05)',
-                                            color: oferta.estado === 'Publicada' ? 'var(--primary)' : 'var(--text-gray)',
-                                            padding: '4px 12px',
-                                            borderRadius: '20px',
-                                            fontSize: '0.85rem',
-                                            fontWeight: 'bold'
-                                        }}>
-                                            {oferta.estado}
-                                        </span>
-                                    </div>
-                                    <div style={{ color: 'var(--text-gray)', fontSize: '1rem', display: 'flex', gap: '20px' }}>
-                                        <span><Briefcase size={14} style={{verticalAlign: 'middle', marginRight: '5px'}}/> {oferta.modalidad}</span>
-                                        <span title="Fecha de publicación">📅 {new Date(oferta.creada_en).toLocaleDateString()}</span>
-                                    </div>
-                                </div>
-                                
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                                    <div style={{ 
-                                        display: 'flex', alignItems: 'center', gap: '8px', 
-                                        background: postulantesCount > 0 ? 'rgba(0,214,107,0.08)' : 'transparent', 
-                                        padding: '8px 16px', borderRadius: '12px',
-                                        color: postulantesCount > 0 ? 'var(--primary)' : 'var(--text-gray)',
-                                        fontWeight: 'bold'
-                                    }}>
-                                        <Users size={20} />
-                                        <span>{postulantesCount} Postulantes</span>
-                                    </div>
-                                    <span style={{ color: 'var(--primary)', fontSize: '0.9rem', fontWeight: 'bold' }}>Ver detalle &rarr;</span>
-                                </div>
+
+                {/* Lista de Ofertas */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    {(() => {
+                        const filtered = ofertas.filter(o => filterEstado === 'todas' || o.estado === filterEstado);
+                        const sorted = [...filtered].sort((a, b) => {
+                            const pa = a.postulaciones[0]?.count || 0;
+                            const pb = b.postulaciones[0]?.count || 0;
+                            if (sortBy === 'newest') return new Date(b.creada_en) - new Date(a.creada_en);
+                            if (sortBy === 'oldest') return new Date(a.creada_en) - new Date(b.creada_en);
+                            if (sortBy === 'most_posts') return pb - pa;
+                            if (sortBy === 'least_posts') return pa - pb;
+                            return 0;
+                        });
+
+                        if (sorted.length === 0) return (
+                            <div style={{ textAlign: 'center', padding: '5rem 2rem', background: 'rgba(0,0,0,0.02)', borderRadius: '24px', border: '2px dashed rgba(0,0,0,0.1)' }}>
+                                <Briefcase size={64} color="var(--primary)" style={{ opacity: 0.5, marginBottom: '1.5rem' }} />
+                                <h3 style={{ fontSize: '1.8rem', color: 'var(--text-dark)', marginBottom: '1rem' }}>
+                                    {ofertas.length === 0 ? 'Aún no tienes búsquedas publicadas' : 'Sin resultados para este filtro'}
+                                </h3>
+                                <p style={{ color: 'var(--text-gray)', fontSize: '1.1rem', maxWidth: '500px', margin: '0 auto' }}>
+                                    {ofertas.length === 0
+                                        ? 'Crea tu primera oferta laboral definiendo el rol, rango salarial y las habilidades exactas que requieres de los candidatos.'
+                                        : 'Probá cambiando el filtro de estado.'}
+                                </p>
                             </div>
-                        )
-                    })}
+                        );
+
+                        return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                                {sorted.map((oferta) => {
+                                    const postulantesCount = oferta.postulaciones[0]?.count || 0;
+                                    return (
+                                        <div 
+                                            key={oferta.id}
+                                            onClick={() => navigate(`/oferta-empresa/${oferta.id}`)}
+                                            style={{ 
+                                                background: 'var(--bg-white)', borderRadius: '16px', padding: '1.8rem',
+                                                border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
+                                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                cursor: 'pointer', transition: 'all 0.2s ease-in-out'
+                                            }}
+                                            onMouseOver={e => {
+                                                e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,214,107,0.1)';
+                                                e.currentTarget.style.borderColor = 'rgba(0,214,107,0.3)';
+                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                            }}
+                                            onMouseOut={e => {
+                                                e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.03)';
+                                                e.currentTarget.style.borderColor = 'rgba(0,0,0,0.05)';
+                                                e.currentTarget.style.transform = 'translateY(0)';
+                                            }}
+                                        >
+                                            <div style={{ minWidth: 0 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                                                    <h3 style={{ margin: 0, fontSize: '1.3rem', color: 'var(--text-dark)' }}>{oferta.titulo}</h3>
+                                                    <span style={{ 
+                                                        background: oferta.estado === 'Publicada' ? 'rgba(0,214,107,0.1)' : oferta.estado === 'Borrador' ? 'rgba(255,193,7,0.12)' : 'rgba(0,0,0,0.05)',
+                                                        color: oferta.estado === 'Publicada' ? 'var(--primary)' : oferta.estado === 'Borrador' ? '#d97706' : 'var(--text-gray)',
+                                                        padding: '3px 10px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: 'bold'
+                                                    }}>
+                                                        {oferta.estado}
+                                                    </span>
+                                                </div>
+                                                <div style={{ color: 'var(--text-gray)', fontSize: '0.95rem', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                        <Briefcase size={13}/> {oferta.modalidad}
+                                                    </span>
+                                                    {oferta.nombre_empresa_custom && (
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--secondary)', fontWeight: '600' }}>
+                                                            <Building2 size={13}/> {oferta.nombre_empresa_custom}
+                                                        </span>
+                                                    )}
+                                                    {oferta.ciudad && (
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                            <MapPin size={13}/> {oferta.ciudad}
+                                                        </span>
+                                                    )}
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                        <CalendarDays size={13}/> {new Date(oferta.creada_en).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0, marginLeft: '1rem' }}>
+                                                <div style={{ 
+                                                    display: 'flex', alignItems: 'center', gap: '8px', 
+                                                    background: postulantesCount > 0 ? 'rgba(0,214,107,0.08)' : 'rgba(0,0,0,0.03)', 
+                                                    padding: '8px 16px', borderRadius: '12px',
+                                                    color: postulantesCount > 0 ? 'var(--primary)' : 'var(--text-gray)',
+                                                    fontWeight: 'bold'
+                                                }}>
+                                                    <Users size={18} />
+                                                    <span>{postulantesCount} Postulantes</span>
+                                                </div>
+                                                <span style={{ color: 'var(--primary)', fontSize: '0.88rem', fontWeight: 'bold' }}>Ver detalle →</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
                 </div>
-            )}
+            </div>
         </div>
     );
 }
+

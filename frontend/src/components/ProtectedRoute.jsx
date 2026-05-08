@@ -64,7 +64,8 @@ export default function ProtectedRoute({ requiredRole, redirectTo = '/login' }) 
     if (requiredRole && user.user_metadata?.rol !== requiredRole) {
         // Redirigir según el rol real del usuario
         const userRole = user.user_metadata?.rol;
-        const fallback = userRole === 'empresa' ? '/dashboard-empresa'
+        const fallback = userRole === 'admin' ? '/admin'
+                       : userRole === 'empresa' ? '/dashboard-empresa'
                        : userRole === 'candidato' ? '/mi-perfil'
                        : '/login';
         return <Navigate to={fallback} replace />;
