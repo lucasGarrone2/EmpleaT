@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import { Filter, Star, MapPin, Briefcase, ChevronLeft, ChevronRight } from 'lucide-react';
+import MatchBadge from '../components/MatchBadge';
+import PremiumActionZone from '../components/PremiumActionZone';
+import InterviewModal from '../components/InterviewModal';
 
 export default function ListaOfertas() {
     const { user } = useAuth();
@@ -15,6 +18,8 @@ export default function ListaOfertas() {
     const [error, setError] = useState(null);
     const [applyingTo, setApplyingTo] = useState(null);
     const [expandedOferta, setExpandedOferta] = useState(null);
+    const [candidatoData, setCandidatoData] = useState(null);
+    const [showInterviewModalFor, setShowInterviewModalFor] = useState(null);
 
     const locationRouter = useLocation();
     const queryParams = new URLSearchParams(locationRouter.search);
@@ -45,7 +50,7 @@ export default function ListaOfertas() {
             try {
                 const { data: candData, error: candError } = await supabase
                     .from('candidatos')
-                    .select('id')
+                    .select('id, es_premium')
                     .eq('auth_id', user.id)
                     .maybeSingle();
                 
@@ -55,6 +60,7 @@ export default function ListaOfertas() {
                     return;
                 }
                 setCandidatoId(candData.id);
+                setCandidatoData(candData);
 
                 const { data: candSkills, error: skillsError } = await supabase
                     .from('candidato_skills')
@@ -80,7 +86,7 @@ export default function ListaOfertas() {
                 const { data: ofertasData, error: ofError } = await supabase
                     .from('ofertas')
                     .select(`
-                        id, titulo, modalidad, descripcion, salario_min_usd, salario_max_usd, creada_en, porcentaje_match_minimo, ciudad, nombre_empresa_custom, oculta_admin,
+                        id, titulo, modalidad, descripcion, salario_min_usd, salario_max_usd, creada_en, porcentaje_match_minimo, ciudad, nombre_empresa_custom, oculta_admin, seniority,
                         empresas (nombre, ubicacion, logo_url, baneada),
                         oferta_skills (
                             skill_id,
@@ -437,6 +443,11 @@ export default function ListaOfertas() {
                                                         </span>
                                                     )}
                                                     <span style={{ background: '#EAF9F1', color: '#00B159', padding: '4px 10px', borderRadius: '6px' }}>{oferta.modalidad}</span>
+                                                    {(oferta.seniority && oferta.seniority !== 'Indistinto') && (
+                                                        <span style={{ background: '#FFF4E5', color: '#E68A00', padding: '4px 10px', borderRadius: '6px', fontWeight: 'bold' }}>
+                                                            {oferta.seniority}
+                                                        </span>
+                                                    )}
                                                     {(oferta.salario_min_usd > 0) && (
                                                         <span style={{ background: '#E6F7FF', color: '#0084FF', padding: '4px 10px', borderRadius: '6px', fontWeight: '500' }}>
                                                             ${oferta.salario_min_usd.toLocaleString()} - {oferta.salario_max_usd ? `$${oferta.salario_max_usd.toLocaleString()} USD` : '+ USD'}
@@ -444,20 +455,28 @@ export default function ListaOfertas() {
                                                     )}
                                                 </div>
 
-                                                {/* Motivational Badge */}
-                                                {oferta.porcentaje_match_minimo > 0 && (
-                                                    <div style={{ display: 'inline-block', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(255, 165, 0, 0.3)' }}>
-                                                        🌟 ¡Tu perfil supera el {oferta.porcentaje_match_minimo}% exigido por la empresa!
-                                                    </div>
-                                                )}
+                                                {/* Motivational Badges */}
+                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                    {oferta.porcentaje_match_minimo > 0 && (
+                                                        <div style={{ display: 'inline-block', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(255, 165, 0, 0.3)' }}>
+                                                            🌟 ¡Tu perfil supera el {oferta.porcentaje_match_minimo}% exigido por la empresa!
+                                                        </div>
+                                                    )}
+                                                    {oferta.porcentajeMatch >= 80 && (
+                                                        <div style={{ display: 'inline-block', background: 'linear-gradient(90deg, #FFB020 0%, #FF9800 100%)', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(255, 176, 32, 0.3)' }}>
+                                                            ✨ Simulación IA Disponible
+                                                        </div>
+                                                    )}
+                                                </div>
+                                               
+
                                             </div>
                                         </div>
 
                                         {/* Match y Boton */}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                                            <div style={{ textAlign: 'center', color: matchColor }}>
-                                                <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{oferta.porcentajeMatch}%</div>
-                                                <div style={{ fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '1px' }}>MATCH</div>
+                                            <div style={{ textAlign: 'center' }}>
+                                                <MatchBadge percentage={oferta.porcentajeMatch} size={64} />
                                             </div>
                                             
                                             <button 
@@ -513,16 +532,22 @@ export default function ListaOfertas() {
                                                 </div>
                                             </div>
 
-                                            <div style={{ marginTop: '2rem' }}>
+                                            <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                                 {!yaPostulado && (
                                                     <button 
                                                         onClick={(e) => handlePostularse(e, oferta.id, oferta.porcentajeMatch)}
                                                         disabled={applyingTo === oferta.id}
-                                                        style={{ background: '#00d66b', color: 'white', padding: '14px 28px', borderRadius: '10px', border: 'none', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,214,107,0.3)' }}
+                                                        style={{ background: '#00d66b', color: 'white', padding: '14px 28px', borderRadius: '10px', border: 'none', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer', boxShadow: '0 4px 15px rgba(0,214,107,0.3)', width: 'fit-content' }}
                                                     >
                                                         {applyingTo === oferta.id ? 'Cargando...' : 'Postularme Ahora'}
                                                     </button>
                                                 )}
+
+                                                <PremiumActionZone 
+                                                    matchScore={oferta.porcentajeMatch} 
+                                                    isPremium={candidatoData?.es_premium} 
+                                                    onSimulateClick={() => setShowInterviewModalFor(oferta)} 
+                                                />
                                             </div>
                                         </div>
                                     )}
@@ -573,6 +598,15 @@ export default function ListaOfertas() {
                     </div>
                 </main>
             </div>
+
+            {showInterviewModalFor && (
+                <InterviewModal
+                    candidatoId={candidatoId}
+                    ofertaId={showInterviewModalFor.id}
+                    porcentajeMatch={showInterviewModalFor.porcentajeMatch}
+                    onClose={() => setShowInterviewModalFor(null)}
+                />
+            )}
         </div>
     );
 }

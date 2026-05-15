@@ -20,6 +20,8 @@ import TerminosLegales from './pages/TerminosLegales';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import AdminDashboard from './pages/AdminDashboard';
+import SkillQuiz from './pages/SkillQuiz';
+import Pricing from './pages/Pricing';
 
 function App() {
   return (
@@ -45,6 +47,8 @@ function App() {
             <Route path="/ofertas" element={<ListaOfertas />} />
             <Route path="/perfil" element={<PerfilCandidato />} />
             <Route path="/mi-perfil" element={<MiPerfil />} />
+            <Route path="/quiz/:skill" element={<SkillQuiz />} />
+            <Route path="/pricing" element={<Pricing />} />
           </Route>
 
           {/* Rutas protegidas: solo empresas */}

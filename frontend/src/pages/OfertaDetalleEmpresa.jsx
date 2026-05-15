@@ -40,7 +40,7 @@ export default function OfertaDetalleEmpresa() {
                 const { data: ofData, error: ofError } = await supabase
                     .from('ofertas')
                     .select(`
-                        id, empresa_id, titulo, modalidad, descripcion, estado, creada_en,
+                        id, empresa_id, titulo, modalidad, descripcion, estado, creada_en, seniority,
                         oferta_skills (
                             skill_id,
                             nombre_original,
@@ -172,6 +172,17 @@ export default function OfertaDetalleEmpresa() {
                         </h1>
                         <div style={{ display: 'flex', gap: '15px', color: 'var(--text-gray)', fontSize: '1.05rem', alignItems: 'center' }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Briefcase size={18}/> {oferta.modalidad}</span>
+                            {(oferta.seniority && oferta.seniority !== 'Indistinto') && (
+                                <>
+                                    <span>•</span>
+                                    <span style={{ 
+                                        background: '#FFF4E5', color: '#E68A00', padding: '4px 12px', 
+                                        borderRadius: '15px', fontSize: '0.85rem', fontWeight: 'bold' 
+                                    }}>
+                                        {oferta.seniority}
+                                    </span>
+                                </>
+                            )}
                             <span>•</span>
                             <span style={{ 
                                 background: oferta.estado === 'Publicada' ? 'rgba(0,214,107,0.1)' : 'rgba(0,0,0,0.05)',

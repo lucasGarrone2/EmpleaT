@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { User, Briefcase, Clock, FileText, Edit2, Save, X, BrainCircuit, Trash2, PlusCircle } from 'lucide-react';
+import { User, Briefcase, Clock, FileText, Edit2, Save, X, BrainCircuit, Trash2, PlusCircle, Award } from 'lucide-react';
 import './Register.css'; // Reusing established styles
 
 export default function MiPerfil() {
@@ -12,6 +12,7 @@ export default function MiPerfil() {
     const [loading, setLoading] = useState(true);
     const [candidato, setCandidato] = useState(null);
     const [skills, setSkills] = useState([]);
+    const [insignias, setInsignias] = useState([]);
     
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({
@@ -98,6 +99,15 @@ export default function MiPerfil() {
                             .eq('candidato_id', candData.id);
                         if (altSkillsData) setSkills(altSkillsData);
                     }
+
+                    // Fetch insignias
+                    const { data: insigniasData } = await supabase
+                        .from('candidato_insignias')
+                        .select('insignias(nombre)')
+                        .eq('candidato_id', candData.id);
+                    if (insigniasData) {
+                        setInsignias(insigniasData.map(i => i.insignias.nombre));
+                    }
                 }
             } catch (err) {
                 console.error("Error al obtener perfil", err);
@@ -127,6 +137,35 @@ export default function MiPerfil() {
         } catch (err) {
             console.error("Error eliminando skill", err);
             setError("No se pudo eliminar la habilidad.");
+        }
+    };
+
+    const handleAddSkill = async () => {
+        if (!candidato || !newSkillInput.trim()) return;
+        setAddingSkill(true);
+        setError(null);
+        try {
+            const { data, error } = await supabase
+                .from('candidato_skills')
+                .insert([{
+                    candidato_id: candidato.id,
+                    nombre_original: newSkillInput.trim(),
+                    nivel_estimado: newSkillNivel
+                }])
+                .select()
+                .single();
+                
+            if (error) throw error;
+            
+            setSkills([...skills, data]);
+            setNewSkillInput('');
+            setSuccessMessage("Habilidad agregada correctamente");
+            setTimeout(() => setSuccessMessage(''), 3000);
+        } catch (err) {
+            console.error("Error agregando skill", err);
+            setError("No se pudo agregar la habilidad.");
+        } finally {
+            setAddingSkill(false);
         }
     };
 
@@ -516,6 +555,11 @@ export default function MiPerfil() {
                                                 }}>
                                                     Lvl {skillItem.nivel_estimado}
                                                 </span>
+                                                {insignias.includes(skillName) ? (
+                                                    <Award size={18} color="#FFD700" title="Habilidad Validada" style={{ filter: 'drop-shadow(0 0 2px rgba(255, 215, 0, 0.5))' }} />
+                                                ) : (
+                                                    !editMode && <Link to={`/quiz/${encodeURIComponent(skillName)}`} style={{ fontSize: '0.85rem', color: 'var(--primary)', textDecoration: 'underline', marginLeft: '4px' }}>Validar</Link>
+                                                )}
                                                 {editMode && (
                                                     <button 
                                                         onClick={() => handleDeleteSkill(skillItem.skill_id)}

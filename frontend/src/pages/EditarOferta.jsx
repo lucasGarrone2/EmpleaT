@@ -24,6 +24,7 @@ export default function EditarOferta() {
         salario_max_usd: '',
         limite_postulaciones: '',
         porcentaje_match_minimo: '',
+        seniority: 'Indistinto',
         estado: 'Publicada'
     });
 
@@ -73,6 +74,7 @@ export default function EditarOferta() {
                 salario_max_usd: ofData.salario_max_usd || '',
                 limite_postulaciones: ofData.limite_postulaciones || '',
                 porcentaje_match_minimo: ofData.porcentaje_match_minimo || '',
+                seniority: ofData.seniority || 'Indistinto',
                 estado: ofData.estado || 'Publicada'
             });
 
@@ -202,6 +204,7 @@ export default function EditarOferta() {
                     nombre_empresa_custom: formData.nombre_empresa_custom?.trim() || null,
                     salario_min_usd: parseInt(formData.salario_min_usd),
                     salario_max_usd: formData.salario_max_usd ? parseInt(formData.salario_max_usd) : null,
+                    seniority: formData.seniority,
                     estado: formData.estado,
                     limite_postulaciones: formData.limite_postulaciones ? parseInt(formData.limite_postulaciones) : null,
                     porcentaje_match_minimo: formData.porcentaje_match_minimo ? parseInt(formData.porcentaje_match_minimo) : 0,
@@ -356,6 +359,20 @@ export default function EditarOferta() {
                             <option value="Remoto">Remoto</option>
                             <option value="Híbrido">Híbrido</option>
                             <option value="Presencial">Presencial</option>
+                        </select>
+                    </div>
+                    <div style={{ flex: '1 1 150px' }}>
+                        <label style={{ display: 'block', color: 'var(--text-gray)', fontWeight: 'bold', marginBottom: '8px' }}>Seniority *</label>
+                        <select 
+                            value={formData.seniority}
+                            onChange={e => setFormData({...formData, seniority: e.target.value})}
+                            style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1.05rem', outline: 'none', background: 'white', boxSizing: 'border-box' }}
+                        >
+                            <option value="Trainee">Trainee</option>
+                            <option value="Junior">Junior</option>
+                            <option value="Semi Senior">Semi Senior</option>
+                            <option value="Senior">Senior</option>
+                            <option value="Indistinto">Indistinto</option>
                         </select>
                     </div>
                     {(formData.modalidad === 'Presencial' || formData.modalidad === 'Híbrido') && (

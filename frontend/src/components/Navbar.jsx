@@ -10,6 +10,7 @@ const Navbar = () => {
     const { user } = useAuth();
     const [userName, setUserName] = useState('');
     const [userAvatar, setUserAvatar] = useState(null);
+    const [isPremium, setIsPremium] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
 
@@ -56,13 +57,20 @@ const Navbar = () => {
                 } else {
                     const { data } = await supabase
                         .from('candidatos')
-                        .select('nombre_completo, foto_url')
+                        .select('nombre_completo, foto_url, es_premium')
                         .eq('auth_id', user.id)
                         .maybeSingle();
 
-                    if (data && data.nombre_completo) {
-                        setUserName(data.nombre_completo.split(' ')[0]);
-                        setUserAvatar(data.foto_url);
+                    if (data) {
+                        setIsPremium(data.es_premium);
+                        
+                        if (data.nombre_completo) {
+                            setUserName(data.nombre_completo.split(' ')[0]);
+                            setUserAvatar(data.foto_url);
+                        } else {
+                            const emailName = user.email.split('@')[0];
+                            setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
+                        }
                     } else {
                         const emailName = user.email.split('@')[0];
                         setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
@@ -190,7 +198,14 @@ const Navbar = () => {
                                         userName.charAt(0)
                                     )}
                                 </div>
-                                <span>Hola, {userName}</span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    Hola, {userName} 
+                                    {isPremium && (
+                                        <span title="Usuario Premium" style={{ display: 'inline-flex', padding: '2px 6px', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(255,165,0,0.3)' }}>
+                                            PREMIUM
+                                        </span>
+                                    )}
+                                </span>
                             </div>
 
                             {/* DROPDOWN MENU HAMBURGUESA */}
