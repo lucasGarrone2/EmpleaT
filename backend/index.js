@@ -740,11 +740,11 @@ app.post('/api/create-preference', async (req, res) => {
                     }
                 ],
                 back_urls: {
-                    success: "http://localhost:5173/ofertas?payment_status=success",
-                    failure: "http://localhost:5173/pricing?payment_status=failure",
-                    pending: "http://localhost:5173/ofertas?payment_status=pending"
+                    success: `${process.env.NGROK_URL}/api/redirect-mp?status=approved`,
+                    failure: `${process.env.NGROK_URL}/api/redirect-mp?status=failure`,
+                    pending: `${process.env.NGROK_URL}/api/redirect-mp?status=pending`
                 },
-                // auto_return: "approved",
+                auto_return: "approved",
                 external_reference: auth_id, // Guardamos el auth_id para el webhook
                 notification_url: `${process.env.NGROK_URL}/api/webhook` // ngrok u otro tunel en desarrollo
             }
@@ -753,7 +753,7 @@ app.post('/api/create-preference', async (req, res) => {
         res.json({ init_point: response.init_point });
     } catch (error) {
         console.error("Error creando preferencia Mercado Pago:", error);
-        res.status(500).json({ error: "Error al crear la preferencia de pago." });
+        res.status(500).json({ error: "Error al crear la preferencia de pago.", details: error.message, full: error });
     }
 });
 
@@ -791,6 +791,59 @@ app.post('/api/webhook', async (req, res) => {
         }
     } else {
         res.status(200).send("OK");
+    }
+});
+
+app.post('/api/confirm-payment', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        if (!authHeader) return res.status(401).json({ error: "No autorizado." });
+        
+        const { payment_id } = req.body;
+        if (!payment_id) return res.status(400).json({ error: "Falta payment_id." });
+
+        const response = await fetch(`https://api.mercadopago.com/v1/payments/${payment_id}`, {
+            headers: {
+                Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN}`
+            }
+        });
+        
+        if (!response.ok) {
+            return res.status(404).json({ error: "Pago no encontrado." });
+        }
+
+        const paymentInfo = await response.json();
+
+        if (paymentInfo.status === 'approved') {
+            const auth_id = paymentInfo.external_reference;
+            if (auth_id) {
+                const supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+                
+                await supabaseAdmin
+                    .from('candidatos')
+                    .update({ es_premium: true, premium_desde: new Date().toISOString() })
+                    .eq('auth_id', auth_id);
+                
+                return res.json({ success: true, message: "Premium activado correctamente." });
+            }
+        }
+        
+        return res.status(400).json({ success: false, message: "El pago no está aprobado o es inválido." });
+
+    } catch (error) {
+        console.error("Error en /api/confirm-payment:", error);
+        res.status(500).json({ error: "Error confirmando el pago." });
+    }
+});
+
+app.get('/api/redirect-mp', (req, res) => {
+    const status = req.query.status || req.query.payment_status;
+    const payment_id = req.query.payment_id;
+    
+    if (status === 'approved' || status === 'success') {
+        res.redirect(`http://localhost:5173/ofertas?payment_status=success&payment_id=${payment_id}&status=approved`);
+    } else {
+        res.redirect(`http://localhost:5173/pricing?payment_status=failure`);
     }
 });
 

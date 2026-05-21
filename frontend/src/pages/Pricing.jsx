@@ -11,7 +11,10 @@ export default function Pricing() {
     const [success, setSuccess] = useState(false);
 
     const handleUpgrade = async (plan) => {
-        if (!user) return;
+        if (!user) {
+            navigate('/register');
+            return;
+        }
         setLoadingPlan(plan.meses);
         try {
             // Obtenemos token para el backend

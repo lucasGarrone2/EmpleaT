@@ -59,6 +59,37 @@ export default function ListaOfertas() {
                     navigate('/perfil');
                     return;
                 }
+                
+                // Confirmación de pago Mercado Pago fallback
+                const paymentId = queryParams.get('payment_id');
+                const paymentStatus = queryParams.get('status');
+                let esPremiumLocal = candData.es_premium;
+
+                if (paymentId && paymentStatus === 'approved') {
+                    try {
+                        const token = await supabase.auth.getSession().then(res => res.data.session?.access_token);
+                        const confirmRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/confirm-payment`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({ payment_id: paymentId })
+                        });
+                        
+                        const confirmData = await confirmRes.json();
+                        if (confirmData.success) {
+                            esPremiumLocal = true;
+                            // Limpiar URL para no volver a ejecutar
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                            alert("¡Listo! Tu pago ya se acreditó. ¡Ya eres Premium!");
+                        }
+                    } catch (e) {
+                        console.error("Error confirmando pago en frontend:", e);
+                    }
+                }
+
+                candData.es_premium = esPremiumLocal;
                 setCandidatoId(candData.id);
                 setCandidatoData(candData);
 

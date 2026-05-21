@@ -37,6 +37,7 @@ function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth/callback" element={<GoogleCallback/>} />
           <Route path="/terminos-legales" element={<TerminosLegales/>} />
+          <Route path="/pricing" element={<Pricing />} />
 
           {/* Rutas para cualquier autenticado. Eliminada /ofertas hacia rutas especificas */}
           <Route element={<ProtectedRoute />}>
@@ -48,7 +49,6 @@ function App() {
             <Route path="/perfil" element={<PerfilCandidato />} />
             <Route path="/mi-perfil" element={<MiPerfil />} />
             <Route path="/quiz/:skill" element={<SkillQuiz />} />
-            <Route path="/pricing" element={<Pricing />} />
           </Route>
 
           {/* Rutas protegidas: solo empresas */}

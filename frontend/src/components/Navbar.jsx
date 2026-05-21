@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { LogOut, Menu, User, Briefcase, PlusCircle, Search, Home } from 'lucide-react';
+import { LogOut, Menu, User, Briefcase, PlusCircle, Search, Home, Sparkles } from 'lucide-react';
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -155,6 +155,7 @@ const Navbar = () => {
                     <a href="/" style={navItemStyle('/')}>Inicio</a>
                     {!user && (
                         <>
+                            <a href="/pricing" style={{...navItemStyle('/pricing'), display: 'flex', alignItems: 'center', gap: '4px', color: '#D48800'}}><Sparkles size={16}/> Premium</a>
                             <a href="/ofertas" style={navItemStyle('/ofertas')}>Encontrar Trabajo</a>
                             <a href="#proximamente" style={navItemStyle('/para-empresas')}>Para Empresas</a>
                         </>
@@ -164,7 +165,31 @@ const Navbar = () => {
                 {/* Auth & Profile Actions */}
                 <div className="auth-buttons user-menu-container">
                     {user ? (
-                        <div style={{ position: 'relative' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            {user.user_metadata?.rol !== 'empresa' && user.user_metadata?.rol !== 'admin' && !isPremium && (
+                                <button
+                                    onClick={() => navigate('/pricing')}
+                                    style={{
+                                        background: 'linear-gradient(90deg, #FFB020 0%, #FF9800 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        padding: '8px 16px',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        boxShadow: '0 4px 15px rgba(255,176,32,0.3)',
+                                        transition: 'transform 0.2s',
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                    onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                                >
+                                    <Sparkles size={16} /> Premium
+                                </button>
+                            )}
+                            <div style={{ position: 'relative' }}>
                             <div 
                                 onClick={() => setMenuOpen(!menuOpen)} 
                                 style={{ 
@@ -264,6 +289,14 @@ const Navbar = () => {
                                             >
                                                 <Search size={18} color="var(--primary)"/> Encontrar Trabajo
                                             </div>
+                                            <div 
+                                                onClick={() => { navigate('/pricing'); setMenuOpen(false); }}
+                                                style={dropdownItemStyle}
+                                                onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <Sparkles size={18} color="var(--primary)"/> {isPremium ? 'Mi Suscripción' : 'Hazte Premium'}
+                                            </div>
                                         </>
                                     )}
 
@@ -279,6 +312,7 @@ const Navbar = () => {
                                     </div>
                                 </div>
                             )}
+                            </div>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', gap: '15px' }}>
