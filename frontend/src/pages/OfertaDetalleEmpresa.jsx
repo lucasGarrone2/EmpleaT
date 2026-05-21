@@ -66,7 +66,7 @@ export default function OfertaDetalleEmpresa() {
                     .select(`
                         id, estado, fecha_postulacion, porcentaje_match_calculado,
                         candidatos (
-                            id, nombre_completo, ubicacion, modalidad_preferida, score_proactividad, titulo_profesional, anios_experiencia, foto_url,
+                            id, nombre_completo, ubicacion, modalidad_preferida, score_proactividad, titulo_profesional, anios_experiencia, foto_url, es_premium,
                             candidato_skills(
                                 skill_id,
                                 nombre_original,
@@ -75,11 +75,108 @@ export default function OfertaDetalleEmpresa() {
                             )
                         )
                     `)
-                    .eq('oferta_id', id)
-                    .order('porcentaje_match_calculado', { ascending: false });
+                    .eq('oferta_id', id);
 
                 if (postError) throw postError;
-                setPostulantes(postData || []);
+
+                // Precalcular afinidades en memoria para poder ordenar por Tiers Premium
+                const reqSkills = ofData.oferta_skills || [];
+                const synonymMap = {
+                    'sql': ['mysql', 'postgresql', 'sql server', 'oracle', 'pl/sql'],
+                    'mysql': ['sql', 'base de datos', 'mariadb'],
+                    'postgresql': ['sql', 'base de datos'],
+                    'cloud': ['aws', 'azure', 'gcp', 'google cloud', 'nube'],
+                    'aws': ['cloud', 'nube', 'amazon web services'],
+                    'azure': ['cloud', 'nube', 'microsoft azure'],
+                    'gcp': ['cloud', 'nube', 'google cloud'],
+                    'frontend': ['react', 'vue', 'angular', 'html', 'css', 'javascript', 'js'],
+                    'backend': ['node', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'express', 'desarrollo web'],
+                    'javascript': ['js', 'typescript', 'react', 'node', 'vue', 'angular', 'frontend'],
+                    'js': ['javascript', 'typescript', 'frontend'],
+                    'react': ['javascript', 'frontend', 'reactjs', 'react.js'],
+                    'java': ['spring', 'backend', 'java ee', 'springboot'],
+                    'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi'],
+                    'desarrollo web': ['html', 'css', 'javascript', 'frontend', 'backend', 'web', 'php'],
+                    'html': ['html5', 'frontend', 'desarrollo web', 'css'],
+                    'css': ['css3', 'frontend', 'desarrollo web', 'html']
+                };
+
+                const processedPostulantes = (postData || []).map(post => {
+                    const cant = post.candidatos;
+                    let totalScore = 0;
+                    const matchTags = [];
+                    const candSkills = cant?.candidato_skills || [];
+
+                    if (reqSkills.length > 0) {
+                        reqSkills.forEach(req => {
+                            const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+                            const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
+                            const nivelReq = req.nivel_requerido ?? null;
+                            
+                            const matchTarget = candSkills.find(cs => {
+                                if (cs.skill_id && cs.skill_id === req.skill_id) return true;
+                                const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
+                                if (!csStr || !reqStr) return false;
+                                if (csStr === reqStr) return true;
+                                const minLen = Math.min(csStr.length, reqStr.length);
+                                if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
+                                const reqSynonyms = synonymMap[reqStr] || [];
+                                const csSynonyms = synonymMap[csStr] || [];
+                                if (reqSynonyms.some(syn => csStr.includes(syn) || syn.includes(csStr))) return true;
+                                if (csSynonyms.some(syn => reqStr.includes(syn) || syn.includes(reqStr))) return true;
+                                return false;
+                            });
+                            
+                            if (matchTarget) {
+                                matchTags.push(req.nombre_original || req.diccionario_skills?.nombre_skill || reqStr);
+                                if (!nivelReq) {
+                                    totalScore += 1.0;
+                                } else {
+                                    const nivelCand = matchTarget.nivel_estimado || 3;
+                                    const diff = nivelReq - nivelCand;
+                                    if (diff <= 0) totalScore += 1.0;
+                                    else if (diff === 1) totalScore += 0.75;
+                                    else if (diff === 2) totalScore += 0.50;
+                                    else totalScore += 0.10;
+                                }
+                            }
+                        });
+                    }
+
+                    const recalculatedMatch = reqSkills.length > 0
+                        ? Math.round((totalScore / reqSkills.length) * 100)
+                        : (post.porcentaje_match_calculado ?? 0);
+
+                    return {
+                        ...post,
+                        recalculatedMatch,
+                        matchTags
+                    };
+                });
+
+                // Ordenar: >= 80% Premium van primero, luego >= 80% No Premium, luego < 80%
+                processedPostulantes.sort((a, b) => {
+                    const matchA = a.recalculatedMatch;
+                    const matchB = b.recalculatedMatch;
+                    const premiumA = !!a.candidatos?.es_premium;
+                    const premiumB = !!b.candidatos?.es_premium;
+
+                    const isHighMatchA = matchA >= 80;
+                    const isHighMatchB = matchB >= 80;
+
+                    if (isHighMatchA && isHighMatchB) {
+                        if (premiumA && !premiumB) return -1;
+                        if (!premiumA && premiumB) return 1;
+                        return matchB - matchA;
+                    }
+
+                    if (isHighMatchA && !isHighMatchB) return -1;
+                    if (!isHighMatchA && isHighMatchB) return 1;
+
+                    return matchB - matchA;
+                });
+
+                setPostulantes(processedPostulantes);
 
             } catch (err) {
                 console.error("Error al cargar detalle", err);
@@ -289,74 +386,8 @@ export default function OfertaDetalleEmpresa() {
                 ) : (
                     postulantes.map((post, index) => {
                         const cant = post.candidatos;
-                        
-                        // Match ponderado por nivel — mismo algoritmo que la vista del candidato
-                        let totalScore = 0;
-                        const matchTags = [];
-                        
-                        const reqSkills = oferta.oferta_skills || [];
-                        const candSkills = cant.candidato_skills || [];
-
-                        if (reqSkills.length > 0) {
-                            const synonymMap = {
-                                'sql': ['mysql', 'postgresql', 'sql server', 'oracle', 'pl/sql'],
-                                'mysql': ['sql', 'base de datos', 'mariadb'],
-                                'postgresql': ['sql', 'base de datos'],
-                                'cloud': ['aws', 'azure', 'gcp', 'google cloud', 'nube'],
-                                'aws': ['cloud', 'nube', 'amazon web services'],
-                                'azure': ['cloud', 'nube', 'microsoft azure'],
-                                'gcp': ['cloud', 'nube', 'google cloud'],
-                                'frontend': ['react', 'vue', 'angular', 'html', 'css', 'javascript', 'js'],
-                                'backend': ['node', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'express', 'desarrollo web'],
-                                'javascript': ['js', 'typescript', 'react', 'node', 'vue', 'angular', 'frontend'],
-                                'js': ['javascript', 'typescript', 'frontend'],
-                                'react': ['javascript', 'frontend', 'reactjs', 'react.js'],
-                                'java': ['spring', 'backend', 'java ee', 'springboot'],
-                                'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi'],
-                                'desarrollo web': ['html', 'css', 'javascript', 'frontend', 'backend', 'web', 'php'],
-                                'html': ['html5', 'frontend', 'desarrollo web', 'css'],
-                                'css': ['css3', 'frontend', 'desarrollo web', 'html']
-                            };
-
-                            reqSkills.forEach(req => {
-                                const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
-                                const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
-                                const nivelReq = req.nivel_requerido ?? null;
-                                
-                                const matchTarget = candSkills.find(cs => {
-                                    if (cs.skill_id && cs.skill_id === req.skill_id) return true;
-                                    const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
-                                    if (!csStr || !reqStr) return false;
-                                    if (csStr === reqStr) return true;
-                                    const minLen = Math.min(csStr.length, reqStr.length);
-                                    if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
-                                    const reqSynonyms = synonymMap[reqStr] || [];
-                                    const csSynonyms = synonymMap[csStr] || [];
-                                    if (reqSynonyms.some(syn => csStr.includes(syn) || syn.includes(csStr))) return true;
-                                    if (csSynonyms.some(syn => reqStr.includes(syn) || syn.includes(reqStr))) return true;
-                                    return false;
-                                });
-                                
-                                if (matchTarget) {
-                                    matchTags.push(req.nombre_original || req.diccionario_skills?.nombre_skill || reqStr);
-                                    if (!nivelReq) {
-                                        totalScore += 1.0;
-                                    } else {
-                                        const nivelCand = matchTarget.nivel_estimado || 3;
-                                        const diff = nivelReq - nivelCand;
-                                        if (diff <= 0) totalScore += 1.0;
-                                        else if (diff === 1) totalScore += 0.75;
-                                        else if (diff === 2) totalScore += 0.50;
-                                        else totalScore += 0.10;
-                                    }
-                                }
-                            });
-                        }
-                        
-                        const recalculatedMatch = reqSkills.length > 0
-                            ? Math.round((totalScore / reqSkills.length) * 100)
-                            : (post.porcentaje_match_calculado ?? 0);
-
+                        const recalculatedMatch = post.recalculatedMatch;
+                        const matchTags = post.matchTags || [];
                         const isTop = index === 0;
 
                         return (
@@ -404,8 +435,13 @@ export default function OfertaDetalleEmpresa() {
                                         )}
                                     </div>
                                     <div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
                                             <h3 style={{ margin: 0, fontSize: '1.3rem', color: 'var(--text-dark)' }}>{cant.nombre_completo}</h3>
+                                            {cant.es_premium && (
+                                                <span title="Candidato Premium" style={{ display: 'inline-flex', padding: '2px 8px', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(255,165,0,0.3)', letterSpacing: '0.5px' }}>
+                                                    PREMIUM
+                                                </span>
+                                            )}
                                             {isTop && <span style={{ background: 'var(--primary)', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>MEJOR MATCH</span>}
                                         </div>
                                         <div style={{ color: 'var(--text-gray)', fontSize: '0.95rem', display: 'flex', gap: '15px' }}>

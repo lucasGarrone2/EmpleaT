@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { Filter, Star, MapPin, Briefcase, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Filter, Star, MapPin, Briefcase, ChevronLeft, ChevronRight, Sparkles, Zap } from 'lucide-react';
 import MatchBadge from '../components/MatchBadge';
 import PremiumActionZone from '../components/PremiumActionZone';
 import InterviewModal from '../components/InterviewModal';
@@ -419,6 +419,73 @@ export default function ListaOfertas() {
                             <option>Finanzas</option>
                         </select>
                     </div>
+
+                    {candidatoData && !candidatoData.es_premium && (
+                        <div style={{
+                            marginTop: '2rem',
+                            background: 'linear-gradient(135deg, #102C21 0%, #1A4635 100%)',
+                            borderRadius: '16px',
+                            padding: '1.5rem',
+                            color: 'white',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            boxShadow: '0 10px 25px rgba(16,44,33,0.2)'
+                        }}>
+                            {/* Decorative glowing element */}
+                            <div style={{
+                                position: 'absolute',
+                                right: '-20px',
+                                top: '-20px',
+                                width: '80px',
+                                height: '80px',
+                                borderRadius: '50%',
+                                background: 'rgba(0, 214, 107, 0.15)',
+                                filter: 'blur(10px)'
+                            }} />
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                <Sparkles size={20} color="#FF9D42" fill="#FF9D42" />
+                                <span style={{ fontWeight: 'bold', fontSize: '0.85rem', color: '#FF9D42', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                                    EmpleaT Premium
+                                </span>
+                            </div>
+
+                            <h4 style={{ color: 'white', fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '10px', lineHeight: '1.3' }}>
+                                ¿Quieres conseguir trabajo 3 veces más rápido?
+                            </h4>
+                            
+                            <p style={{ fontSize: '0.85rem', color: '#A3C7B5', marginBottom: '1.5rem', lineHeight: '1.4' }}>
+                                Practica entrevistas con IA personalizadas para cada oferta y obtén feedback instantáneo.
+                            </p>
+
+                            <button
+                                onClick={() => navigate('/pricing')}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px',
+                                    background: 'linear-gradient(90deg, #FFB020 0%, #FF9800 100%)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '10px',
+                                    fontWeight: 'bold',
+                                    fontSize: '0.9rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    boxShadow: '0 4px 12px rgba(255,152,0,0.3)',
+                                    transition: 'all 0.2s',
+                                    position: 'relative',
+                                    zIndex: 1
+                                }}
+                                onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                            >
+                                <Zap size={14} fill="white" /> Ser Premium
+                            </button>
+                        </div>
+                    )}
                 </aside>
 
                 {/* LISTA DE OFERTAS */}
