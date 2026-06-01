@@ -16,6 +16,10 @@ export default function PerfilCandidatoParaEmpresa() {
     const [ofertaSkills, setOfertaSkills] = useState([]);
     const [error, setError] = useState(null);
 
+    // ATS Pipeline states
+    const [estadoPostulacion, setEstadoPostulacion] = useState('postulado');
+    const [postulacionId, setPostulacionId] = useState(null);
+
     useEffect(() => {
         if (!user || user.user_metadata?.rol !== 'empresa') {
             navigate('/login');
@@ -55,7 +59,7 @@ export default function PerfilCandidatoParaEmpresa() {
                 // VALIDACIÓN IDOR: ¿El candidato realmente se postuló a esta oferta?
                 const { data: postulacionValida, error: postErr } = await supabase
                     .from('postulaciones')
-                    .select('id')
+                    .select('id, estado')
                     .eq('oferta_id', ofertaId)
                     .eq('candidato_id', candidatoId)
                     .maybeSingle();
@@ -63,6 +67,9 @@ export default function PerfilCandidatoParaEmpresa() {
                 if (postErr || !postulacionValida) {
                     throw new Error("Acceso Denegado: Este perfil es privado porque el candidato no aplicó a tu oferta.");
                 }
+
+                setPostulacionId(postulacionValida.id);
+                setEstadoPostulacion(postulacionValida.estado || 'postulado');
 
                 setOfertaSkills(ofData.oferta_skills || []);
 
@@ -103,6 +110,22 @@ export default function PerfilCandidatoParaEmpresa() {
 
         fetchDetalle();
     }, [ofertaId, candidatoId, user, navigate]);
+
+    // Función para cambiar de fase del pipeline ATS
+    const updateEstado = async (nuevoEstado) => {
+        try {
+            const { error: updateErr } = await supabase
+                .from('postulaciones')
+                .update({ estado: nuevoEstado })
+                .eq('id', postulacionId);
+
+            if (updateErr) throw updateErr;
+            setEstadoPostulacion(nuevoEstado);
+        } catch (err) {
+            console.error("Error al actualizar estado:", err);
+            alert("No se pudo actualizar el estado de la postulación.");
+        }
+    };
 
 
     if (loading) {
@@ -214,75 +237,265 @@ export default function PerfilCandidatoParaEmpresa() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                 
                 {/* Cabecera del Candidato */}
-                <div style={{ background: 'var(--bg-white)', padding: '2.5rem', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 5px 15px rgba(0,0,0,0.02)', display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                    <div style={{ 
-                        width: '90px', height: '90px', borderRadius: '50%', 
-                        background: 'linear-gradient(135deg, rgba(0,214,107,0.1) 0%, rgba(0,153,77,0.1) 100%)',
-                        color: 'var(--primary)', display: 'flex', justifyContent: 'center', alignItems: 'center',
-                        fontSize: '2.5rem', fontWeight: 'bold', overflow: 'hidden'
-                    }}>
-                        {candidato.foto_url ? (
-                            <img src={candidato.foto_url} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                            candidato.nombre_completo.charAt(0).toUpperCase()
-                        )}
-                    </div>
-                    <div>
-                        <h1 style={{ margin: '0 0 5px 0', fontSize: '2rem', color: 'var(--text-dark)' }}>{candidato.nombre_completo}</h1>
-                        <div style={{ color: 'var(--text-gray)', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Briefcase size={18}/> {candidato.titulo_profesional || 'Profesional'}</span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={18}/> {candidato.anios_experiencia} años exp.</span>
-                            {candidato.ubicacion && <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={18}/> {candidato.ubicacion}</span>}
+                <div style={{ 
+                    background: 'var(--bg-white)', 
+                    padding: '2.5rem', 
+                    borderRadius: '24px', 
+                    border: '1px solid rgba(0,0,0,0.05)', 
+                    boxShadow: '0 5px 15px rgba(0,0,0,0.02)', 
+                    display: 'flex', 
+                    gap: '2.5rem', 
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap'
+                }}>
+                    {/* Columna Izquierda: Avatar, Nombre e Info + CV */}
+                    <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', flexWrap: 'wrap', flex: '1 1 500px' }}>
+                        <div style={{ 
+                            width: '90px', 
+                            height: '90px', 
+                            borderRadius: '50%', 
+                            background: 'linear-gradient(135deg, rgba(0,214,107,0.1) 0%, rgba(0,153,77,0.1) 100%)',
+                            color: 'var(--primary)', 
+                            display: 'flex', 
+                            justifyContent: 'center', 
+                            alignItems: 'center',
+                            fontSize: '2.5rem', 
+                            fontWeight: 'bold', 
+                            overflow: 'hidden',
+                            flexShrink: 0
+                        }}>
+                            {candidato.foto_url ? (
+                                <img src={candidato.foto_url} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                                candidato.nombre_completo.charAt(0).toUpperCase()
+                            )}
+                        </div>
+                        <div style={{ flex: '1 1 300px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                                <h1 style={{ margin: 0, fontSize: '2rem', color: 'var(--text-dark)' }}>{candidato.nombre_completo}</h1>
+                                {candidato.es_premium && (
+                                    <span style={{ padding: '2px 8px', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 'bold' }}>
+                                        PREMIUM
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ color: 'var(--text-gray)', fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', marginBottom: '1.2rem' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Briefcase size={18}/> {candidato.titulo_profesional || 'Profesional'}</span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Clock size={18}/> {candidato.anios_experiencia} años exp.</span>
+                                {candidato.ubicacion && <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MapPin size={18}/> {candidato.ubicacion}</span>}
+                            </div>
+
+                            {/* Widget de Descarga de CV */}
+                            <div style={{ maxWidth: '350px' }}>
+                                {candidato.cv_url ? (
+                                    <div 
+                                        onClick={async () => {
+                                            try {
+                                                const { data, error } = await supabase.storage.from('cv_files').download(candidato.cv_url);
+                                                if (error) throw error;
+                                                const url = URL.createObjectURL(data);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = candidato.cv_url.split('/').pop() || 'curriculum.pdf';
+                                                a.click();
+                                                URL.revokeObjectURL(url);
+                                            } catch (err) {
+                                                console.error('Error al descargar CV:', err);
+                                                alert("No se pudo descargar el archivo.");
+                                            }
+                                        }}
+                                        style={{ 
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: '10px', 
+                                            background: 'rgba(0,214,107,0.03)', 
+                                            padding: '10px 14px', 
+                                            borderRadius: '12px', 
+                                            border: '1px dashed rgba(0,214,107,0.3)', 
+                                            cursor: 'pointer', 
+                                            transition: 'all 0.2s' 
+                                        }}
+                                        onMouseOver={e => {
+                                            e.currentTarget.style.background = 'rgba(0,214,107,0.08)';
+                                            e.currentTarget.style.borderStyle = 'solid';
+                                        }}
+                                        onMouseOut={e => {
+                                            e.currentTarget.style.background = 'rgba(0,214,107,0.03)';
+                                            e.currentTarget.style.borderStyle = 'dashed';
+                                        }}
+                                        title="Descargar CV del candidato"
+                                    >
+                                        <FileText size={18} color="var(--primary)" />
+                                        <span style={{ fontWeight: '600', color: 'var(--text-dark)', fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '280px' }}>
+                                            Descargar CV (PDF)
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f5f5f5', padding: '10px 14px', borderRadius: '12px', border: '1px dashed #ccc' }}>
+                                        <FileText size={18} color="#999" />
+                                        <span style={{ fontWeight: '500', color: '#999', fontSize: '0.9rem' }}>Ningún CV cargado</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-               
+                    {/* Columna Derecha: Panel de ATS y Contacto Seguro */}
+                    <div style={{
+                        flex: '1 1 320px',
+                        background: 'rgba(0,214,107,0.02)',
+                        border: '1px solid rgba(0,214,107,0.12)',
+                        borderRadius: '20px',
+                        padding: '1.5rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,214,107,0.08)', paddingBottom: '10px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-gray)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Proceso de Selección
+                            </span>
+                            {(() => {
+                                const normalized = estadoPostulacion?.toLowerCase();
+                                if (normalized === 'postulado') return <span style={{ padding: '4px 10px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>Postulado</span>;
+                                if (normalized === 'en revisión' || normalized === 'en_revision' || normalized === 'en revision') return <span style={{ padding: '4px 10px', background: '#fef3c7', color: '#b45309', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>CV Visto</span>;
+                                if (normalized === 'entrevista') return <span style={{ padding: '4px 10px', background: '#f3e8ff', color: '#6b21a8', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>En Entrevista</span>;
+                                if (normalized === 'seleccionado' || normalized === 'contratado') return <span style={{ padding: '4px 10px', background: '#dcfce7', color: '#15803d', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>¡Seleccionado! 🎉</span>;
+                                if (normalized === 'rechazado') return <span style={{ padding: '4px 10px', background: '#fee2e2', color: '#b91c1c', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>Finalizado</span>;
+                                return <span style={{ padding: '4px 10px', background: '#f3f4f6', color: '#374151', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>{estadoPostulacion}</span>;
+                            })()}
+                        </div>
 
-                                <div>
-                                        <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.9rem', marginBottom: '0.3rem' }}>Currículum Vitae</label>
-                                        {candidato.cv_url ? (
-                                            <div 
-                                                onClick={async () => {
-                                                    try {
-                                                        const { data, error } = await supabase.storage.from('cv_files').download(candidato.cv_url);
-                                                        if (error) throw error;
-                                                        const url = URL.createObjectURL(data);
-                                                        const a = document.createElement('a');
-                                                        a.href = url;
-                                                        a.download = candidato.cv_url.split('/').pop() || 'curriculum.pdf';
-                                                        a.click();
-                                                        URL.revokeObjectURL(url);
-                                                    } catch (err) {
-                                                        console.error('Error al descargar CV:', err);
-                                                        alert("No se pudo descargar el archivo.");
-                                                    }
-                                                }}
-                                                style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,214,107,0.05)', padding: '12px 15px', borderRadius: '10px', border: '1px dashed var(--primary)', cursor: 'pointer', transition: 'background 0.2s' }}
-                                                onMouseOver={e => e.currentTarget.style.background = 'rgba(0,214,107,0.1)'}
-                                                onMouseOut={e => e.currentTarget.style.background = 'rgba(0,214,107,0.05)'}
-                                                title="Descargar mi CV"
-                                            >
-                                                <FileText size={20} color="var(--primary)" />
-                                                <span style={{ fontWeight: '500', color: 'var(--text-dark)' }}>
-                                                    {(() => {
-                                                        const filename = candidato.cv_url.split('/').pop();
-                                                        const parts = filename.split('_');
-                                                        return (parts.length >= 3 && parts[0] === 'cv') ? parts.slice(2).join('_') : filename;
-                                                    })()}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f5f5f5', padding: '12px 15px', borderRadius: '10px', border: '1px dashed #ccc' }}>
-                                                <FileText size={20} color="#999" />
-                                                <span style={{ fontWeight: '500', color: '#999' }}>Ningún CV cargado</span>
-                                            </div>
-                                        )}
-                                        
-                                 </div>
-
-                
-
-
+                        {estadoPostulacion?.toLowerCase() === 'postulado' ? (
+                            // Candidato "Postulado": Email Oculto/Enmascarado + Botón de Iniciar Proceso
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '8px', 
+                                    background: '#f8fafc', 
+                                    padding: '10px 14px', 
+                                    borderRadius: '10px', 
+                                    border: '1px solid #e2e8f0',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.9rem',
+                                    color: '#94a3b8',
+                                    userSelect: 'none'
+                                }}>
+                                    📧 {candidato.email ? (() => {
+                                        const [local, domain] = candidato.email.split('@');
+                                        if (!local || !domain) return "••••@••••.com";
+                                        return `${local.charAt(0)}•••••@${domain}`;
+                                    })() : "••••@••••.com"}
+                                </div>
+                                <button
+                                    onClick={() => updateEstado('En revisión')}
+                                    style={{
+                                        background: 'var(--primary)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        padding: '12px',
+                                        fontSize: '0.95rem',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 4px 15px rgba(0,214,107,0.2)',
+                                        transition: 'all 0.2s',
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                    onMouseOver={e => {
+                                        e.currentTarget.style.transform = 'translateY(-1px)';
+                                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,214,107,0.3)';
+                                    }}
+                                    onMouseOut={e => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,214,107,0.2)';
+                                    }}
+                                >
+                                    🚀 Iniciar Proceso (Revelar Email)
+                                </button>
+                            </div>
+                        ) : (
+                            // Proceso iniciado: Email Real Revelado + Selector ATS de fase
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between', 
+                                    background: 'rgba(0,214,107,0.04)', 
+                                    padding: '10px 14px', 
+                                    borderRadius: '10px', 
+                                    border: '1px solid rgba(0,214,107,0.15)' 
+                                }}>
+                                    <a 
+                                        href={`mailto:${candidato.email}`} 
+                                        style={{ 
+                                            fontSize: '0.9rem', 
+                                            color: 'var(--primary)', 
+                                            fontWeight: '700', 
+                                            textDecoration: 'none',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                            maxWidth: '200px'
+                                        }}
+                                        title="Enviar correo electrónico directo"
+                                    >
+                                        📧 {candidato.email}
+                                    </a>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(candidato.email);
+                                            alert("¡Email copiado al portapapeles con éxito!");
+                                        }}
+                                        style={{ 
+                                            background: 'none', 
+                                            border: 'none', 
+                                            color: '#64748b', 
+                                            cursor: 'pointer', 
+                                            fontSize: '0.75rem',
+                                            fontWeight: 'bold',
+                                            textDecoration: 'underline'
+                                        }}
+                                    >
+                                        Copiar
+                                    </button>
+                                </div>
+                                
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                    <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>
+                                        Mover candidato a:
+                                    </label>
+                                    <select
+                                        value={estadoPostulacion}
+                                        onChange={(e) => updateEstado(e.target.value)}
+                                        style={{
+                                            padding: '10px',
+                                            borderRadius: '10px',
+                                            border: '1px solid #cbd5e1',
+                                            fontSize: '0.9rem',
+                                            fontWeight: 'bold',
+                                            color: 'var(--text-dark)',
+                                            background: 'white',
+                                            cursor: 'pointer',
+                                            outline: 'none',
+                                            boxShadow: '0 2px 5px rgba(0,0,0,0.02)'
+                                        }}
+                                    >
+                                        <option value="En revisión">CV Visto / En Revisión</option>
+                                        <option value="Entrevista">En Entrevista</option>
+                                        <option value="Seleccionado">¡Contratado! 🎉</option>
+                                        <option value="Rechazado">Rechazado</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Sobre Mí */}

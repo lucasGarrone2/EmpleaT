@@ -282,6 +282,14 @@ const Navbar = () => {
                                                 <User size={18} color="var(--primary)"/> Mi Perfil Profesional
                                             </div>
                                             <div 
+                                                onClick={() => { navigate('/mis-postulaciones'); setMenuOpen(false); }}
+                                                style={dropdownItemStyle}
+                                                onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <Briefcase size={18} color="var(--primary)"/> Mis Postulaciones
+                                            </div>
+                                            <div 
                                                 onClick={() => { navigate('/ofertas'); setMenuOpen(false); }}
                                                 style={dropdownItemStyle}
                                                 onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}

@@ -21,7 +21,10 @@ export default function EmpresaDashboard() {
     const [onboardData, setOnboardData] = useState({
         nombre: '',
         sector: '',
-        ubicacion: ''
+        ubicacion: '',
+        cuit: '',
+        razon_social: '',
+        sitio_web: ''
     });
     const [logoFile, setLogoFile] = useState(null);
     const [logoPreview, setLogoPreview] = useState(null);
@@ -89,6 +92,20 @@ export default function EmpresaDashboard() {
         setGuardando(true);
         setError(null);
 
+        // 1. CUIT check (exactly 11 digits)
+        const cuitClean = onboardData.cuit.replace(/[^0-9]/g, '');
+        if (!/^\d{11}$/.test(cuitClean)) {
+            setError("El CUIT debe consistir de exactamente 11 dígitos numéricos.");
+            setGuardando(false);
+            return;
+        }
+
+        // 2. Website check
+        let webUrl = onboardData.sitio_web.trim();
+        if (webUrl && !/^https?:\/\//i.test(webUrl)) {
+            webUrl = "https://" + webUrl;
+        }
+
         try {
             let finalLogoUrl = null;
 
@@ -117,7 +134,10 @@ export default function EmpresaDashboard() {
                 auth_id: user.id,
                 nombre: onboardData.nombre,
                 sector: onboardData.sector,
-                ubicacion: onboardData.ubicacion
+                ubicacion: onboardData.ubicacion,
+                cuit: cuitClean,
+                razon_social: onboardData.razon_social,
+                sitio_web: webUrl
             };
             if (finalLogoUrl) insertPayload.logo_url = finalLogoUrl;
 
@@ -127,7 +147,12 @@ export default function EmpresaDashboard() {
                 .select()
                 .single();
 
-            if (insertError) throw insertError;
+            if (insertError) {
+                if (insertError.code === '23505' || insertError.message?.includes('unique_cuit') || insertError.message?.includes('cuit')) {
+                    throw new Error("Este CUIT ya se encuentra registrado por otra empresa activa. Por favor, verifique el número.");
+                }
+                throw insertError;
+            }
             
             setEmpresa(data);
             setIsOnboarding(false);
@@ -168,7 +193,7 @@ export default function EmpresaDashboard() {
                 <div className="bg-shape shape-1"></div>
                 <div className="bg-shape shape-2"></div>
                 
-                <div style={{ position: 'relative', width: '100%', maxWidth: '600px', backgroundColor: 'var(--bg-white)', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', padding: '3.5rem', zIndex: 1 }}>
+                <div style={{ position: 'relative', width: '100%', maxWidth: '650px', backgroundColor: 'var(--bg-white)', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', padding: '3.5rem', zIndex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '1rem' }}>
                         {logoPreview ? (
                             <img src={logoPreview} alt="Logo Prev" style={{ width: '64px', height: '64px', borderRadius: '18px', objectFit: 'cover', border: '1px solid rgba(0,214,107,0.3)' }} />
@@ -177,18 +202,100 @@ export default function EmpresaDashboard() {
                                 <Building2 size={32} color="var(--primary)" />
                             </div>
                         )}
-                        <h2 className="brand-title" style={{ fontSize: '2.2rem', margin: 0 }}>Perfil Corporativo / Reclutador</h2>
+                        <h2 className="brand-title" style={{ fontSize: '2.2rem', margin: 0 }}>Registro de Empresa</h2>
                     </div>
                     <p style={{ color: 'var(--text-gray)', fontSize: '1.1rem', marginBottom: '2.5rem' }}>
-                        Para comenzar a publicar búsquedas, necesitamos algunos datos sobre tu empresa o tu perfil como reclutador independiente.
+                        Completa el formulario de verificación fiscal para activar tu cuenta de reclutamiento oficial en EmpleaT.
                     </p>
 
-                    {error && <div className="message error" style={{marginBottom: '2rem'}}>{error}</div>}
+                    {error && <div className="message error" style={{marginBottom: '2rem', padding: '12px 18px', borderLeft: '4px solid #f44336'}}>{error}</div>}
 
                     <form onSubmit={handleOnboardSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                         
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                            <div>
+                                <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>CUIT de la Organización *</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    pattern="\d{11}"
+                                    title="El CUIT debe consistir de exactamente 11 dígitos numéricos sin guiones ni espacios."
+                                    value={onboardData.cuit}
+                                    onChange={e => setOnboardData({...onboardData, cuit: e.target.value.replace(/[^0-9]/g, '')})}
+                                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+                                    placeholder="Ej: 30715496328"
+                                    maxLength="11"
+                                />
+                                <small style={{ color: 'var(--text-gray)', marginTop: '4px', display: 'block' }}>11 dígitos numéricos.</small>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Razón Social *</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={onboardData.razon_social}
+                                    onChange={e => setOnboardData({...onboardData, razon_social: e.target.value})}
+                                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+                                    placeholder="Ej: TechCorp S.A."
+                                />
+                                <small style={{ color: 'var(--text-gray)', marginTop: '4px', display: 'block' }}>Nombre legal de la firma.</small>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                            <div>
+                                <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Nombre Comercial *</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={onboardData.nombre}
+                                    onChange={e => setOnboardData({...onboardData, nombre: e.target.value})}
+                                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+                                    placeholder="Ej: TechCorp"
+                                />
+                                <small style={{ color: 'var(--text-gray)', marginTop: '4px', display: 'block' }}>Cómo se mostrará a los candidatos.</small>
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Sitio Web Corporativo *</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={onboardData.sitio_web}
+                                    onChange={e => setOnboardData({...onboardData, sitio_web: e.target.value})}
+                                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+                                    placeholder="Ej: www.techcorp.com"
+                                />
+                                <small style={{ color: 'var(--text-gray)', marginTop: '4px', display: 'block' }}>URL oficial de la empresa.</small>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                            <div>
+                                <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Rubro o Sector Principal *</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={onboardData.sector}
+                                    onChange={e => setOnboardData({...onboardData, sector: e.target.value})}
+                                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+                                    placeholder="Ej: Tecnología, Salud, Finanzas..."
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Ubicación *</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={onboardData.ubicacion}
+                                    onChange={e => setOnboardData({...onboardData, ubicacion: e.target.value})}
+                                    style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
+                                    placeholder="Ej: Buenos Aires, Argentina"
+                                />
+                            </div>
+                        </div>
+
                         <div>
-                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Logo de la Empresa o Agencia (Opcional)</label>
+                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Logo de la Empresa (Opcional)</label>
                             <input 
                                 type="file" 
                                 accept="image/jpeg, image/png, image/webp"
@@ -196,38 +303,6 @@ export default function EmpresaDashboard() {
                                 style={{ width: '100%', padding: '10px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', background: '#f9fdfa', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}
                             />
                             <small style={{ color: 'var(--text-gray)', marginTop: '4px', display: 'block' }}>Formatos aceptados: JPG, PNG, WEBP. Max 2MB.</small>
-                        </div>
-
-                        <div>
-                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Nombre de la Empresa o Reclutador</label>
-                            <input 
-                                type="text" 
-                                required
-                                value={onboardData.nombre}
-                                onChange={e => setOnboardData({...onboardData, nombre: e.target.value})}
-                                style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
-                                placeholder="Ej: TechCorp S.A. o Juan Pérez Reclutamiento"
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Rubro o Sector Principal</label>
-                            <input 
-                                type="text" 
-                                value={onboardData.sector}
-                                onChange={e => setOnboardData({...onboardData, sector: e.target.value})}
-                                style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
-                                placeholder="Ej: IT, RRHH, Consultoría..."
-                            />
-                        </div>
-                        <div>
-                            <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.95rem', marginBottom: '0.5rem', fontWeight: 'bold' }}>Ubicación (Sede Central o Base Operativa)</label>
-                            <input 
-                                type="text" 
-                                value={onboardData.ubicacion}
-                                onChange={e => setOnboardData({...onboardData, ubicacion: e.target.value})}
-                                style={{ width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1.05rem', outline: 'none', boxSizing: 'border-box' }}
-                                placeholder="Ej: Buenos Aires, Argentina"
-                            />
                         </div>
                         
                         <button 

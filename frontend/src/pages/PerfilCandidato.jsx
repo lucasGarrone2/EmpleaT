@@ -126,6 +126,7 @@ export default function PerfilCandidato() {
                     titulo_profesional: datosExtraidos.profesion,
                     anios_experiencia: datosExtraidos.experiencia_anios,
                     sobre_mi: bio, // Este campo se carga desde el textarea manual
+                    email: user.email, // Guardamos el email para contacto del reclutador
                     ...(pdfPath ? { cv_url: pdfPath } : {})
                 }, { onConflict: 'auth_id' })
                 .select('id')

@@ -22,6 +22,7 @@ import ResetPassword from './pages/ResetPassword';
 import AdminDashboard from './pages/AdminDashboard';
 import SkillQuiz from './pages/SkillQuiz';
 import Pricing from './pages/Pricing';
+import MisPostulaciones from './pages/MisPostulaciones';
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
             <Route path="/perfil" element={<PerfilCandidato />} />
             <Route path="/mi-perfil" element={<MiPerfil />} />
             <Route path="/quiz/:skill" element={<SkillQuiz />} />
+            <Route path="/mis-postulaciones" element={<MisPostulaciones />} />
           </Route>
 
           {/* Rutas protegidas: solo empresas */}

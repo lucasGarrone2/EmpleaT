@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { User, Briefcase, Clock, FileText, Edit2, Save, X, BrainCircuit, Trash2, PlusCircle, Award } from 'lucide-react';
+import { User, Briefcase, Clock, FileText, Edit2, Save, X, BrainCircuit, Trash2, PlusCircle, Award, Calendar, ExternalLink } from 'lucide-react';
 import './Register.css'; // Reusing established styles
 
 export default function MiPerfil() {
@@ -13,6 +13,7 @@ export default function MiPerfil() {
     const [candidato, setCandidato] = useState(null);
     const [skills, setSkills] = useState([]);
     const [insignias, setInsignias] = useState([]);
+    const [postulaciones, setPostulaciones] = useState([]);
     
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({
@@ -107,6 +108,31 @@ export default function MiPerfil() {
                         .eq('candidato_id', candData.id);
                     if (insigniasData) {
                         setInsignias(insigniasData.map(i => i.insignias.nombre));
+                    }
+
+                    // Fetch applications (postulaciones) with ATS stages in real time
+                    const { data: postData, error: postError } = await supabase
+                        .from('postulaciones')
+                        .select(`
+                            id,
+                            estado,
+                            fecha_postulacion,
+                            ofertas (
+                                id,
+                                titulo,
+                                empresas (
+                                    razon_social,
+                                    sitio_web
+                                )
+                            )
+                        `)
+                        .eq('candidato_id', candData.id)
+                        .order('fecha_postulacion', { ascending: false });
+
+                    if (!postError && postData) {
+                        setPostulaciones(postData);
+                    } else if (postError) {
+                        console.error("Error fetching postulaciones", postError);
                     }
                 }
             } catch (err) {
@@ -330,7 +356,7 @@ export default function MiPerfil() {
                 )}
 
                 {!candidato ? (
-                    <div style={{ textAlign: 'center', padding: '3rem' }}>
+                    <div style={{ textalign: 'center', padding: '3rem' }}>
                         <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>¡Aún no has completado tu perfil mágico!</h3>
                         <p style={{ color: 'var(--text-gray)', marginBottom: '2rem', fontSize: '1.1rem' }}>Sube tu CV para que nuestra IA extraiga todos tus datos y te conecte con las mejores empresas.</p>
                         <button 
@@ -506,7 +532,7 @@ export default function MiPerfil() {
                             )}
                         </div>
 
-                        {/* Fila Terciaria: Skills */}
+                        {/* Fila Terciaria: Habilidades */}
                         <div style={{ background: 'var(--bg-white)', padding: '2rem', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', margin: 0, fontSize: '1.3rem' }}>
@@ -517,7 +543,6 @@ export default function MiPerfil() {
                                 </span>
                             </div>
                             
-
 
                             {skills.length > 0 ? (
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: editMode ? '1.5rem' : 0 }}>
@@ -620,6 +645,154 @@ export default function MiPerfil() {
                                             <PlusCircle size={18} /> {addingSkill ? 'Agregando...' : 'Agregar'}
                                         </button>
                                     </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* SECCIÓN NUEVA Y PREMIUM: Mis Postulaciones (Tablero ATS y Progreso) */}
+                        <div style={{ background: 'var(--bg-white)', padding: '2rem', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', marginBottom: '1.5rem', fontSize: '1.3rem' }}>
+                                <Briefcase size={24} /> Mis Postulaciones
+                            </h3>
+
+                            {postulaciones.length > 0 ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                                    {postulaciones.map((post) => {
+                                        const oferta = post.ofertas;
+                                        const empresa = oferta?.empresas;
+                                        const normalized = post.estado?.toLowerCase() || 'postulado';
+                                        
+                                        const isEnRevisionOrHigher = ['en_revision', 'en revisión', 'en revision', 'entrevista', 'seleccionado', 'contratado'].includes(normalized);
+                                        const isEntrevistaOrHigher = ['entrevista', 'seleccionado', 'contratado'].includes(normalized);
+                                        
+                                        return (
+                                            <div key={post.id} style={{
+                                                background: 'rgba(0,214,107,0.01)',
+                                                border: '1px solid rgba(0,214,107,0.1)',
+                                                borderRadius: '16px',
+                                                padding: '1.8rem',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '1.5rem',
+                                                boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
+                                            }}>
+                                                {/* Encabezado de la postulación */}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                                                    <div>
+                                                        <h4 style={{ margin: '0 0 5px 0', fontSize: '1.2rem', color: 'var(--text-dark)' }}>{oferta?.titulo}</h4>
+                                                        <div style={{ color: 'var(--text-gray)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <span style={{ fontWeight: '600' }}>{empresa?.razon_social || 'Empresa Privada'}</span>
+                                                            {empresa?.sitio_web && (
+                                                                <a href={empresa.sitio_web.startsWith('http') ? empresa.sitio_web : `https://${empresa.sitio_web}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: 'var(--primary)', textDecoration: 'none' }}>
+                                                                    Sitio Web <ExternalLink size={12} />
+                                                                </a>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
+                                                        {(() => {
+                                                            if (normalized === 'en_revision' || normalized === 'en revisión' || normalized === 'en revision') return <span style={{ padding: '4px 12px', background: '#fef3c7', color: '#b45309', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>CV Visto / En Revisión</span>;
+                                                            if (normalized === 'entrevista') return <span style={{ padding: '4px 12px', background: '#f3e8ff', color: '#6b21a8', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>En Entrevista</span>;
+                                                            if (normalized === 'seleccionado' || normalized === 'contratado') return <span style={{ padding: '4px 12px', background: '#dcfce7', color: '#15803d', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>¡Seleccionado! 🎉</span>;
+                                                            if (normalized === 'rechazado') return <span style={{ padding: '4px 12px', background: '#fee2e2', color: '#b91c1c', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>Proceso Finalizado</span>;
+                                                            return <span style={{ padding: '4px 12px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>Enviado</span>;
+                                                        })()}
+                                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-gray)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <Calendar size={12} /> Postulado el {new Date(post.created_at).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* ATS Horizontal Timeline (Stepper) */}
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1.2rem', position: 'relative', padding: '0 1rem' }}>
+                                                    {/* Connecting Line */}
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        top: '15px',
+                                                        left: '8%',
+                                                        right: '8%',
+                                                        height: '4px',
+                                                        background: '#e2e8f0',
+                                                        zIndex: 0
+                                                    }}></div>
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        top: '15px',
+                                                        left: '8%',
+                                                        width: (normalized === 'seleccionado' || normalized === 'contratado') ? '84%' : normalized === 'entrevista' ? '56%' : isEnRevisionOrHigher ? '28%' : '0%',
+                                                        height: '4px',
+                                                        background: normalized === 'rechazado' ? '#ef4444' : 'var(--primary)',
+                                                        zIndex: 0,
+                                                        transition: 'width 0.4s ease'
+                                                    }}></div>
+                                                    
+                                                    {/* Step 1: Postulado */}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, flex: 1 }}>
+                                                        <div style={{
+                                                            width: '32px', height: '32px', borderRadius: '50%',
+                                                            background: normalized === 'rechazado' ? '#fee2e2' : 'var(--primary)',
+                                                            color: normalized === 'rechazado' ? '#b91c1c' : 'white',
+                                                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                                                            fontWeight: 'bold', fontSize: '0.85rem', border: '3px solid white',
+                                                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                                                        }}>✓</div>
+                                                        <span style={{ fontSize: '0.78rem', fontWeight: 'bold', color: 'var(--text-dark)', marginTop: '6px' }}>Enviado</span>
+                                                    </div>
+
+                                                    {/* Step 2: CV Visto */}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, flex: 1 }}>
+                                                        <div style={{
+                                                            width: '32px', height: '32px', borderRadius: '50%',
+                                                            background: normalized === 'rechazado' ? '#fee2e2' : isEnRevisionOrHigher ? 'var(--primary)' : '#e2e8f0',
+                                                            color: normalized === 'rechazado' ? '#b91c1c' : isEnRevisionOrHigher ? 'white' : '#64748b',
+                                                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                                                            fontWeight: 'bold', fontSize: '0.85rem', border: '3px solid white',
+                                                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                                                        }}>{normalized === 'rechazado' ? '✗' : isEnRevisionOrHigher ? '✓' : '2'}</div>
+                                                        <span style={{ fontSize: '0.78rem', fontWeight: isEnRevisionOrHigher ? 'bold' : '500', color: isEnRevisionOrHigher ? 'var(--text-dark)' : 'var(--text-gray)', marginTop: '6px' }}>
+                                                            {normalized === 'rechazado' ? 'Finalizado' : 'CV Visto'}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Step 3: Entrevista */}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, flex: 1 }}>
+                                                        <div style={{
+                                                            width: '32px', height: '32px', borderRadius: '50%',
+                                                            background: normalized === 'rechazado' ? '#fee2e2' : isEntrevistaOrHigher ? 'var(--primary)' : '#e2e8f0',
+                                                            color: normalized === 'rechazado' ? '#b91c1c' : isEntrevistaOrHigher ? 'white' : '#64748b',
+                                                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                                                            fontWeight: 'bold', fontSize: '0.85rem', border: '3px solid white',
+                                                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                                                        }}>{normalized === 'rechazado' ? '✗' : isEntrevistaOrHigher ? '✓' : '3'}</div>
+                                                        <span style={{ fontSize: '0.78rem', fontWeight: isEntrevistaOrHigher ? 'bold' : '500', color: isEntrevistaOrHigher ? 'var(--text-dark)' : 'var(--text-gray)', marginTop: '6px' }}>Entrevista</span>
+                                                    </div>
+
+                                                    {/* Step 4: Seleccionado */}
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, flex: 1 }}>
+                                                        <div style={{
+                                                            width: '32px', height: '32px', borderRadius: '50%',
+                                                            background: (normalized === 'seleccionado' || normalized === 'contratado') ? '#22c55e' : normalized === 'rechazado' ? '#fee2e2' : '#e2e8f0',
+                                                            color: (normalized === 'seleccionado' || normalized === 'contratado') ? 'white' : normalized === 'rechazado' ? '#b91c1c' : '#64748b',
+                                                            display: 'flex', justifyContent: 'center', alignItems: 'center',
+                                                            fontWeight: 'bold', fontSize: '0.85rem', border: '3px solid white',
+                                                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                                                        }}>{(normalized === 'seleccionado' || normalized === 'contratado') ? '🎉' : normalized === 'rechazado' ? '✗' : '4'}</div>
+                                                        <span style={{ fontSize: '0.78rem', fontWeight: (normalized === 'seleccionado' || normalized === 'contratado') ? 'bold' : '500', color: (normalized === 'seleccionado' || normalized === 'contratado') ? '#166534' : 'var(--text-gray)', marginTop: '6px' }}>Seleccionado</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div style={{ textAlign: 'center', padding: '2rem 1rem', background: 'rgba(0,0,0,0.01)', border: '1px dashed rgba(0,0,0,0.1)', borderRadius: '12px' }}>
+                                    <p style={{ color: 'var(--text-gray)', margin: '0 0 1rem 0', fontSize: '1rem', fontStyle: 'italic' }}>
+                                        Aún no te has postulado a ninguna oferta de empleo.
+                                    </p>
+                                    <Link to="/" style={{ color: 'var(--primary)', fontWeight: 'bold', textDecoration: 'none' }}>
+                                        🔍 Explorar Ofertas de Empleo y Postularse
+                                    </Link>
                                 </div>
                             )}
                         </div>

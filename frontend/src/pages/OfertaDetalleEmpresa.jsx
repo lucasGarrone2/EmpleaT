@@ -64,7 +64,7 @@ export default function OfertaDetalleEmpresa() {
                 const { data: postData, error: postError } = await supabase
                     .from('postulaciones')
                     .select(`
-                        id, estado, fecha_postulacion, porcentaje_match_calculado,
+                        id, estado, fecha_postulacion, porcentaje_match_calculado, match_boost_estado,
                         candidatos (
                             id, nombre_completo, ubicacion, modalidad_preferida, score_proactividad, titulo_profesional, anios_experiencia, foto_url, es_premium,
                             candidato_skills(
@@ -143,9 +143,13 @@ export default function OfertaDetalleEmpresa() {
                         });
                     }
 
-                    const recalculatedMatch = reqSkills.length > 0
+                    let recalculatedMatch = reqSkills.length > 0
                         ? Math.round((totalScore / reqSkills.length) * 100)
                         : (post.porcentaje_match_calculado ?? 0);
+
+                    if (post.match_boost_estado === 'aprobado') {
+                        recalculatedMatch = Math.min(100, recalculatedMatch + 5);
+                    }
 
                     return {
                         ...post,
@@ -442,7 +446,20 @@ export default function OfertaDetalleEmpresa() {
                                                     PREMIUM
                                                 </span>
                                             )}
+                                            {post.match_boost_estado === 'aprobado' && (
+                                                <span title="Match potenciado (+5%). El candidato aprobó con éxito el cuestionario de la oferta." style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 8px', background: 'linear-gradient(90deg, #00d66b 0%, #00994d 100%)', color: 'white', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,214,107,0.3)', letterSpacing: '0.5px' }}>
+                                                    <Zap size={10} fill="white" /> BOOSTED
+                                                </span>
+                                            )}
                                             {isTop && <span style={{ background: 'var(--primary)', color: 'white', padding: '2px 8px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 'bold' }}>MEJOR MATCH</span>}
+                                            {(() => {
+                                                const normalized = post.estado?.toLowerCase();
+                                                if (normalized === 'en_revision' || normalized === 'en revisión' || normalized === 'en revision') return <span style={{ display: 'inline-flex', padding: '2px 8px', background: '#fef3c7', color: '#b45309', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '0.5px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>CV VISTO</span>;
+                                                if (normalized === 'entrevista') return <span style={{ display: 'inline-flex', padding: '2px 8px', background: '#f3e8ff', color: '#6b21a8', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '0.5px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>ENTREVISTA</span>;
+                                                if (normalized === 'seleccionado' || normalized === 'contratado') return <span style={{ display: 'inline-flex', padding: '2px 8px', background: '#dcfce7', color: '#15803d', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '0.5px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>SELECCIONADO</span>;
+                                                if (normalized === 'rechazado') return <span style={{ display: 'inline-flex', padding: '2px 8px', background: '#fee2e2', color: '#b91c1c', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '0.5px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>RECHAZADO</span>;
+                                                return <span style={{ display: 'inline-flex', padding: '2px 8px', background: '#e0f2fe', color: '#0369a1', borderRadius: '10px', fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '0.5px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>NUEVO</span>;
+                                            })()}
                                         </div>
                                         <div style={{ color: 'var(--text-gray)', fontSize: '0.95rem', display: 'flex', gap: '15px' }}>
                                             <span>{cant.titulo_profesional || 'Profesional'} {cant.anios_experiencia ? `· ${cant.anios_experiencia} años exp.` : ''}</span>

@@ -6,6 +6,7 @@ import { Filter, Star, MapPin, Briefcase, ChevronLeft, ChevronRight, Sparkles, Z
 import MatchBadge from '../components/MatchBadge';
 import PremiumActionZone from '../components/PremiumActionZone';
 import InterviewModal from '../components/InterviewModal';
+import BoostQuizModal from '../components/BoostQuizModal';
 
 export default function ListaOfertas() {
     const { user } = useAuth();
@@ -14,12 +15,13 @@ export default function ListaOfertas() {
     const [loading, setLoading] = useState(true);
     const [candidatoId, setCandidatoId] = useState(null);
     const [ofertas, setOfertas] = useState([]);
-    const [postulacionesIds, setPostulacionesIds] = useState(new Set());
+    const [postulacionesMap, setPostulacionesMap] = useState({});
     const [error, setError] = useState(null);
     const [applyingTo, setApplyingTo] = useState(null);
     const [expandedOferta, setExpandedOferta] = useState(null);
     const [candidatoData, setCandidatoData] = useState(null);
     const [showInterviewModalFor, setShowInterviewModalFor] = useState(null);
+    const [boostQuizModalFor, setBoostQuizModalFor] = useState(null);
 
     const locationRouter = useLocation();
     const queryParams = new URLSearchParams(locationRouter.search);
@@ -108,11 +110,14 @@ export default function ListaOfertas() {
 
                 const { data: misPostulaciones } = await supabase
                     .from('postulaciones')
-                    .select('oferta_id')
+                    .select('oferta_id, match_boost_estado')
                     .eq('candidato_id', candData.id);
                 
-                const setPostuladas = new Set((misPostulaciones || []).map(p => p.oferta_id));
-                setPostulacionesIds(setPostuladas);
+                const mapPostuladas = {};
+                (misPostulaciones || []).forEach(p => {
+                    mapPostuladas[p.oferta_id] = p;
+                });
+                setPostulacionesMap(mapPostuladas);
 
                 const { data: ofertasData, error: ofError } = await supabase
                     .from('ofertas')
@@ -258,11 +263,10 @@ export default function ListaOfertas() {
                 }
             }
 
-            setPostulacionesIds(prev => {
-                const updated = new Set(prev);
-                updated.add(ofertaId);
-                return updated;
-            });
+            setPostulacionesMap(prev => ({
+                ...prev,
+                [ofertaId]: { oferta_id: ofertaId, match_boost_estado: 'pendiente' }
+            }));
         } catch (err) {
             alert("Error del servidor: No pudimos procesar tu solicitud.");
         } finally {
@@ -497,11 +501,13 @@ export default function ListaOfertas() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         {ofertasPaginadas.map(oferta => {
                             const matchColor = oferta.porcentajeMatch >= 75 ? '#00d66b' : (oferta.porcentajeMatch >= 40 ? '#FFB020' : '#d32f2f');
-                            const isExpanded = expandedOferta === oferta.id;
-                            const yaPostulado = postulacionesIds.has(oferta.id);
-                            
-                            // Extrae la primera letra de la empresa
-                            const empLetra = (oferta.empresas?.nombre || 'E').charAt(0).toUpperCase();
+                             const isExpanded = expandedOferta === oferta.id;
+                             const yaPostulado = !!postulacionesMap[oferta.id];
+                             const boostEstado = postulacionesMap[oferta.id]?.match_boost_estado || 'pendiente';
+                             const finalMatch = boostEstado === 'aprobado' ? Math.min(100, oferta.porcentajeMatch + 5) : oferta.porcentajeMatch;
+                             
+                             // Extrae la primera letra de la empresa
+                             const empLetra = (oferta.empresas?.nombre || 'E').charAt(0).toUpperCase();
 
                             return (
                                 <div key={oferta.id} 
@@ -560,7 +566,7 @@ export default function ListaOfertas() {
                                                             🌟 ¡Tu perfil supera el {oferta.porcentaje_match_minimo}% exigido por la empresa!
                                                         </div>
                                                     )}
-                                                    {oferta.porcentajeMatch >= 80 && (
+                                                    {finalMatch >= 80 && (
                                                         <div style={{ display: 'inline-block', background: 'linear-gradient(90deg, #FFB020 0%, #FF9800 100%)', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(255, 176, 32, 0.3)' }}>
                                                             ✨ Simulación IA Disponible
                                                         </div>
@@ -574,7 +580,7 @@ export default function ListaOfertas() {
                                         {/* Match y Boton */}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
                                             <div style={{ textAlign: 'center' }}>
-                                                <MatchBadge percentage={oferta.porcentajeMatch} size={64} />
+                                                <MatchBadge percentage={finalMatch} size={64} />
                                             </div>
                                             
                                             <button 
@@ -641,10 +647,87 @@ export default function ListaOfertas() {
                                                     </button>
                                                 )}
 
+                                                {candidatoData?.es_premium && (
+                                                    <div style={{
+                                                        padding: '1.2rem',
+                                                        background: yaPostulado 
+                                                            ? (boostEstado === 'aprobado' 
+                                                                ? 'linear-gradient(135deg, rgba(0,214,107,0.1) 0%, rgba(0,214,107,0.03) 100%)' 
+                                                                : boostEstado === 'desaprobado' 
+                                                                    ? 'rgba(211,47,47,0.03)' 
+                                                                    : 'linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(255,215,0,0.03) 100%)')
+                                                            : 'linear-gradient(135deg, rgba(255,215,0,0.06) 0%, rgba(255,215,0,0.02) 100%)',
+                                                        borderRadius: '12px',
+                                                        border: `1px solid ${yaPostulado 
+                                                            ? (boostEstado === 'aprobado' ? 'rgba(0,214,107,0.3)' : boostEstado === 'desaprobado' ? '#eaeaea' : 'rgba(255,215,0,0.3)')
+                                                            : 'rgba(255,215,0,0.2)'}`,
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        flexWrap: 'wrap',
+                                                        gap: '1rem'
+                                                    }}>
+                                                        <div style={{ flex: 1, minWidth: '200px' }}>
+                                                            <h4 style={{ 
+                                                                margin: '0 0 6px 0', 
+                                                                fontSize: '1rem', 
+                                                                color: !yaPostulado 
+                                                                    ? '#D48800'
+                                                                    : (boostEstado === 'aprobado' ? '#00b159' : boostEstado === 'desaprobado' ? '#555' : '#D48800'), 
+                                                                display: 'flex', 
+                                                                alignItems: 'center', 
+                                                                gap: '8px',
+                                                                fontWeight: 'bold' 
+                                                            }}>
+                                                                <Zap size={18} fill={(!yaPostulado || boostEstado === 'aprobado') ? '#D48800' : boostEstado === 'desaprobado' ? 'none' : '#D48800'} color={!yaPostulado ? '#D48800' : (boostEstado === 'aprobado' ? '#00b159' : boostEstado === 'desaprobado' ? '#555' : '#D48800')} /> 
+                                                                {!yaPostulado 
+                                                                    ? 'Potenciador de Match Premium (+5%) Disponible'
+                                                                    : (boostEstado === 'aprobado' 
+                                                                        ? '¡Match Potenciado Exitosamente! (+5% Activo)' 
+                                                                        : boostEstado === 'desaprobado' 
+                                                                            ? 'Desafío de Match Finalizado' 
+                                                                            : 'Potenciador de Match Premium (+5%)')}
+                                                            </h4>
+                                                            <p style={{ margin: 0, fontSize: '0.85rem', color: '#666', lineHeight: '1.4' }}>
+                                                                {!yaPostulado 
+                                                                    ? 'Postúlate primero a esta oferta para desbloquear el cuestionario de 3 preguntas de nivel medio y potenciar tu afinidad.'
+                                                                    : (boostEstado === 'aprobado' 
+                                                                        ? 'Tu afinidad final subió un 5%. Apareces más arriba en el panel de la empresa con la insignia de proactividad.' 
+                                                                        : boostEstado === 'desaprobado' 
+                                                                            ? 'Completaste el cuestionario de la oferta pero no obtuviste el boost. Tu postulación original sigue activa.' 
+                                                                            : 'Demuestra tus conocimientos respondiendo 3 preguntas rápidas de nivel medio sobre los requisitos de esta oferta para destacar.')}
+                                                            </p>
+                                                        </div>
+                                                        
+                                                        {yaPostulado && boostEstado === 'pendiente' && (
+                                                            <button
+                                                                onClick={() => setBoostQuizModalFor(oferta)}
+                                                                style={{
+                                                                    background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)',
+                                                                    color: 'white',
+                                                                    padding: '10px 20px',
+                                                                    borderRadius: '8px',
+                                                                    border: 'none',
+                                                                    fontWeight: 'bold',
+                                                                    fontSize: '0.9rem',
+                                                                    cursor: 'pointer',
+                                                                    boxShadow: '0 4px 12px rgba(255,165,0,0.3)',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '6px',
+                                                                    transition: 'transform 0.2s'
+                                                                }}
+                                                            >
+                                                                ⚡ Iniciar Desafío
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+
                                                 <PremiumActionZone 
-                                                    matchScore={oferta.porcentajeMatch} 
+                                                    matchScore={finalMatch} 
                                                     isPremium={candidatoData?.es_premium} 
-                                                    onSimulateClick={() => setShowInterviewModalFor(oferta)} 
+                                                    onSimulateClick={() => setShowInterviewModalFor({ ...oferta, porcentajeMatch: finalMatch })} 
                                                 />
                                             </div>
                                         </div>
@@ -703,6 +786,23 @@ export default function ListaOfertas() {
                     ofertaId={showInterviewModalFor.id}
                     porcentajeMatch={showInterviewModalFor.porcentajeMatch}
                     onClose={() => setShowInterviewModalFor(null)}
+                />
+            )}
+
+            {boostQuizModalFor && (
+                <BoostQuizModal
+                    candidatoId={candidatoId}
+                    oferta={boostQuizModalFor}
+                    onClose={() => setBoostQuizModalFor(null)}
+                    onSuccess={(nuevoEstado) => {
+                        setPostulacionesMap(prev => ({
+                            ...prev,
+                            [boostQuizModalFor.id]: {
+                                ...prev[boostQuizModalFor.id],
+                                match_boost_estado: nuevoEstado
+                            }
+                        }));
+                    }}
                 />
             )}
         </div>
