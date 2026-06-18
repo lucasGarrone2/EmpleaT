@@ -4,8 +4,8 @@ import { Zap, Sparkles, X, CheckCircle2, XCircle, BrainCircuit, Loader2 } from '
 import { getQuestionsForSkills } from '../utils/questionsBank';
 
 export default function BoostQuizModal({ candidatoId, oferta, onClose, onSuccess }) {
-    // 1. Obtener preguntas basadas en las skills de la oferta
-    const qData = getQuestionsForSkills(oferta.oferta_skills || []);
+    // 1. Obtener preguntas basadas en las skills de la oferta (se ejecuta una sola vez al montar el componente)
+    const [qData] = useState(() => getQuestionsForSkills(oferta.oferta_skills || []));
     const preguntas = qData.questions;
     const skillLabel = qData.skillLabel;
 
@@ -120,7 +120,7 @@ export default function BoostQuizModal({ candidatoId, oferta, onClose, onSuccess
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <BrainCircuit size={24} color="#FFD700" />
-                        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', fontFamily: "'Outfit', sans-serif" }}>
+                    <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', fontFamily: "'Outfit', sans-serif", color: 'white' }}>
                             Desafío de Match: {skillLabel}
                         </h2>
                     </div>

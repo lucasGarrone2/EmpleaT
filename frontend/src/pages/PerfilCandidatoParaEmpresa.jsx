@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
-import { User, Briefcase, Clock, FileText, ArrowLeft, BrainCircuit, MapPin, CheckCircle, XCircle } from 'lucide-react';
+import { User, Briefcase, Clock, FileText, ArrowLeft, BrainCircuit, MapPin, CheckCircle, XCircle, Rocket, PartyPopper } from 'lucide-react';
 import './Register.css'; // Mantenemos los estilos consistentes
 
 export default function PerfilCandidatoParaEmpresa() {
     const { ofertaId, candidatoId } = useParams();
     const { user } = useAuth();
     const navigate = useNavigate();
+    const showAlert = useAlert();
 
     const [loading, setLoading] = useState(true);
     const [candidato, setCandidato] = useState(null);
@@ -19,6 +21,44 @@ export default function PerfilCandidatoParaEmpresa() {
     // ATS Pipeline states
     const [estadoPostulacion, setEstadoPostulacion] = useState('postulado');
     const [postulacionId, setPostulacionId] = useState(null);
+
+    // Estados para el Modal de Motivo de Rechazo (ATS)
+    const [rejectionReasons, setRejectionReasons] = useState([]);
+    const [showRejectionModal, setShowRejectionModal] = useState(false);
+    const [selectedReasonId, setSelectedReasonId] = useState('');
+    const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
+
+    useEffect(() => {
+        const fetchRejectionReasons = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('motivos_rechazo')
+                    .select('*')
+                    .order('id', { ascending: true });
+                if (!error && data && data.length > 0) {
+                    setRejectionReasons(data);
+                } else {
+                    setRejectionReasons([
+                        { id: 1, descripcion: 'No cumple con los requisitos técnicos' },
+                        { id: 2, descripcion: 'Pretensión salarial fuera de rango' },
+                        { id: 3, descripcion: 'Ubicación o modalidad incompatible' },
+                        { id: 4, descripcion: 'No superó la entrevista técnica / IA' },
+                        { id: 5, descripcion: 'Otro motivo' }
+                    ]);
+                }
+            } catch (err) {
+                console.error("Error al cargar motivos de rechazo:", err);
+                setRejectionReasons([
+                    { id: 1, descripcion: 'No cumple con los requisitos técnicos' },
+                    { id: 2, descripcion: 'Pretensión salarial fuera de rango' },
+                    { id: 3, descripcion: 'Ubicación o modalidad incompatible' },
+                    { id: 4, descripcion: 'No superó la entrevista técnica / IA' },
+                    { id: 5, descripcion: 'Otro motivo' }
+                ]);
+            }
+        };
+        fetchRejectionReasons();
+    }, []);
 
     useEffect(() => {
         if (!user || user.user_metadata?.rol !== 'empresa') {
@@ -45,14 +85,14 @@ export default function PerfilCandidatoParaEmpresa() {
 
                 if (ofError || !ofData) throw new Error("Oferta no encontrada");
 
-                // Verificar que esta oferta pertenezca a la empresa que está logueada
-                const { data: empData } = await supabase
-                    .from('empresas')
-                    .select('id')
+                // Verificar que el usuario pertenece a la empresa de esta oferta
+                const { data: miembroData } = await supabase
+                    .from('empresa_miembros')
+                    .select('empresa_id')
                     .eq('auth_id', user.id)
-                    .single();
-
-                if (empData?.id !== ofData.empresa_id) {
+                    .maybeSingle();
+ 
+                if (!miembroData || miembroData.empresa_id !== ofData.empresa_id) {
                     throw new Error("No tienes permiso para ver esta información");
                 }
 
@@ -113,6 +153,12 @@ export default function PerfilCandidatoParaEmpresa() {
 
     // Función para cambiar de fase del pipeline ATS
     const updateEstado = async (nuevoEstado) => {
+        if (nuevoEstado === 'Rechazado') {
+            setSelectedReasonId('');
+            setShowRejectionModal(true);
+            return;
+        }
+
         try {
             const { error: updateErr } = await supabase
                 .from('postulaciones')
@@ -123,8 +169,40 @@ export default function PerfilCandidatoParaEmpresa() {
             setEstadoPostulacion(nuevoEstado);
         } catch (err) {
             console.error("Error al actualizar estado:", err);
-            alert("No se pudo actualizar el estado de la postulación.");
+            showAlert("No se pudo actualizar el estado de la postulación.", "Error", "error");
         }
+    };
+
+    const handleConfirmRejection = async () => {
+        if (!selectedReasonId || !postulacionId) return;
+        setIsSubmittingRejection(true);
+
+        try {
+            const { error: updateErr } = await supabase
+                .from('postulaciones')
+                .update({ 
+                    estado: 'Rechazado',
+                    motivo_rechazo_id: parseInt(selectedReasonId)
+                })
+                .eq('id', postulacionId);
+
+            if (updateErr) throw updateErr;
+
+            setEstadoPostulacion('Rechazado');
+            setShowRejectionModal(false);
+            setSelectedReasonId('');
+        } catch (err) {
+            console.error("Error al rechazar candidato:", err);
+            showAlert("No se pudo rechazar al postulante: " + err.message, "Error", "error");
+            setShowRejectionModal(false);
+        } finally {
+            setIsSubmittingRejection(false);
+        }
+    };
+
+    const handleCancelRejection = () => {
+        setShowRejectionModal(false);
+        setSelectedReasonId('');
     };
 
 
@@ -302,7 +380,7 @@ export default function PerfilCandidatoParaEmpresa() {
                                                 URL.revokeObjectURL(url);
                                             } catch (err) {
                                                 console.error('Error al descargar CV:', err);
-                                                alert("No se pudo descargar el archivo.");
+                                                showAlert("No se pudo descargar el archivo.", "Error", "error");
                                             }
                                         }}
                                         style={{ 
@@ -362,7 +440,7 @@ export default function PerfilCandidatoParaEmpresa() {
                                 if (normalized === 'postulado') return <span style={{ padding: '4px 10px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>Postulado</span>;
                                 if (normalized === 'en revisión' || normalized === 'en_revision' || normalized === 'en revision') return <span style={{ padding: '4px 10px', background: '#fef3c7', color: '#b45309', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>CV Visto</span>;
                                 if (normalized === 'entrevista') return <span style={{ padding: '4px 10px', background: '#f3e8ff', color: '#6b21a8', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>En Entrevista</span>;
-                                if (normalized === 'seleccionado' || normalized === 'contratado') return <span style={{ padding: '4px 10px', background: '#dcfce7', color: '#15803d', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>¡Seleccionado! 🎉</span>;
+                                if (normalized === 'seleccionado' || normalized === 'contratado') return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', background: '#dcfce7', color: '#15803d', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>¡Seleccionado! <PartyPopper size={12} /></span>;
                                 if (normalized === 'rechazado') return <span style={{ padding: '4px 10px', background: '#fee2e2', color: '#b91c1c', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>Finalizado</span>;
                                 return <span style={{ padding: '4px 10px', background: '#f3f4f6', color: '#374151', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>{estadoPostulacion}</span>;
                             })()}
@@ -417,7 +495,9 @@ export default function PerfilCandidatoParaEmpresa() {
                                         e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,214,107,0.2)';
                                     }}
                                 >
-                                    🚀 Iniciar Proceso (Revelar Email)
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                                        <Rocket size={16} /> Iniciar Proceso (Revelar Email)
+                                    </span>
                                 </button>
                             </div>
                         ) : (
@@ -451,7 +531,7 @@ export default function PerfilCandidatoParaEmpresa() {
                                     <button
                                         onClick={() => {
                                             navigator.clipboard.writeText(candidato.email);
-                                            alert("¡Email copiado al portapapeles con éxito!");
+                                            showAlert("¡Email copiado al portapapeles con éxito!", "Copiado", "success");
                                         }}
                                         style={{ 
                                             background: 'none', 
@@ -489,7 +569,7 @@ export default function PerfilCandidatoParaEmpresa() {
                                     >
                                         <option value="En revisión">CV Visto / En Revisión</option>
                                         <option value="Entrevista">En Entrevista</option>
-                                        <option value="Seleccionado">¡Contratado! 🎉</option>
+                                        <option value="Seleccionado">¡Contratado!</option>
                                         <option value="Rechazado">Rechazado</option>
                                     </select>
                                 </div>
@@ -559,6 +639,73 @@ export default function PerfilCandidatoParaEmpresa() {
                 </div>
 
             </div>
+
+            {/* MODAL DE MOTIVO DE RECHAZO (ATS) */}
+            {showRejectionModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', boxSizing: 'border-box' }}>
+                    <div style={{ background: 'white', borderRadius: '24px', padding: '2.5rem', width: '100%', maxWidth: '450px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
+                        <h3 style={{ fontSize: '1.4rem', margin: '0 0 1rem 0', color: 'var(--text-dark)', fontWeight: 'bold' }}>
+                            Motivo de Rechazo Requerido
+                        </h3>
+                        <p style={{ color: 'var(--text-gray)', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                            Para descartar a este candidato, por favor selecciona el motivo principal de rechazo.
+                        </p>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '2rem' }}>
+                            {rejectionReasons.map(reason => (
+                                <label key={reason.id} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    padding: '12px 16px',
+                                    borderRadius: '12px',
+                                    border: `1px solid ${selectedReasonId === String(reason.id) ? 'var(--primary)' : '#e2e8f0'}`,
+                                    background: selectedReasonId === String(reason.id) ? 'rgba(0,214,107,0.03)' : 'white',
+                                    cursor: 'pointer',
+                                    fontWeight: selectedReasonId === String(reason.id) ? 'bold' : 'normal',
+                                    transition: 'all 0.2s'
+                                }}>
+                                    <input 
+                                        type="radio" 
+                                        name="rejectionReason" 
+                                        value={reason.id} 
+                                        checked={selectedReasonId === String(reason.id)}
+                                        onChange={(e) => setSelectedReasonId(e.target.value)}
+                                        style={{ accentColor: 'var(--primary)', width: '18px', height: '18px' }}
+                                    />
+                                    <span style={{ fontSize: '0.95rem', color: 'var(--text-dark)' }}>{reason.descripcion}</span>
+                                </label>
+                            ))}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button 
+                                onClick={handleCancelRejection}
+                                style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', background: 'white', color: 'var(--text-gray)', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={handleConfirmRejection}
+                                disabled={!selectedReasonId || isSubmittingRejection}
+                                style={{ 
+                                    flex: 1, 
+                                    padding: '12px', 
+                                    borderRadius: '12px', 
+                                    border: 'none', 
+                                    background: selectedReasonId ? '#dc2626' : '#94a3b8', 
+                                    color: 'white', 
+                                    fontWeight: 'bold', 
+                                    cursor: selectedReasonId ? 'pointer' : 'not-allowed',
+                                    opacity: isSubmittingRejection ? 0.7 : 1
+                                }}
+                            >
+                                {isSubmittingRejection ? 'Guardando...' : 'Descartar Candidato'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

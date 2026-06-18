@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import { Briefcase, ArrowLeft, CheckCircle2, X, FileSearch } from 'lucide-react';
+import { COMMON_SKILLS } from '../utils/commonSkills';
 
 export default function CrearOferta() {
     const { user } = useAuth();
@@ -39,15 +40,15 @@ export default function CrearOferta() {
 
         const fetchEmpresa = async () => {
             const { data, error } = await supabase
-                .from('empresas')
-                .select('id')
+                .from('empresa_miembros')
+                .select('empresa_id')
                 .eq('auth_id', user.id)
                 .maybeSingle();
 
             if (error || !data) {
                 navigate('/dashboard-empresa');
             } else {
-                setEmpresaId(data.id);
+                setEmpresaId(data.empresa_id);
                 setLoading(false);
             }
         };
@@ -81,42 +82,6 @@ export default function CrearOferta() {
             return;
         }
 
-        const COMMON_SKILLS = [
-            // CÓDIGO Y DESARROLLO
-            'React', 'React.js', 'Node', 'Node.js', 'Python', 'Java', 'C#', 'C++', 'C', 'PHP', 'Ruby', 'Go', 'Golang', 'Swift', 'Kotlin', 'TypeScript', 'Javascript', 'JS', 'HTML', 'HTML5', 'CSS', 'CSS3', 'Sass', 'Less',
-            'Angular', 'Vue', 'Vue.js', 'Svelte', 'Spring Boot', 'Django', 'Flask', 'FastAPI', 'Laravel', 'Express.js', 'Next.js', 'Nuxt.js', 'NestJS',
-            'Desarrollo Web', 'Frontend', 'Backend', 'Fullstack', 'Full Stack', 'Programación', 'Software', 'Arquitectura de Software', 'Microservicios',
-
-            // BASES DE DATOS Y DATOS
-            'SQL', 'MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'Cassandra', 'Elasticsearch', 'GraphQL', 'REST API', 'API', 'Oracle', 'MariaDB', 'SQLite',
-            'Machine Learning', 'Inteligencia Artificial', 'Data Science', 'Data Engineering', 'Big Data', 'Hadoop', 'Spark', 'Kafka', 'TensorFlow', 'PyTorch', 'Pandas',
-
-            // CLOUD, DEVOPS E INFRAESTRUCTURA
-            'AWS', 'Amazon Web Services', 'Azure', 'GCP', 'Google Cloud', 'Cloud', 'Nube', 'Docker', 'Kubernetes', 'Terraform', 'Ansible', 'Jenkins', 
-            'Git', 'GitHub', 'GitLab', 'Bitbucket', 'CI/CD', 'DevOps', 'Linux', 'Ubuntu', 'Windows Server', 'Bash', 'PowerShell', 'SysAdmin', 'Seguridad Informática', 'Ciberseguridad',
-
-            // QA Y TESTING
-            'QA', 'Testing', 'Selenium', 'Cypress', 'Jest', 'Mocha', 'Postman', 'Pruebas Unitarias', 'TDD', 'BDD',
-
-            // METODOLOGÍAS Y SOFT SKILLS
-            'Scrum', 'Agile', 'Ágil', 'Kanban', 'Jira', 'Trello', 'Confluence', 'Gestión de Proyectos', 'Project Management', 'Product Manager', 'Product Owner', 'Scrum Master',
-            'Liderazgo', 'Team Lead', 'Gestión de Equipos', 'Comunicación', 'Resolución de Problemas',
-
-            // DISEÑO Y UX/UI
-            'Figma', 'Adobe XD', 'Sketch', 'Photoshop', 'Illustrator', 'InDesign', 'Premiere', 'After Effects', 'Lightroom', 'UI', 'UX', 'Diseño Web', 'Diseño Gráfico', 
-            'Edición de Video', 'Animación', '3D', 'Blender', 'Cinema 4D', 'Fotografía', 'UX Research',
-
-            // MARKETING, VENTAS Y SEO
-            'Marketing', 'Marketing Digital', 'SEO', 'SEM', 'Google Ads', 'Facebook Ads', 'Meta Ads', 'Social Media', 'Redes Sociales', 'Community Manager',
-            'Copywriting', 'Redacción', 'Inbound Marketing', 'Email Marketing', 'Mailchimp', 'HubSpot', 'Salesforce', 'CRM', 'Ventas', 'B2B', 'B2C', 'Atención al Cliente', 'Soporte',
-
-            // NEGOCIOS, FINANZAS Y RRHH
-            'Recursos Humanos', 'RRHH', 'Selección de Personal', 'IT Recruiter', 'Headhunting', 'Contabilidad', 'Finanzas', 'Auditoría', 'Facturación', 'Nóminas', 'SAP', 'ERP', 'Excel', 'Power BI', 'Tableau', 'Data Analytics',
-
-            // INGENIERÍA TRADICIONAL Y OTROS
-            'AutoCAD', 'SolidWorks', 'Revit', 'Ingeniería Civil', 'Ingeniería Industrial', 'Ingeniería Mecánica', 'Logística', 'Supply Chain', 'Traducción', 'Inglés Avanzado', 'Inglés Bilingüe'
-        ];
-
         const extracted = [];
         const descLower = formData.descripcion.toLowerCase();
         
@@ -126,7 +91,7 @@ export default function CrearOferta() {
             const regex = new RegExp(`(?:^|\\s|_|[.,;!/?()])${safeSkill}(?:$|\\s|_|[.,;!/?()])`, 'i');
             
             if (regex.test(descLower)) {
-                if (!skillsList.some(s => s.toLowerCase() === skillLower)) {
+                if (!skillsList.some(s => s.nombre.toLowerCase() === skillLower)) {
                     extracted.push(skill);
                 }
             }

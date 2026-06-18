@@ -1,19 +1,39 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
-import { User, Briefcase, Clock, FileText, Edit2, Save, X, BrainCircuit, Trash2, PlusCircle, Award, Calendar, ExternalLink } from 'lucide-react';
+import { User, Briefcase, Clock, FileText, Edit2, Save, X, BrainCircuit, Trash2, PlusCircle, Award, Calendar, ExternalLink, Lock, Sparkles, PartyPopper, Check } from 'lucide-react';
 import './Register.css'; // Reusing established styles
 
 export default function MiPerfil() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const showAlert = useAlert();
     
     const [loading, setLoading] = useState(true);
     const [candidato, setCandidato] = useState(null);
     const [skills, setSkills] = useState([]);
     const [insignias, setInsignias] = useState([]);
     const [postulaciones, setPostulaciones] = useState([]);
+    const [quizIntentos, setQuizIntentos] = useState([]);
+    
+    const getSkillCooldown = (skillName) => {
+        if (!quizIntentos || quizIntentos.length === 0) return null;
+        const skillAttempts = quizIntentos.filter(i => i.skill_nombre && i.skill_nombre.toLowerCase() === skillName.toLowerCase());
+        if (skillAttempts.length === 0) return null;
+        
+        // Get the latest attempt
+        const latestAttempt = skillAttempts[0];
+        const msSinceAttempt = Date.now() - new Date(latestAttempt.fecha_intento).getTime();
+        const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+        
+        if (msSinceAttempt < COOLDOWN_MS) {
+            const remainingHours = Math.ceil((COOLDOWN_MS - msSinceAttempt) / (1000 * 60 * 60));
+            return remainingHours;
+        }
+        return null;
+    };
     
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({
@@ -24,6 +44,7 @@ export default function MiPerfil() {
     });
     
     const [guardando, setGuardando] = useState(false);
+    const [generatingBio, setGeneratingBio] = useState(false);
     const [error, setError] = useState(null);
     const [successMessage, setSuccessMessage] = useState('');
     const [fotoFile, setFotoFile] = useState(null);
@@ -134,6 +155,17 @@ export default function MiPerfil() {
                     } else if (postError) {
                         console.error("Error fetching postulaciones", postError);
                     }
+
+                    // Fetch quiz attempts to verify cooldowns
+                    const { data: intentosData } = await supabase
+                        .from('quiz_intentos')
+                        .select('skill_nombre, fecha_intento, finalizado, aprobado')
+                        .eq('candidato_id', candData.id)
+                        .order('fecha_intento', { ascending: false });
+                    
+                    if (intentosData) {
+                        setQuizIntentos(intentosData);
+                    }
                 }
             } catch (err) {
                 console.error("Error al obtener perfil", err);
@@ -171,19 +203,53 @@ export default function MiPerfil() {
         setAddingSkill(true);
         setError(null);
         try {
+            const trimmedSkillName = newSkillInput.trim();
+
+            // 1. Buscar si la habilidad ya existe en el diccionario_skills (insensible a mayúsculas/minúsculas)
+            const { data: existingSkill, error: findError } = await supabase
+                .from('diccionario_skills')
+                .select('id, nombre_skill')
+                .ilike('nombre_skill', trimmedSkillName)
+                .maybeSingle();
+
+            if (findError) throw findError;
+
+            let skillId;
+
+            if (!existingSkill) {
+                // 2. Si no existe en el diccionario, la registramos como una habilidad personalizada
+                const { data: newSkill, error: insertError } = await supabase
+                    .from('diccionario_skills')
+                    .insert([{
+                        nombre_skill: trimmedSkillName,
+                        tipo: 'Personalizado'
+                    }])
+                    .select('id')
+                    .single();
+
+                if (insertError) throw insertError;
+                skillId = newSkill.id;
+            } else {
+                skillId = existingSkill.id;
+            }
+
+            // 3. Relacionar la habilidad con el candidato en candidato_skills usando upsert
             const { data, error } = await supabase
                 .from('candidato_skills')
-                .insert([{
+                .upsert([{
                     candidato_id: candidato.id,
-                    nombre_original: newSkillInput.trim(),
+                    skill_id: skillId,
+                    nombre_original: trimmedSkillName,
                     nivel_estimado: newSkillNivel
-                }])
+                }], { onConflict: 'candidato_id, skill_id' })
                 .select()
                 .single();
                 
             if (error) throw error;
             
-            setSkills([...skills, data]);
+            // Reemplazar o agregar la skill en el estado local de React
+            const updatedSkills = skills.filter(s => s.skill_id !== skillId);
+            setSkills([...updatedSkills, data]);
             setNewSkillInput('');
             setSuccessMessage("Habilidad agregada correctamente");
             setTimeout(() => setSuccessMessage(''), 3000);
@@ -220,6 +286,48 @@ export default function MiPerfil() {
             ...formData,
             [name]: value
         });
+    };
+
+    const handleGenerateBio = async () => {
+        if (!candidato) return;
+        setGeneratingBio(true);
+        setError(null);
+        setSuccessMessage('');
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("No hay sesión activa");
+
+            const skillsText = skills.map(s => s.nombre_original || s.diccionario_skills?.nombre_skill || '').filter(Boolean).join(', ');
+
+            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/generate-bio`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({ skillsText })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || "Error al generar biografía con IA.");
+            }
+
+            const data = await response.json();
+            if (data.success && data.bio) {
+                setFormData(prev => ({
+                    ...prev,
+                    sobre_mi: data.bio
+                }));
+                setSuccessMessage("¡Biografía generada con IA! Recuerda guardar los cambios.");
+                setTimeout(() => setSuccessMessage(''), 4000);
+            }
+        } catch (err) {
+            console.error("Error al generar bio con IA:", err);
+            setError(err.message || "No se pudo generar la biografía con IA.");
+        } finally {
+            setGeneratingBio(false);
+        }
     };
 
     const handleSave = async () => {
@@ -298,7 +406,7 @@ export default function MiPerfil() {
             <div className="bg-shape shape-1"></div>
             <div className="bg-shape shape-2"></div>
             
-            <div style={{ 
+            <div className="profile-card-container" style={{ 
                 position: 'relative', 
                 width: '100%', 
                 maxWidth: '1000px', 
@@ -356,7 +464,7 @@ export default function MiPerfil() {
                 )}
 
                 {!candidato ? (
-                    <div style={{ textalign: 'center', padding: '3rem' }}>
+                    <div style={{ textAlign: 'center', padding: '3rem' }}>
                         <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>¡Aún no has completado tu perfil mágico!</h3>
                         <p style={{ color: 'var(--text-gray)', marginBottom: '2rem', fontSize: '1.1rem' }}>Sube tu CV para que nuestra IA extraiga todos tus datos y te conecte con las mejores empresas.</p>
                         <button 
@@ -480,7 +588,7 @@ export default function MiPerfil() {
                                                         URL.revokeObjectURL(url);
                                                     } catch (err) {
                                                         console.error('Error al descargar CV:', err);
-                                                        alert("No se pudo descargar el archivo.");
+                                                        showAlert("No se pudo descargar el archivo.", "Error", "error");
                                                     }
                                                 }}
                                                 style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(0,214,107,0.05)', padding: '12px 15px', borderRadius: '10px', border: '1px dashed var(--primary)', cursor: 'pointer', transition: 'background 0.2s' }}
@@ -513,9 +621,62 @@ export default function MiPerfil() {
 
                         {/* Fila Secundaria: Sobre Mí */}
                         <div style={{ background: 'var(--bg-white)', padding: '2rem', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
-                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', marginBottom: '1.5rem', fontSize: '1.3rem' }}>
-                                <User size={24} /> Sobre Mí
-                            </h3>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', margin: 0, fontSize: '1.3rem' }}>
+                                    <User size={24} /> Sobre Mí
+                                </h3>
+                                {editMode && (
+                                    candidato?.es_premium ? (
+                                        <button 
+                                            type="button"
+                                            onClick={handleGenerateBio}
+                                            disabled={generatingBio}
+                                            style={{
+                                                background: 'linear-gradient(135deg, #00d66b 0%, #00b359 100%)',
+                                                color: 'white',
+                                                border: 'none',
+                                                padding: '8px 16px',
+                                                borderRadius: '12px',
+                                                fontSize: '0.85rem',
+                                                fontWeight: 'bold',
+                                                cursor: 'pointer',
+                                                boxShadow: '0 4px 10px rgba(0,214,107,0.2)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onMouseOver={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                                            onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                                        >
+                                            {generatingBio ? 'Generando...' : (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                    Generar Bio con IA <Sparkles size={16} />
+                                                </span>
+                                            )}
+                                        </button>
+                                    ) : (
+                                        <Link 
+                                            to="/pricing"
+                                            style={{
+                                                background: '#f1f5f9',
+                                                color: '#64748b',
+                                                border: '1px solid #cbd5e1',
+                                                padding: '8px 16px',
+                                                borderRadius: '12px',
+                                                fontSize: '0.85rem',
+                                                fontWeight: 'bold',
+                                                textDecoration: 'none',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px'
+                                            }}
+                                        >
+                                            Generar Bio con IA (Premium 👑)
+                                        </Link>
+                                    )
+                                )}
+                            </div>
                             
                             {editMode ? (
                                 <textarea 
@@ -583,7 +744,26 @@ export default function MiPerfil() {
                                                 {insignias.includes(skillName) ? (
                                                     <Award size={18} color="#FFD700" title="Habilidad Validada" style={{ filter: 'drop-shadow(0 0 2px rgba(255, 215, 0, 0.5))' }} />
                                                 ) : (
-                                                    !editMode && <Link to={`/quiz/${encodeURIComponent(skillName)}`} style={{ fontSize: '0.85rem', color: 'var(--primary)', textDecoration: 'underline', marginLeft: '4px' }}>Validar</Link>
+                                                    !editMode && (() => {
+                                                        const cooldownHours = getSkillCooldown(skillName);
+                                                        if (cooldownHours !== null) {
+                                                            return (
+                                                                <span style={{ 
+                                                                    fontSize: '0.85rem', 
+                                                                    color: '#d32f2f', 
+                                                                    marginLeft: '4px',
+                                                                    fontWeight: 'bold',
+                                                                    cursor: 'not-allowed',
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '2px'
+                                                                }} title={`Debes esperar ${cooldownHours}h para reintentar`}>
+                                                                    <Lock size={12} /> Bloqueado ({cooldownHours}h)
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return <Link to={`/quiz/${encodeURIComponent(skillName)}`} style={{ fontSize: '0.85rem', color: 'var(--primary)', textDecoration: 'underline', marginLeft: '4px' }}>Validar</Link>;
+                                                    })()
                                                 )}
                                                 {editMode && (
                                                     <button 
@@ -694,7 +874,7 @@ export default function MiPerfil() {
                                                         {(() => {
                                                             if (normalized === 'en_revision' || normalized === 'en revisión' || normalized === 'en revision') return <span style={{ padding: '4px 12px', background: '#fef3c7', color: '#b45309', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>CV Visto / En Revisión</span>;
                                                             if (normalized === 'entrevista') return <span style={{ padding: '4px 12px', background: '#f3e8ff', color: '#6b21a8', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>En Entrevista</span>;
-                                                            if (normalized === 'seleccionado' || normalized === 'contratado') return <span style={{ padding: '4px 12px', background: '#dcfce7', color: '#15803d', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>¡Seleccionado! 🎉</span>;
+                                                            if (normalized === 'seleccionado' || normalized === 'contratado') return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 12px', background: '#dcfce7', color: '#15803d', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>¡Seleccionado! <PartyPopper size={12} /></span>;
                                                             if (normalized === 'rechazado') return <span style={{ padding: '4px 12px', background: '#fee2e2', color: '#b91c1c', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>Proceso Finalizado</span>;
                                                             return <span style={{ padding: '4px 12px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>Enviado</span>;
                                                         })()}
@@ -736,7 +916,7 @@ export default function MiPerfil() {
                                                             display: 'flex', justifyContent: 'center', alignItems: 'center',
                                                             fontWeight: 'bold', fontSize: '0.85rem', border: '3px solid white',
                                                             boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                                                        }}>✓</div>
+                                                        }}><Check size={14} /></div>
                                                         <span style={{ fontSize: '0.78rem', fontWeight: 'bold', color: 'var(--text-dark)', marginTop: '6px' }}>Enviado</span>
                                                     </div>
 
@@ -749,7 +929,7 @@ export default function MiPerfil() {
                                                             display: 'flex', justifyContent: 'center', alignItems: 'center',
                                                             fontWeight: 'bold', fontSize: '0.85rem', border: '3px solid white',
                                                             boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                                                        }}>{normalized === 'rechazado' ? '✗' : isEnRevisionOrHigher ? '✓' : '2'}</div>
+                                                        }}>{normalized === 'rechazado' ? <X size={14} /> : isEnRevisionOrHigher ? <Check size={14} /> : '2'}</div>
                                                         <span style={{ fontSize: '0.78rem', fontWeight: isEnRevisionOrHigher ? 'bold' : '500', color: isEnRevisionOrHigher ? 'var(--text-dark)' : 'var(--text-gray)', marginTop: '6px' }}>
                                                             {normalized === 'rechazado' ? 'Finalizado' : 'CV Visto'}
                                                         </span>
@@ -764,7 +944,7 @@ export default function MiPerfil() {
                                                             display: 'flex', justifyContent: 'center', alignItems: 'center',
                                                             fontWeight: 'bold', fontSize: '0.85rem', border: '3px solid white',
                                                             boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                                                        }}>{normalized === 'rechazado' ? '✗' : isEntrevistaOrHigher ? '✓' : '3'}</div>
+                                                        }}>{normalized === 'rechazado' ? <X size={14} /> : isEntrevistaOrHigher ? <Check size={14} /> : '3'}</div>
                                                         <span style={{ fontSize: '0.78rem', fontWeight: isEntrevistaOrHigher ? 'bold' : '500', color: isEntrevistaOrHigher ? 'var(--text-dark)' : 'var(--text-gray)', marginTop: '6px' }}>Entrevista</span>
                                                     </div>
 
@@ -777,7 +957,7 @@ export default function MiPerfil() {
                                                             display: 'flex', justifyContent: 'center', alignItems: 'center',
                                                             fontWeight: 'bold', fontSize: '0.85rem', border: '3px solid white',
                                                             boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                                                        }}>{(normalized === 'seleccionado' || normalized === 'contratado') ? '🎉' : normalized === 'rechazado' ? '✗' : '4'}</div>
+                                                        }}>{(normalized === 'seleccionado' || normalized === 'contratado') ? <PartyPopper size={14} /> : normalized === 'rechazado' ? <X size={14} /> : '4'}</div>
                                                         <span style={{ fontSize: '0.78rem', fontWeight: (normalized === 'seleccionado' || normalized === 'contratado') ? 'bold' : '500', color: (normalized === 'seleccionado' || normalized === 'contratado') ? '#166534' : 'var(--text-gray)', marginTop: '6px' }}>Seleccionado</span>
                                                     </div>
                                                 </div>

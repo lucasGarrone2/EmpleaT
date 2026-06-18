@@ -1,16 +1,185 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
-import { Filter, Star, MapPin, Briefcase, ChevronLeft, ChevronRight, Sparkles, Zap } from 'lucide-react';
+import { Filter, Star, MapPin, Briefcase, ChevronLeft, ChevronRight, Sparkles, Zap, Users, TrendingUp, BarChart3, DollarSign, Lock, Rocket, Trophy, ThumbsUp, Lightbulb } from 'lucide-react';
 import MatchBadge from '../components/MatchBadge';
 import PremiumActionZone from '../components/PremiumActionZone';
 import InterviewModal from '../components/InterviewModal';
 import BoostQuizModal from '../components/BoostQuizModal';
+import OfertaCardSkeleton from '../components/OfertaCardSkeleton';
+import AdaptarCvModal from '../components/AdaptarCvModal';
+
+function PremiumStats({ offerId, candidatoId, currentCandidateMatch, currentOfferSalary, esPremium, marketAvgSalary }) {
+    const [stats, setStats] = useState({ totalPostulantes: 0, candidateRank: 0, avgMatch: 0 });
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            if (!esPremium) return;
+            setLoading(true);
+            try {
+                const sessionRes = await supabase.auth.getSession();
+                const token = sessionRes.data.session?.access_token;
+                
+                const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/premium/oferta-stats/${offerId}?currentMatch=${currentCandidateMatch}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) throw new Error("No se pudieron cargar las estadísticas");
+
+                const statsData = await response.json();
+                setStats({
+                    totalPostulantes: statsData.totalPostulantes,
+                    candidateRank: statsData.candidateRank,
+                    avgMatch: statsData.avgMatch
+                });
+            } catch (e) {
+                console.error("Error al obtener estadísticas premium de postulación:", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStats();
+    }, [offerId, candidatoId, esPremium, currentCandidateMatch]);
+
+    if (!esPremium) {
+        return (
+            <div style={{ marginTop: '2rem', position: 'relative', borderRadius: '16px', border: '1px solid rgba(255,215,0,0.3)', padding: '1.5rem', background: 'linear-gradient(135deg, rgba(255,215,0,0.02) 0%, rgba(255,215,0,0.05) 100%)', overflow: 'hidden' }}>
+                <h4 style={{ margin: '0 0 1rem 0', color: '#B7791F', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', fontWeight: 'bold' }}>
+                    <Sparkles size={18} fill="#B7791F" /> Estadísticas Competitivas de la Oferta
+                </h4>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', filter: 'blur(4px)', opacity: 0.5, pointerEvents: 'none', select: 'none' }}>
+                    <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid #EAEAEA' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Candidatos Totales</span>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold', margin: '4px 0', color: '#333' }}>14 postulantes</div>
+                    </div>
+                    <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid #EAEAEA' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Puesto Estimado</span>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold', margin: '4px 0', color: '#333' }}>#3 de 15</div>
+                    </div>
+                    <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid #EAEAEA' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Afinidad Promedio</span>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold', margin: '4px 0', color: '#333' }}>72% (Por encima)</div>
+                    </div>
+                    <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid #EAEAEA' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#888', textTransform: 'uppercase', fontWeight: 'bold' }}>Sueldo vs. Mercado</span>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 'bold', margin: '4px 0', color: '#333' }}>+12% vs. Mercado</div>
+                    </div>
+                </div>
+
+                <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(255,255,255,0.7)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '1rem', boxSizing: 'border-box', textAlign: 'center' }}>
+                    <div style={{ background: '#FFFDF0', border: '1px solid #F6E05E', color: '#B7791F', padding: '6px 12px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+                        <Lock size={14} /> Exclusivo para Usuarios Premium
+                    </div>
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: '#4A5568', maxWidth: '380px', lineHeight: '1.4', fontWeight: '500' }}>
+                        Accede a información estratégica en tiempo real de salarios, cantidad de postulantes y tu puesto en el ranking de candidatos.
+                    </p>
+                    <a href="/pricing" style={{ background: 'linear-gradient(90deg, #FFB020 0%, #FF9800 100%)', color: 'white', textDecoration: 'none', padding: '8px 18px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(255,176,32,0.3)', transition: 'transform 0.2s' }}>
+                        Ver Planes Premium 👑
+                    </a>
+                </div>
+            </div>
+        );
+    }
+
+    if (loading) {
+        return (
+            <div style={{ marginTop: '2rem', padding: '1.5rem', background: '#F8F9FA', borderRadius: '16px', border: '1px solid #EAEAEA', textAlign: 'center', color: '#888', fontSize: '0.95rem' }}>
+                Cargando estadísticas de competencia...
+            </div>
+        );
+    }
+
+    const currentSal = currentOfferSalary || 0;
+    const salaryDiffPercent = marketAvgSalary > 0 ? Math.round(((currentSal - marketAvgSalary) / marketAvgSalary) * 100) : 0;
+    const isSalaryAbove = salaryDiffPercent >= 0;
+
+    return (
+        <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'linear-gradient(135deg, #F0FDF4 0%, #FFFFFF 100%)', borderRadius: '16px', border: '1px solid rgba(0,214,107,0.15)' }}>
+            <h4 style={{ margin: '0 0 1.2rem 0', color: 'var(--secondary)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.05rem', fontWeight: 'bold' }}>
+                <TrendingUp size={18} color="var(--primary)" /> Estadísticas Competitivas Premium
+            </h4>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.1)', boxShadow: '0 4px 10px rgba(0,0,0,0.01)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        <Users size={14} /> Postulantes
+                    </div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 'bold', margin: '6px 0 2px 0', color: 'var(--text-dark)' }}>
+                        {stats.totalPostulantes} {stats.totalPostulantes === 1 ? 'postulante' : 'postulantes'}
+                    </div>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Aplicados en total a este empleo</span>
+                </div>
+
+                <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.1)', boxShadow: '0 4px 10px rgba(0,0,0,0.01)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        <BarChart3 size={14} /> Posicionamiento
+                    </div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', margin: '6px 0 2px 0', color: 'var(--primary)' }}>
+                        {(() => {
+                            const rank = stats.candidateRank;
+                            const total = stats.totalPostulantes;
+                            if (!total || total === 0) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Primer postulante <Rocket size={16} /></span>;
+                            const pct = (rank / total) * 100;
+                            if (pct <= 10) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Top 10% de afinidad <Trophy size={16} /></span>;
+                            if (pct <= 25) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Top 25% de afinidad <Sparkles size={16} /></span>;
+                            if (pct <= 50) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Top 50% de afinidad <ThumbsUp size={16} /></span>;
+                            if (pct <= 75) return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Top 75% de afinidad <TrendingUp size={16} /></span>;
+                            return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Top 100% de afinidad <Briefcase size={16} /></span>;
+                        })()}
+                    </div>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Ubicación estimada en el grupo</span>
+                </div>
+
+                <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.1)', boxShadow: '0 4px 10px rgba(0,0,0,0.01)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        <Zap size={14} /> Afinidad Promedio
+                    </div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 'bold', margin: '6px 0 2px 0', color: 'var(--text-dark)' }}>
+                        {stats.avgMatch}%
+                    </div>
+                    <span style={{ 
+                        fontSize: '0.8rem', 
+                        fontWeight: 'bold',
+                        color: currentCandidateMatch >= stats.avgMatch ? '#15803d' : '#b91c1c'
+                    }}>
+                        {currentCandidateMatch >= stats.avgMatch 
+                            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>¡Estás {currentCandidateMatch - stats.avgMatch}% por arriba! <Rocket size={14} /></span> 
+                            : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Estás {stats.avgMatch - currentCandidateMatch}% por debajo <Lightbulb size={14} /></span>}
+                    </span>
+                </div>
+
+                <div style={{ background: 'white', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(0,214,107,0.1)', boxShadow: '0 4px 10px rgba(0,0,0,0.01)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        <DollarSign size={14} /> Salario vs Mercado
+                    </div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 'bold', margin: '6px 0 2px 0', color: 'var(--text-dark)' }}>
+                        {currentSal ? `$${currentSal.toLocaleString()} USD` : 'N/A'}
+                    </div>
+                    <span style={{ 
+                        fontSize: '0.8rem', 
+                        fontWeight: 'bold',
+                        color: isSalaryAbove ? '#15803d' : '#b91c1c'
+                    }}>
+                        {currentSal === 0 
+                            ? 'No especificado por la empresa'
+                            : `${isSalaryAbove ? 'Por encima' : 'Por debajo'} del promedio ($${Math.round(marketAvgSalary).toLocaleString()} USD)`}
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export default function ListaOfertas() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const showAlert = useAlert();
 
     const [loading, setLoading] = useState(true);
     const [candidatoId, setCandidatoId] = useState(null);
@@ -22,6 +191,8 @@ export default function ListaOfertas() {
     const [candidatoData, setCandidatoData] = useState(null);
     const [showInterviewModalFor, setShowInterviewModalFor] = useState(null);
     const [boostQuizModalFor, setBoostQuizModalFor] = useState(null);
+    const [adaptarCvModalFor, setAdaptarCvModalFor] = useState(null);
+    const [marketAvgSalary, setMarketAvgSalary] = useState(0);
 
     const locationRouter = useLocation();
     const queryParams = new URLSearchParams(locationRouter.search);
@@ -37,6 +208,7 @@ export default function ListaOfertas() {
 
     const [ordenamiento, setOrdenamiento] = useState('Mejor Match');
     const [paginaActual, setPaginaActual] = useState(1);
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
 
     useEffect(() => {
         if (!user) {
@@ -84,7 +256,7 @@ export default function ListaOfertas() {
                             esPremiumLocal = true;
                             // Limpiar URL para no volver a ejecutar
                             window.history.replaceState({}, document.title, window.location.pathname);
-                            alert("¡Listo! Tu pago ya se acreditó. ¡Ya eres Premium!");
+                            showAlert("¡Listo! Tu pago ya se acreditó. ¡Ya eres Premium!", "¡Éxito!", "success");
                         }
                     } catch (e) {
                         console.error("Error confirmando pago en frontend:", e);
@@ -136,6 +308,19 @@ export default function ListaOfertas() {
                 if (ofError) throw ofError;
 
                 const ofertasValidas = (ofertasData || []).filter(o => !o.oculta_admin && (!o.empresas || !o.empresas.baneada));
+
+                // Calcular salario promedio del mercado en base a las ofertas cargadas
+                const salaries = ofertasValidas
+                    .map(o => {
+                        const min = o.salario_min_usd || 0;
+                        const max = o.salario_max_usd || min;
+                        return (min + max) / 2;
+                    })
+                    .filter(s => s > 0);
+                const avgSal = salaries.length > 0 
+                    ? salaries.reduce((acc, s) => acc + s, 0) / salaries.length 
+                    : 0;
+                setMarketAvgSalary(avgSal);
 
                 const ofertasConMatch = ofertasValidas.map(oferta => {
                     const skillsRequeridas = oferta.oferta_skills || [];
@@ -239,7 +424,7 @@ export default function ListaOfertas() {
                     .eq('oferta_id', ofertaId);
                     
                 if (count >= ofertaInfo.limite_postulaciones) {
-                    alert("Lo sentimos. Esta oferta ha alcanzado su cupo máximo de postulantes.");
+                    showAlert("Lo sentimos. Esta oferta ha alcanzado su cupo máximo de postulantes.", "Cupo Máximo", "warning");
                     setApplyingTo(null);
                     return;
                 }
@@ -268,7 +453,7 @@ export default function ListaOfertas() {
                 [ofertaId]: { oferta_id: ofertaId, match_boost_estado: 'pendiente' }
             }));
         } catch (err) {
-            alert("Error del servidor: No pudimos procesar tu solicitud.");
+            showAlert("Error del servidor: No pudimos procesar tu solicitud.", "Error", "error");
         } finally {
             setApplyingTo(null);
         }
@@ -342,20 +527,39 @@ export default function ListaOfertas() {
         setPaginaActual(1);
     }, [filtros, ordenamiento]);
 
-    if (loading) {
-        return (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#FAFAFB' }}>
-                <div style={{ color: 'var(--primary)', fontSize: '1.5rem', fontWeight: 'bold' }}>Buscando empleos...</div>
-            </div>
-        );
-    }
+
 
     return (
         <div style={{ background: '#FAFAFB', minHeight: 'calc(100vh - 70px)', padding: '2rem 1rem' }}>
-            <div style={{ maxWidth: '1300px', margin: '0 auto', display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                
+            <div className="ofertas-container" style={{ maxWidth: '1300px', margin: '0 auto', display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                {/* Botón de Hamburguesa para Filtros en Mobile */}
+                <button
+                    onClick={() => setShowMobileFilters(!showMobileFilters)}
+                    className="filter-toggle-btn"
+                    style={{
+                        display: 'none',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '12px',
+                        background: 'white',
+                        border: '1px solid rgba(0, 214, 107, 0.3)',
+                        color: 'var(--text-dark)',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        marginBottom: '1rem',
+                        fontSize: '1rem',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
+                    }}
+                >
+                    <Filter size={18} color="var(--primary)" /> 
+                    {showMobileFilters ? 'Ocultar Filtros' : 'Filtrar Ofertas ☰'}
+                </button>
+
                 {/* SIDEBAR FILTROS */}
-                <aside style={{ flex: '0 0 280px', width: '280px', background: 'white', borderRadius: '12px', padding: '1.5rem', border: '1px solid #EAEAEA' }}>
+                <aside className={`ofertas-sidebar ${showMobileFilters ? 'show' : ''}`} style={{ flex: '0 0 280px', width: '280px', background: 'white', borderRadius: '12px', padding: '1.5rem', border: '1px solid #EAEAEA' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
                         <Filter size={20} color="#555" />
                         <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#333' }}>Filtros</h3>
@@ -408,12 +612,6 @@ export default function ListaOfertas() {
                         </select>
                     </div>
 
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.9rem', color: '#666', fontWeight: 'bold', marginBottom: '10px' }}>Rating de empresa</label>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                            {[1, 2, 3, 4, 5].map(i => <Star key={i} size={18} fill="#e0e0e0" color="#e0e0e0" />)}
-                        </div>
-                    </div>
 
                     <div>
                         <label style={{ display: 'block', fontSize: '0.9rem', color: '#666', fontWeight: 'bold', marginBottom: '10px' }}>Rubro</label>
@@ -493,13 +691,23 @@ export default function ListaOfertas() {
                 </aside>
 
                 {/* LISTA DE OFERTAS */}
-                <main style={{ flex: 1, minWidth: '0' }}>
-                    <div style={{ marginBottom: '1.5rem', color: '#888', fontSize: '0.95rem' }}>
-                        {ofertasOrdenadas.length} empleos encontrados
-                    </div>
+                <main className="ofertas-main" style={{ flex: 1, minWidth: '0' }}>
+                    {loading ? (
+                        <div className="skeleton" style={{ width: '150px', height: '18px', marginBottom: '1.5rem', borderRadius: '4px' }} />
+                    ) : (
+                        <div style={{ marginBottom: '1.5rem', color: '#888', fontSize: '0.95rem' }}>
+                            {ofertasOrdenadas.length} empleos encontrados
+                        </div>
+                    )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {ofertasPaginadas.map(oferta => {
+                        {loading ? (
+                            Array.from({ length: 4 }).map((_, idx) => (
+                                <OfertaCardSkeleton key={idx} />
+                            ))
+                        ) : (
+                            <>
+                                {ofertasPaginadas.map(oferta => {
                             const matchColor = oferta.porcentajeMatch >= 75 ? '#00d66b' : (oferta.porcentajeMatch >= 40 ? '#FFB020' : '#d32f2f');
                              const isExpanded = expandedOferta === oferta.id;
                              const yaPostulado = !!postulacionesMap[oferta.id];
@@ -533,47 +741,57 @@ export default function ListaOfertas() {
                                                     empLetra
                                                 )}
                                             </div>
-                                            
-                                            {/* Info Basica */}
-                                            <div>
-                                                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.15rem', color: '#222' }}>{oferta.titulo}</h3>
-                                                <div style={{ color: '#666', fontSize: '0.95rem', marginBottom: '8px' }}>{oferta.nombre_empresa_custom || oferta.empresas?.nombre}</div>
+                                                        {/* Info Basica */}
+                                            <div style={{ flex: 1, minWidth: '0' }}>
+                                                <h3 style={{ margin: '0 0 5px 0', fontSize: '1.2rem', fontWeight: 'bold', color: '#222' }}>{oferta.titulo}</h3>
                                                 
-                                                <div style={{ display: 'flex', gap: '10px', fontSize: '0.85rem', flexWrap: 'wrap', marginBottom: '8px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px', color: '#666', fontSize: '0.95rem' }}>
+                                                    <span style={{ fontWeight: '600', color: '#333' }}>{oferta.nombre_empresa_custom || oferta.empresas?.nombre}</span>
+                                                    <span>•</span>
+                                                    <span style={{ background: '#EAF9F1', color: '#00B159', padding: '2px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '500' }}>{oferta.modalidad}</span>
+                                                    
                                                     {(oferta.modalidad === 'Presencial' || oferta.modalidad === 'Híbrido') && (
-                                                        <span style={{ background: '#F5F6F8', color: '#555', padding: '4px 10px', borderRadius: '6px' }}>
-                                                            <MapPin size={12} style={{ display: 'inline', marginRight: '4px', position: 'relative', top: '1px' }} />
-                                                            {oferta.ciudad || oferta.empresas?.ubicacion || 'Ubicación a acordar'}
-                                                        </span>
+                                                        <>
+                                                            <span>•</span>
+                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                                                <MapPin size={12} />
+                                                                {oferta.ciudad || oferta.empresas?.ubicacion || 'Ubicación a acordar'}
+                                                            </span>
+                                                        </>
                                                     )}
-                                                    <span style={{ background: '#EAF9F1', color: '#00B159', padding: '4px 10px', borderRadius: '6px' }}>{oferta.modalidad}</span>
+                                                    
                                                     {(oferta.seniority && oferta.seniority !== 'Indistinto') && (
-                                                        <span style={{ background: '#FFF4E5', color: '#E68A00', padding: '4px 10px', borderRadius: '6px', fontWeight: 'bold' }}>
-                                                            {oferta.seniority}
-                                                        </span>
+                                                        <>
+                                                            <span>•</span>
+                                                            <span style={{ background: '#FFF4E5', color: '#E68A00', padding: '2px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600' }}>
+                                                                {oferta.seniority}
+                                                            </span>
+                                                        </>
                                                     )}
+                                                    
                                                     {(oferta.salario_min_usd > 0) && (
-                                                        <span style={{ background: '#E6F7FF', color: '#0084FF', padding: '4px 10px', borderRadius: '6px', fontWeight: '500' }}>
-                                                            ${oferta.salario_min_usd.toLocaleString()} - {oferta.salario_max_usd ? `$${oferta.salario_max_usd.toLocaleString()} USD` : '+ USD'}
-                                                        </span>
+                                                        <>
+                                                            <span>•</span>
+                                                            <span style={{ background: '#E6F7FF', color: '#0084FF', padding: '2px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600' }}>
+                                                                ${oferta.salario_min_usd.toLocaleString()} - {oferta.salario_max_usd ? `$${oferta.salario_max_usd.toLocaleString()} USD` : '+ USD'}
+                                                            </span>
+                                                        </>
                                                     )}
                                                 </div>
 
                                                 {/* Motivational Badges */}
                                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                                     {oferta.porcentaje_match_minimo > 0 && (
-                                                        <div style={{ display: 'inline-block', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(255, 165, 0, 0.3)' }}>
-                                                            🌟 ¡Tu perfil supera el {oferta.porcentaje_match_minimo}% exigido por la empresa!
+                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 2px 6px rgba(255, 165, 0, 0.2)' }}>
+                                                            <Star size={12} fill="white" /> Match Mínimo ({oferta.porcentaje_match_minimo}%) Superado
                                                         </div>
                                                     )}
                                                     {finalMatch >= 80 && (
-                                                        <div style={{ display: 'inline-block', background: 'linear-gradient(90deg, #FFB020 0%, #FF9800 100%)', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 2px 8px rgba(255, 176, 32, 0.3)' }}>
-                                                            ✨ Simulación IA Disponible
+                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'linear-gradient(90deg, #FFB020 0%, #FF9800 100%)', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 2px 6px rgba(255, 176, 32, 0.2)' }}>
+                                                            <Sparkles size={12} fill="white" /> Simulación IA
                                                         </div>
                                                     )}
                                                 </div>
-                                               
-
                                             </div>
                                         </div>
 
@@ -718,9 +936,55 @@ export default function ListaOfertas() {
                                                                     transition: 'transform 0.2s'
                                                                 }}
                                                             >
-                                                                ⚡ Iniciar Desafío
+                                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                                    <Zap size={16} fill="white" /> Iniciar Desafío
+                                                                </span>
                                                             </button>
                                                         )}
+                                                    </div>
+                                                )}
+
+                                                {candidatoData?.es_premium && !yaPostulado && (
+                                                    <div style={{
+                                                        padding: '1.2rem',
+                                                        background: 'linear-gradient(135deg, rgba(0, 214, 107, 0.08) 0%, rgba(0, 214, 107, 0.02) 100%)',
+                                                        borderRadius: '12px',
+                                                        border: '1px solid rgba(0, 214, 107, 0.15)',
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        flexWrap: 'wrap',
+                                                        gap: '1rem'
+                                                    }}>
+                                                        <div style={{ flex: 1, minWidth: '200px' }}>
+                                                            <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+                                                                <Sparkles size={18} fill="var(--primary)" /> Adaptación de CV con IA Habilitada
+                                                            </h4>
+                                                            <p style={{ margin: 0, fontSize: '0.85rem', color: '#555', lineHeight: '1.4' }}>
+                                                                Optimiza tu extracto y perfil profesional exclusivamente para esta vacante antes de postularte.
+                                                            </p>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => setAdaptarCvModalFor(oferta)}
+                                                            style={{ 
+                                                                background: 'var(--primary)', 
+                                                                color: 'white', 
+                                                                padding: '10px 20px', 
+                                                                borderRadius: '8px', 
+                                                                border: 'none', 
+                                                                fontWeight: 'bold', 
+                                                                fontSize: '0.9rem', 
+                                                                cursor: 'pointer', 
+                                                                boxShadow: '0 4px 12px rgba(0, 214, 107, 0.2)',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                gap: '6px'
+                                                            }}
+                                                        >
+                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                                <Sparkles size={16} /> Adaptar CV
+                                                            </span>
+                                                        </button>
                                                     </div>
                                                 )}
 
@@ -728,6 +992,15 @@ export default function ListaOfertas() {
                                                     matchScore={finalMatch} 
                                                     isPremium={candidatoData?.es_premium} 
                                                     onSimulateClick={() => setShowInterviewModalFor({ ...oferta, porcentajeMatch: finalMatch })} 
+                                                />
+
+                                                <PremiumStats 
+                                                    offerId={oferta.id}
+                                                    candidatoId={candidatoId}
+                                                    currentCandidateMatch={finalMatch}
+                                                    currentOfferSalary={(oferta.salario_min_usd + (oferta.salario_max_usd || oferta.salario_min_usd)) / 2}
+                                                    esPremium={candidatoData?.es_premium}
+                                                    marketAvgSalary={marketAvgSalary}
                                                 />
                                             </div>
                                         </div>
@@ -740,6 +1013,8 @@ export default function ListaOfertas() {
                             <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#888', background: 'white', borderRadius: '12px', border: '1px dashed #ddd' }}>
                                 No hay resultados con los filtros actuales.
                             </div>
+                        )}
+                            </>
                         )}
                         
                         {/* Controles de Paginación */}
@@ -805,6 +1080,13 @@ export default function ListaOfertas() {
                     }}
                 />
             )}
+
+            <AdaptarCvModal 
+                isOpen={!!adaptarCvModalFor}
+                onClose={() => setAdaptarCvModalFor(null)}
+                candidatoId={candidatoId}
+                ofertaId={adaptarCvModalFor?.id}
+            />
         </div>
     );
 }

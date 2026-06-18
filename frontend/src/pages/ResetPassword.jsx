@@ -34,6 +34,8 @@ export default function ResetPassword() {
         if (error) {
             setError(error.message);
         } else {
+            sessionStorage.removeItem('is_recovering_password');
+            await supabase.auth.signOut(); // Sign out to force fresh login with new password
             setSuccess(true);
             setTimeout(() => {
                 navigate('/login');

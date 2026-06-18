@@ -52,3 +52,160 @@ button {
   margin: 0 auto;
   padding: 0 24px;
 }
+
+/* Skeletons */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(18, 26, 22, 0.05) 25%,
+    rgba(18, 26, 22, 0.1) 37%,
+    rgba(18, 26, 22, 0.05) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-loading 1.4s ease infinite;
+}
+
+.skeleton-text {
+  height: 14px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+.skeleton-title {
+  height: 24px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* ==========================================================================
+   Responsive & Mobile Adjustments (Hardening & Mobile Optimization)
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .nav-links {
+    display: none !important;
+  }
+  .navbar-username {
+    display: none !important;
+  }
+  .navbar-user-btn {
+    padding: 6px 10px !important;
+    gap: 8px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  /* Ensure header container doesn't overflow */
+  .header-container {
+    padding: 0 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0.8rem 1rem !important;
+  }
+  
+  /* Reduce profile inner card padding on mobile */
+  .profile-card-container {
+    padding: 2rem 1.25rem !important;
+    margin-top: 2rem !important;
+    margin-bottom: 2rem !important;
+    border-radius: 16px !important;
+  }
+
+  .profile-card-container h2 {
+    font-size: 1.8rem !important;
+  }
+  
+  /* Flex header row for profile header on mobile */
+  .profile-card-container > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 15px !important;
+    margin-bottom: 2rem !important;
+  }
+
+  /* Responsive Offers Page layout */
+  .ofertas-container {
+    flex-direction: column !important;
+    gap: 1.5rem !important;
+  }
+  
+  .filter-toggle-btn {
+    display: flex !important;
+  }
+  
+  .ofertas-sidebar {
+    display: none !important;
+  }
+  
+  .ofertas-sidebar.show {
+    display: block !important;
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  .ofertas-main {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .navbar-premium-btn-text {
+    display: none !important;
+  }
+  
+  .navbar-premium-btn {
+    padding: 8px !important;
+  }
+
+  .navbar-auth-buttons {
+    gap: 8px !important;
+  }
+
+  .navbar-btn-login, .navbar-btn-register {
+    padding: 8px 14px !important;
+    font-size: 0.85rem !important;
+    border-radius: 8px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-premium-btn {
+    display: none !important;
+  }
+  
+  .navbar-btn-login, .navbar-btn-register {
+    padding: 6px 10px !important;
+    font-size: 0.8rem !important;
+  }
+  
+  .logo span {
+    font-size: 1.5rem !important;
+  }
+
+  .notification-dropdown {
+    position: fixed !important;
+    top: 70px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+}
+
+

@@ -23,9 +23,13 @@ export default function SkillQuiz() {
 
     const [error, setError] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const submittingRef = useRef(false);
     const [resultado, setResultado] = useState(null);
 
     useEffect(() => {
+        let isMounted = true;
+        const abortController = new AbortController();
+
         if (!user) {
             navigate('/login');
             return;
@@ -40,11 +44,16 @@ export default function SkillQuiz() {
                     .eq('auth_id', user.id)
                     .single();
 
+                if (!isMounted) return;
+
                 if (candError) throw candError;
                 setCandidatoId(candData.id);
 
                 // 2. Request Quiz Generation
                 const { data: { session } } = await supabase.auth.getSession();
+                
+                if (!isMounted) return;
+
                 const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
                 
                 const res = await fetch(`${backendUrl}/api/generate-quiz`, {
@@ -56,8 +65,11 @@ export default function SkillQuiz() {
                     body: JSON.stringify({
                         skill: decodeURIComponent(skill),
                         candidato_id: candData.id
-                    })
+                    }),
+                    signal: abortController.signal
                 });
+
+                if (!isMounted) return;
 
                 const data = await res.json();
 
@@ -65,9 +77,12 @@ export default function SkillQuiz() {
                     throw new Error(data.error || "Error al generar el examen");
                 }
 
+                if (!isMounted) return;
+
+                const pList = Array.isArray(data?.preguntas) ? data.preguntas : [];
                 setQuizSessionId(data.quiz_session_id);
-                setPreguntas(data.preguntas);
-                setRespuestasUsuario(new Array(data.preguntas.length).fill(null));
+                setPreguntas(pList);
+                setRespuestasUsuario(new Array(pList.length).fill(null));
                 
                 // Start Timer
                 timerRef.current = setInterval(() => {
@@ -82,29 +97,56 @@ export default function SkillQuiz() {
                 }, 1000);
 
             } catch (err) {
-                console.error("Quiz Init Error:", err);
-                setError(err.message);
+                if (err.name === 'AbortError') {
+                    console.log('Examen cancelado (unmounted).');
+                    return;
+                }
+                if (isMounted) {
+                    console.error("Quiz Init Error:", err);
+                    setError(err.message);
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
         initQuiz();
 
         return () => {
+            isMounted = false;
+            abortController.abort();
             if (timerRef.current) clearInterval(timerRef.current);
         };
     }, [user, navigate, skill]);
 
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (preguntas.length > 0 && !resultado) {
+                const message = "Si sales de esta página, perderás tu intento de examen diario. ¿Estás seguro?";
+                e.preventDefault();
+                e.returnValue = message; // Standard
+                return message;
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [preguntas, resultado]);
+
     const handleAutoSubmit = async () => {
         // Enviar respuestas actuales cuando se acaba el tiempo
-        if (submitting || resultado) return;
+        if (submittingRef.current || resultado) return;
         await submitQuiz(respuestasUsuario);
     };
 
     const submitQuiz = async (respuestasParaEnviar) => {
-        if (timerRef.current) clearInterval(timerRef.current);
+        if (submittingRef.current || resultado) return;
+        submittingRef.current = true;
         setSubmitting(true);
+        if (timerRef.current) clearInterval(timerRef.current);
         setError(null);
 
         try {
@@ -137,6 +179,7 @@ export default function SkillQuiz() {
         } catch (err) {
             console.error("Quiz Verify Error:", err);
             setError(err.message);
+            submittingRef.current = false;
         } finally {
             setSubmitting(false);
         }

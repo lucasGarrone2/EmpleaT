@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import { LogOut, Menu, User, Briefcase, PlusCircle, Search, Home, Sparkles } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -12,6 +13,7 @@ const Navbar = () => {
     const [userAvatar, setUserAvatar] = useState(null);
     const [isPremium, setIsPremium] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const loadedUserIdRef = useRef(null);
     const [menuOpen, setMenuOpen] = useState(false);
 
     // Close menu when clicking outside
@@ -34,51 +36,65 @@ const Navbar = () => {
     }, []);
 
     useEffect(() => {
-        if (user) {
-            const fetchName = async () => {
-                const rol = user.user_metadata?.rol;
+        if (!user) {
+            setUserName('');
+            setUserAvatar(null);
+            setIsPremium(false);
+            loadedUserIdRef.current = null;
+            return;
+        }
 
-                if (rol === 'admin') {
-                    setUserName('Admin');
-                } else if (rol === 'empresa') {
-                    const { data } = await supabase
-                        .from('empresas')
-                        .select('nombre, logo_url')
-                        .eq('auth_id', user.id)
-                        .maybeSingle();
+        // Si es un usuario diferente, limpiamos para evitar fugas visuales de la sesión anterior
+        if (user.id !== loadedUserIdRef.current) {
+            setUserName('');
+            setUserAvatar(null);
+            setIsPremium(false);
+            loadedUserIdRef.current = user.id;
+        }
 
-                    if (data && data.nombre) {
-                        setUserName(data.nombre.split(' ')[0]);
-                        setUserAvatar(data.logo_url);
+        const fetchName = async () => {
+            const rol = user.user_metadata?.rol;
+
+            if (rol === 'admin') {
+                setUserName('Admin');
+            } else if (rol === 'empresa') {
+                const { data } = await supabase
+                    .from('empresa_miembros')
+                    .select('empresas (nombre, logo_url)')
+                    .eq('auth_id', user.id)
+                    .maybeSingle();
+ 
+                if (data && data.empresas) {
+                    setUserName(data.empresas.nombre.split(' ')[0]);
+                    setUserAvatar(data.empresas.logo_url);
+                } else {
+                    const emailName = user.email.split('@')[0];
+                    setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
+                }
+            } else {
+                const { data } = await supabase
+                    .from('candidatos')
+                    .select('nombre_completo, foto_url, es_premium')
+                    .eq('auth_id', user.id)
+                    .maybeSingle();
+
+                if (data) {
+                    setIsPremium(data.es_premium);
+                    
+                    if (data.nombre_completo) {
+                        setUserName(data.nombre_completo.split(' ')[0]);
+                        setUserAvatar(data.foto_url);
                     } else {
                         const emailName = user.email.split('@')[0];
                         setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
                     }
                 } else {
-                    const { data } = await supabase
-                        .from('candidatos')
-                        .select('nombre_completo, foto_url, es_premium')
-                        .eq('auth_id', user.id)
-                        .maybeSingle();
-
-                    if (data) {
-                        setIsPremium(data.es_premium);
-                        
-                        if (data.nombre_completo) {
-                            setUserName(data.nombre_completo.split(' ')[0]);
-                            setUserAvatar(data.foto_url);
-                        } else {
-                            const emailName = user.email.split('@')[0];
-                            setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
-                        }
-                    } else {
-                        const emailName = user.email.split('@')[0];
-                        setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
-                    }
+                    const emailName = user.email.split('@')[0];
+                    setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
                 }
-            };
-            fetchName();
-        }
+            }
+        };
+        fetchName();
     }, [user]);
 
     const handleLogout = async () => {
@@ -153,7 +169,7 @@ const Navbar = () => {
                 {/* Navigation Links (Public) */}
                 <nav className="nav-links" style={{ display: 'flex', gap: '2.5rem' }}>
                     <a href="/" style={navItemStyle('/')}>Inicio</a>
-                    {!user && (
+                    {(!user || sessionStorage.getItem('is_recovering_password') === 'true' || location.pathname === '/reset-password') && (
                         <>
                             <a href="/pricing" style={{...navItemStyle('/pricing'), display: 'flex', alignItems: 'center', gap: '4px', color: '#D48800'}}><Sparkles size={16}/> Premium</a>
                             <a href="/ofertas" style={navItemStyle('/ofertas')}>Encontrar Trabajo</a>
@@ -164,11 +180,12 @@ const Navbar = () => {
                 
                 {/* Auth & Profile Actions */}
                 <div className="auth-buttons user-menu-container">
-                    {user ? (
+                    {user && sessionStorage.getItem('is_recovering_password') !== 'true' && location.pathname !== '/reset-password' ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                             {user.user_metadata?.rol !== 'empresa' && user.user_metadata?.rol !== 'admin' && !isPremium && (
                                 <button
                                     onClick={() => navigate('/pricing')}
+                                    className="navbar-premium-btn"
                                     style={{
                                         background: 'linear-gradient(90deg, #FFB020 0%, #FF9800 100%)',
                                         color: 'white',
@@ -186,12 +203,16 @@ const Navbar = () => {
                                     onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                                     onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
                                 >
-                                    <Sparkles size={16} /> Premium
+                                    <Sparkles size={16} /> <span className="navbar-premium-btn-text">Premium</span>
                                 </button>
+                            )}
+                            {user.user_metadata?.rol !== 'empresa' && user.user_metadata?.rol !== 'admin' && (
+                                <NotificationBell />
                             )}
                             <div style={{ position: 'relative' }}>
                             <div 
                                 onClick={() => setMenuOpen(!menuOpen)} 
+                                className="navbar-user-btn"
                                 style={{ 
                                     fontWeight: '600', 
                                     color: 'var(--text-dark)', 
@@ -223,10 +244,10 @@ const Navbar = () => {
                                         userName.charAt(0)
                                     )}
                                 </div>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    Hola, {userName} 
+                                <span className="navbar-username" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {userName && <>Hola, {userName}</>}
                                     {isPremium && (
-                                        <span title="Usuario Premium" style={{ display: 'inline-flex', padding: '2px 6px', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(255,165,0,0.3)' }}>
+                                        <span title="Usuario Premium" className="navbar-premium-badge" style={{ display: 'inline-flex', padding: '2px 6px', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(255,165,0,0.3)' }}>
                                             PREMIUM
                                         </span>
                                     )}
@@ -323,9 +344,10 @@ const Navbar = () => {
                             </div>
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', gap: '15px' }}>
+                        <div className="navbar-auth-buttons" style={{ display: 'flex', gap: '15px' }}>
                             <button 
                                 onClick={() => navigate('/login')}
+                                className="navbar-btn-login"
                                 style={{ 
                                     background: 'transparent', 
                                     border: '1px solid rgba(0,214,107,0.3)', 
@@ -349,6 +371,7 @@ const Navbar = () => {
                             </button>
                             <button 
                                 onClick={() => navigate('/register')}
+                                className="navbar-btn-register"
                                 style={{ 
                                     background: 'var(--primary)', 
                                     color: 'white', 

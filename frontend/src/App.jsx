@@ -1,5 +1,6 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { supabase } from './supabase';
 import LandingPage from './pages/LandingPage';
 import Register from './pages/Register';
 import Login from './pages/Login';
@@ -15,6 +16,7 @@ import EditarOferta from './pages/EditarOferta';
 import PerfilCandidatoParaEmpresa from './pages/PerfilCandidatoParaEmpresa';
 import GoogleCallback from './pages/GoogleCallback';
 import ProtectedRoute from './components/ProtectedRoute';
+import PublicOnlyRoute from './components/PublicOnlyRoute';
 import NotFound from './pages/NotFound';
 import TerminosLegales from './pages/TerminosLegales';
 import ForgotPassword from './pages/ForgotPassword';
@@ -24,21 +26,48 @@ import SkillQuiz from './pages/SkillQuiz';
 import Pricing from './pages/Pricing';
 import MisPostulaciones from './pages/MisPostulaciones';
 
+function RecoveryGuard() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkRecovery = async () => {
+      const isRecovering = sessionStorage.getItem('is_recovering_password') === 'true';
+      const isResetPath = location.pathname === '/reset-password';
+
+      if (isRecovering && !isResetPath) {
+        // Forzamos cerrar sesión si el usuario en recuperación intenta navegar a otra ruta
+        sessionStorage.removeItem('is_recovering_password');
+        await supabase.auth.signOut();
+        navigate('/login', { replace: true });
+      }
+    };
+    checkRecovery();
+  }, [location.pathname, navigate]);
+
+  return null;
+}
+
 function App() {
   return (
     <Router>
       <div className="App">
+        <RecoveryGuard />
         <Navbar />
         <Routes>
-          {/* Rutas públicas */}
+          {/* Rutas públicas accesibles para todos */}
           <Route path="/" element={<LandingPage />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/auth/callback" element={<GoogleCallback/>} />
           <Route path="/terminos-legales" element={<TerminosLegales/>} />
           <Route path="/pricing" element={<Pricing />} />
+
+          {/* Rutas exclusivas para invitados (no logueados) */}
+          <Route element={<PublicOnlyRoute />}>
+            <Route path="/register" element={<Register />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+          </Route>
 
           {/* Rutas para cualquier autenticado. Eliminada /ofertas hacia rutas especificas */}
           <Route element={<ProtectedRoute />}>

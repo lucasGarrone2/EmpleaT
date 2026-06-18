@@ -17,10 +17,14 @@ export function AuthProvider({children}){
 
         //Queda escuchando si el usuario hace login o logout en tiempo real
         const {data: {subscription}} = supabase.auth.onAuthStateChange((event, session)=>{
+            if (event === 'PASSWORD_RECOVERY') {
+                sessionStorage.setItem('is_recovering_password', 'true');
+            }
             // Si el token de sesion expiro o es invalido, limpiar y forzar login
             if (event === 'TOKEN_REFRESH_FAILED' || event === 'SIGNED_OUT') {
                 setUser(null);
                 setLoading(false);
+                sessionStorage.removeItem('is_recovering_password');
                 // Limpiar tokens viejos del localStorage
                 Object.keys(localStorage).forEach(key => {
                     if (key.startsWith('sb-')) localStorage.removeItem(key);

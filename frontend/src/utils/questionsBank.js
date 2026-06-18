@@ -1,41 +1,64 @@
-// Banco de Preguntas Curadas de Nivel Medio para Potenciador de Match (+5%)
+// Banco de Preguntas Curadas Generales y Sencillas para el Potenciador de Match (+5%)
+// Cada categoría tiene un pool amplio, y el sistema elige 3 preguntas aleatorias en cada intento.
 
 export const questionsBank = {
     react: {
         skillLabel: "React",
         questions: [
             {
-                pregunta: "¿Cuál es el propósito principal del hook `useEffect` en React?",
+                pregunta: "¿Qué es React en el desarrollo web?",
                 opciones: [
-                    "Manipular el DOM del navegador directamente sin pasar por el Virtual DOM.",
-                    "Manejar efectos secundarios como llamadas a APIs, suscripciones o manipulación manual del DOM.",
-                    "Crear instancias de componentes basados en clases antiguas.",
-                    "Declarar y actualizar estados reactivos locales en el componente."
+                    "Una base de datos relacional para guardar contraseñas.",
+                    "Una biblioteca de JavaScript para construir interfaces de usuario reutilizables.",
+                    "Un sistema operativo de código abierto para servidores cloud.",
+                    "Un editor de código visual enfocado en diseño gráfico."
                 ],
                 correcta: 1,
-                explicacion: "`useEffect` está diseñado para ejecutar código en respuesta a cambios en el ciclo de vida del componente (montaje, actualización y desmontaje), lo cual abarca efectos secundarios fuera del renderizado puro."
+                explicacion: "React es una biblioteca de JavaScript de código abierto diseñada para crear interfaces de usuario interactivas a partir de componentes modulares."
             },
             {
-                pregunta: "¿Qué es el 'Estado' (State) en un componente de React?",
+                pregunta: "¿Qué es un 'Componente' en React?",
                 opciones: [
-                    "Un objeto interno del componente que almacena datos dinámicos y privados que, al cambiar, disparan un re-renderizado.",
-                    "Una variable global compartida de forma obligatoria por toda la aplicación.",
-                    "Una propiedad estática e inmutable provista por el componente padre.",
-                    "El archivo de configuración CSS que define los colores del componente."
+                    "Una parte reutilizable de la interfaz que contiene su propia lógica y diseño.",
+                    "Un cable de red físico que conecta las computadoras a internet.",
+                    "Un comando de base de datos para borrar registros de usuarios.",
+                    "La hoja de estilos CSS general de la aplicación."
                 ],
                 correcta: 0,
-                explicacion: "El estado (`useState` en componentes funcionales) representa datos locales que pertenecen al componente y cuya modificación actualiza automáticamente la interfaz de usuario."
+                explicacion: "Los componentes son los bloques fundamentales de React. Permiten separar la interfaz en piezas independientes, reutilizables y con estado propio."
             },
             {
-                pregunta: "En React, ¿para qué se utiliza la propiedad especial `key` al renderizar colecciones de elementos?",
+                pregunta: "¿Cuál es el propósito principal de usar el 'Estado' (State) en React?",
                 opciones: [
-                    "Para encriptar la información de las tarjetas en la base de datos.",
-                    "Para vincular hojas de estilo específicas a cada elemento individual.",
-                    "Para ayudar al algoritmo de reconciliación de React a identificar qué elementos han cambiado, se han agregado o eliminado de forma eficiente.",
-                    "Para registrar accesos y clics mediante herramientas de analítica."
+                    "Guardar la dirección IP física del cliente en el backend.",
+                    "Almacenar datos locales dinámicos que, al cambiar, actualizan la pantalla automáticamente.",
+                    "Elegir el país del servidor donde se hospeda la base de datos.",
+                    "Crear copias de seguridad de los archivos CSS de la aplicación."
+                ],
+                correcta: 1,
+                explicacion: "El estado local permite que un componente recuerde información y actualice la interfaz de usuario en tiempo real cuando esos datos cambian."
+            },
+            {
+                pregunta: "¿Qué hook básico se utiliza en React para declarar una variable de estado?",
+                opciones: [
+                    "`useConnection`",
+                    "`useRoute`",
+                    "`useState`",
+                    "`useEffect`"
                 ],
                 correcta: 2,
-                explicacion: "La propiedad `key` proporciona una identidad estable a los elementos de una lista, lo que permite a React reutilizar componentes del DOM existentes en lugar de re-crearlos, optimizando el rendimiento."
+                explicacion: "`useState` es el hook estándar de React que permite añadir estado local a un componente funcional."
+            },
+            {
+                pregunta: "¿Para qué sirve la propiedad especial `key` al renderizar listas en React?",
+                opciones: [
+                    "Para encriptar los datos del usuario en el navegador.",
+                    "Para que React identifique qué elementos cambiaron, se agregaron o eliminaron de forma eficiente.",
+                    "Para aplicar estilos de colores degradados a la pantalla.",
+                    "Para acelerar la velocidad de descarga de la base de datos."
+                ],
+                correcta: 1,
+                explicacion: "La propiedad `key` ayuda al Virtual DOM de React a asociar elementos estables con elementos de la interfaz, previniendo fallos visuales y optimizando el rendimiento."
             }
         ]
     },
@@ -43,7 +66,18 @@ export const questionsBank = {
         skillLabel: "Python",
         questions: [
             {
-                pregunta: "¿Qué tipo de estructura de datos en Python es inmutable por naturaleza?",
+                pregunta: "¿Qué caracteriza al lenguaje de programación Python?",
+                opciones: [
+                    "Es extremadamente difícil de leer y requiere compilarse en binarios crudos.",
+                    "Es un lenguaje de alto nivel reconocido por su sintaxis limpia y facilidad de lectura.",
+                    "Es una base de datos relacional para servidores de alto rendimiento.",
+                    "Solo sirve para diseñar la interfaz visual de páginas web estáticas."
+                ],
+                correcta: 1,
+                explicacion: "Python se destaca por su legibilidad, facilidad de aprendizaje y versatilidad en múltiples rubros (web, ciencia de datos, automatización, etc.)."
+            },
+            {
+                pregunta: "¿Cuál de las siguientes es una estructura de datos inmutable (que no se puede modificar) en Python?",
                 opciones: [
                     "Lista (`list`)",
                     "Diccionario (`dict`)",
@@ -51,29 +85,40 @@ export const questionsBank = {
                     "Conjunto (`set`)"
                 ],
                 correcta: 2,
-                explicacion: "Las tuplas en Python son secuencias inmutables, lo que significa que una vez creadas, sus elementos y su orden no pueden ser modificados, añadidos ni eliminados."
+                explicacion: "Las tuplas se definen entre paréntesis y son inmutables en Python: no se pueden agregar, quitar o reordenar elementos una vez creadas."
             },
             {
-                pregunta: "En Python, ¿cuál es el propósito principal del bloque estructurado `try...except`?",
+                pregunta: "¿Cómo se define una función en Python?",
                 opciones: [
-                    "Crear bucles condicionales infinitos de alta eficiencia.",
-                    "Capturar y gestionar excepciones o errores durante el tiempo de ejecución para evitar que el programa se detenga bruscamente.",
-                    "Declarar funciones lambda anidadas de forma segura.",
-                    "Optimizar el espacio de memoria RAM mediante la recolección automática de basura."
+                    "Usando la palabra clave `def` seguida del nombre de la función.",
+                    "Escribiendo la palabra clave `function` obligatoriamente.",
+                    "Declarándola directamente como una variable de clase sin llaves.",
+                    "Usando el símbolo de numeral `#` antes del nombre."
+                ],
+                correcta: 0,
+                explicacion: "Las funciones en Python se declaran con la palabra reservada `def`, el nombre de la función, paréntesis y dos puntos."
+            },
+            {
+                pregunta: "¿Cuál es la función del bloque `try...except` en Python?",
+                opciones: [
+                    "Crear un bucle condicional infinito muy rápido.",
+                    "Capturar y manejar posibles errores durante la ejecución para evitar que el programa falle.",
+                    "Importar librerías externas desde internet de forma automática.",
+                    "Limpiar los archivos temporales y optimizar el uso de memoria RAM."
                 ],
                 correcta: 1,
-                explicacion: "El bloque `try...except` permite implementar el manejo de errores, ejecutando código alternativo ante una falla y manteniendo el flujo continuo del programa."
+                explicacion: "El bloque `try...except` permite atrapar excepciones de ejecución (como una división por cero o un archivo inexistente) y gestionarlas sin detener el software."
             },
             {
-                pregunta: "¿Qué retornará la expresión `len([10, 20, 30])` en el intérprete de Python?",
+                pregunta: "¿Cuál es la forma correcta de agregar un elemento al final de una lista en Python?",
                 opciones: [
-                    "2",
-                    "4",
-                    "3",
-                    "Dará un error de tipo (`TypeError`)"
+                    "`lista.append(elemento)`",
+                    "`lista.add(elemento)`",
+                    "`lista.push(elemento)`",
+                    "`lista.insert(elemento)`"
                 ],
-                correcta: 2,
-                explicacion: "`len()` cuenta el número de elementos de un iterable. La lista contiene exactamente tres números enteros, por lo que retorna 3."
+                correcta: 0,
+                explicacion: "`append()` es el método integrado en las listas de Python para anexar un nuevo elemento al extremo final."
             }
         ]
     },
@@ -81,37 +126,59 @@ export const questionsBank = {
         skillLabel: "SQL",
         questions: [
             {
-                pregunta: "¿Qué comando se utiliza en SQL para filtrar los registros obtenidos en una consulta estructurada?",
+                pregunta: "¿Qué significa SQL?",
                 opciones: [
-                    "GROUP BY",
-                    "WHERE",
-                    "ORDER BY",
-                    "HAVING"
+                    "Structured Query Language (Lenguaje de Consulta Estructurado).",
+                    "System Quality Level (Nivel de Calidad del Sistema).",
+                    "Simple Queue Link (Enlace de Cola Simple).",
+                    "Secure Quick Login (Acceso Rápido y Seguro)."
                 ],
-                correcta: 1,
-                explicacion: "La cláusula `WHERE` especifica las condiciones de filtrado que deben cumplir las filas individuales antes de ser devueltas en el set de resultados."
+                correcta: 0,
+                explicacion: "SQL es el lenguaje estándar utilizado para interactuar y realizar consultas sobre bases de datos relacionales."
             },
             {
-                pregunta: "¿Cuál es la diferencia fundamental entre una unión `INNER JOIN` y una `LEFT JOIN`?",
+                pregunta: "¿Qué instrucción SQL se utiliza para obtener o leer registros de una base de datos?",
                 opciones: [
-                    "LEFT JOIN solo permite unir tablas si los campos clave contienen cadenas de texto.",
-                    "INNER JOIN devuelve solo las filas con coincidencias exactas en ambas tablas; LEFT JOIN devuelve todas las filas de la tabla izquierda y las filas coincidentes de la derecha (o NULL si no hay coincidencia).",
-                    "No existe diferencia operativa; ambos términos son alias equivalentes en el motor de base de datos.",
-                    "LEFT JOIN borra los datos duplicados de la tabla derecha de manera irreversible."
+                    "`GET`",
+                    "`SELECT`",
+                    "`FIND`",
+                    "`EXTRACT`"
                 ],
                 correcta: 1,
-                explicacion: "`INNER JOIN` es restrictivo y solo muestra intersecciones; `LEFT JOIN` preserva todos los registros del extremo izquierdo, agregando columnas con valores nulos (`NULL`) si la relación no existe en la derecha."
+                explicacion: "La sentencia `SELECT` le indica al motor de base de datos qué columnas y filas deseamos recuperar de una o más tablas."
             },
             {
-                pregunta: "¿Para qué sirve el comando de agrupación `GROUP BY` en SQL?",
+                pregunta: "¿Para qué sirve la cláusula `WHERE` en una consulta SQL?",
                 opciones: [
-                    "Para ordenar los resultados finales en forma alfabética o numérica descendente.",
-                    "Para agrupar filas de datos que tienen los mismos valores en columnas especificadas, usándose comúnmente con funciones de agregación (como `SUM`, `COUNT` o `AVG`).",
-                    "Para eliminar filas duplicadas físicamente del almacenamiento del servidor.",
-                    "Para cambiar temporalmente los nombres de las columnas en la salida."
+                    "Para ordenar los resultados de forma alfabética.",
+                    "Para filtrar registros según una o más condiciones especificadas.",
+                    "Para unir dos o más tablas distintas.",
+                    "Para limitar el número total de filas devueltas."
                 ],
                 correcta: 1,
-                explicacion: "`GROUP BY` reúne filas idénticas basadas en uno o más atributos para que el motor pueda resumir la información (por ejemplo, contar cuántos empleados pertenecen a cada departamento)."
+                explicacion: "La cláusula `WHERE` permite aplicar un filtro sobre las filas del origen de datos antes de devolver los resultados."
+            },
+            {
+                pregunta: "¿Qué es una Clave Primaria (Primary Key) en una tabla de base de datos?",
+                opciones: [
+                    "La contraseña del administrador de la base de datos.",
+                    "Un campo que identifica de forma única a cada registro en la tabla.",
+                    "Una columna que contiene texto de longitud ilimitada.",
+                    "La primera línea del archivo de configuración del servidor."
+                ],
+                correcta: 1,
+                explicacion: "Una clave primaria garantiza la unicidad e identidad única de cada fila en una tabla de base de datos."
+            },
+            {
+                pregunta: "¿Qué tipo de unión (`JOIN`) devuelve únicamente los registros que tienen coincidencia en ambas tablas relacionadas?",
+                opciones: [
+                    "`INNER JOIN`",
+                    "`LEFT JOIN`",
+                    "`OUTER JOIN`",
+                    "`FULL JOIN`"
+                ],
+                correcta: 0,
+                explicacion: "`INNER JOIN` es una intersección exacta que solo muestra resultados si la relación existe en ambos lados de la consulta."
             }
         ]
     },
@@ -119,37 +186,59 @@ export const questionsBank = {
         skillLabel: "JavaScript",
         questions: [
             {
-                pregunta: "¿Cuál es la diferencia principal entre declarar una variable con `let` en lugar de `var`?",
+                pregunta: "¿Qué es JavaScript?",
                 opciones: [
-                    "`let` define variables con ámbito (scope) de bloque; `var` las define con ámbito de función o globales, ignorando bloques como bucles o condicionales.",
-                    "Las variables creadas con `let` son constantes y sus valores no pueden ser reasignados.",
-                    "`let` consume el doble de memoria de ejecución que `var` en el motor V8 del navegador.",
-                    "`let` es compatible con navegadores antiguos de forma nativa sin transpiladores."
+                    "Un lenguaje de programación utilizado principalmente para dar interactividad a páginas web.",
+                    "Una versión simplificada de Java exclusiva para sistemas de escritorio.",
+                    "Un procesador de hojas de estilo CSS para celulares.",
+                    "Un motor de bases de datos que no requiere código."
                 ],
                 correcta: 0,
-                explicacion: "`let` y `const` respetan los bloques delimitados por llaves `{}` (block scope), lo que previene errores comunes de variables que se filtran o sobreescriben debido al hoisting de `var`."
+                explicacion: "JavaScript es un lenguaje interpretado fundamental en el desarrollo web junto con HTML y CSS, permitiendo crear dinamismo en el navegador."
             },
             {
-                pregunta: "¿Qué significa que una función retorne una `Promise` en JavaScript?",
+                pregunta: "¿Cuál es la diferencia básica entre `const` y `let` en JavaScript?",
                 opciones: [
-                    "Que la función terminará su ejecución sincrónica de forma instantánea liberando el procesador.",
-                    "Que representa un valor que estará disponible ahora, en el futuro o nunca, sirviendo para gestionar tareas asíncronas.",
-                    "Que el navegador garantiza al 100% que la operación de red nunca fallará.",
-                    "Que la función ha sido bloqueada debido a políticas de seguridad CORS."
-                ],
-                correcta: 1,
-                explicacion: "Las promesas son contenedores para una operación asíncrona cuyo resultado (éxito con `resolve` o error con `reject`) se resolverá de manera asíncrona en el futuro."
-            },
-            {
-                pregunta: "¿Cuál es el resultado de ejecutar la operación `[1, 2, 3].map(x => x * 2)`?",
-                opciones: [
-                    "`[2, 4, 6]`, sin modificar la lista original.",
-                    "`[2, 4, 6]`, sobreescribiendo los valores dentro del arreglo de entrada.",
-                    "Retorna el valor total de la suma (`12`).",
-                    "Genera una excepción de ejecución porque `.map()` es exclusivo de objetos."
+                    "Las variables con `const` no pueden reasignarse tras su creación; con `let` sí es posible cambiarlas.",
+                    "`const` solo admite números enteros y `let` admite texto largo.",
+                    "`let` funciona únicamente en navegadores y `const` en servidores.",
+                    "`const` borra automáticamente la memoria RAM de forma periódica."
                 ],
                 correcta: 0,
-                explicacion: "El método `.map()` crea y retorna un *nuevo* arreglo con los resultados de aplicar la función callback a cada elemento, manteniendo intacto el arreglo original (inmutabilidad)."
+                explicacion: "`const` se utiliza para declarar variables cuyo valor no variará en el ciclo de vida del bloque de ejecución, a diferencia de `let` que permite reasignación."
+            },
+            {
+                pregunta: "¿Qué es una promesa (`Promise`) en JavaScript?",
+                opciones: [
+                    "Un objeto que representa el resultado (exitoso o fallido) de una operación asíncrona en el futuro.",
+                    "Una función que garantiza al 100% que la conexión de red nunca fallará.",
+                    "Una regla de estilo que obliga a usar llaves en las condicionales.",
+                    "Un método para comprimir archivos JavaScript para subirlos al servidor."
+                ],
+                correcta: 0,
+                explicacion: "Las promesas gestionan operaciones asíncronas, almacenando temporalmente el estado pendiente hasta que se resuelven o se rechazan."
+            },
+            {
+                pregunta: "¿Qué método de arreglos se usa para transformar cada elemento de un array aplicando una función?",
+                opciones: [
+                    "`.map()`",
+                    "`.filter()`",
+                    "`.forEach()`",
+                    "`.reduce()`"
+                ],
+                correcta: 0,
+                explicacion: "El método `.map()` crea un nuevo arreglo con los resultados de la llamada a la función provista aplicada en cada uno de los elementos."
+            },
+            {
+                pregunta: "¿Cómo se escribe un comentario de una sola línea en JavaScript?",
+                opciones: [
+                    "`// Comentario`",
+                    "`/* Comentario`",
+                    "`# Comentario`",
+                    "`<!-- Comentario`"
+                ],
+                correcta: 0,
+                explicacion: "En JavaScript, la doble barra inclinada `//` marca el resto de la línea de código como un comentario ignorado por el intérprete."
             }
         ]
     },
@@ -157,75 +246,472 @@ export const questionsBank = {
         skillLabel: "Node.js",
         questions: [
             {
-                pregunta: "¿Qué es el 'Event Loop' (Bucle de Eventos) en Node.js?",
+                pregunta: "¿Qué es Node.js?",
                 opciones: [
-                    "Un mecanismo de seguridad que previene ciclos infinitos en el backend.",
-                    "Un motor de renderizado HTML que procesa plantillas en el servidor.",
-                    "El componente central que permite a Node.js realizar operaciones de E/S no bloqueantes, ejecutando callbacks asíncronas en un único hilo.",
-                    "Un bucle recursivo manual que el desarrollador debe programar al inicio del servidor."
+                    "Un entorno de ejecución que permite ejecutar código JavaScript del lado del servidor.",
+                    "Una librería frontend para maquetar estilos responsivos.",
+                    "Un software de base de datos no relacional muy popular.",
+                    "Un programa de compresión de archivos ZIP para hosting."
                 ],
-                correcta: 2,
-                explicacion: "El Event Loop es el corazón asíncrono de Node.js. Se encarga de delegar tareas pesadas (lectura de archivos, consultas de red) al sistema operativo o a un hilo auxiliar y recibir la respuesta en un hilo de ejecución principal."
+                correcta: 0,
+                explicacion: "Node.js es un entorno de ejecución multiplataforma para JS fuera del navegador, enfocado en servicios de red y desarrollo de APIs de backend."
             },
             {
-                pregunta: "¿Qué función cumple el comando `npm install` ejecutado en una carpeta de proyecto?",
+                pregunta: "¿Qué es `npm` en Node.js?",
                 opciones: [
-                    "Compilar todo el código JavaScript a lenguaje de máquina para producción.",
-                    "Descargar e instalar todas las dependencias listadas en el archivo `package.json` dentro del directorio `node_modules`.",
-                    "Publicar la aplicación en los servidores oficiales de Node.js de forma gratuita.",
-                    "Verificar fallos de sintaxis del código de manera interactiva."
+                    "El gestor de paquetes por defecto para instalar y administrar dependencias del proyecto.",
+                    "Un tipo de base de datos en memoria sumamente veloz.",
+                    "Un protocolo de comunicación en red cifrada.",
+                    "Un comando que compila el código a lenguaje C++."
+                ],
+                correcta: 0,
+                explicacion: "npm (Node Package Manager) permite buscar, descargar y actualizar librerías publicadas por otros desarrolladores e integrarlas a nuestra app."
+            },
+            {
+                pregunta: "¿Para qué sirve el archivo `package.json` en un proyecto de Node?",
+                opciones: [
+                    "Guardar claves secretas y contraseñas de las bases de datos de forma pública.",
+                    "Definir los metadatos del proyecto, scripts de arranque y la lista de dependencias requeridas.",
+                    "Definir el diseño visual de la interfaz del frontend.",
+                    "Almacenar el historial de navegación de los clientes."
                 ],
                 correcta: 1,
-                explicacion: "`npm install` lee el archivo `package.json`, resuelve el árbol de dependencias requerido e instala las librerías necesarias en la carpeta local `node_modules`."
+                explicacion: "El archivo `package.json` es el corazón del proyecto. Contiene configuraciones críticas, comandos y las librerías necesarias para que la app se construya e instale correctamente."
             },
             {
-                pregunta: "En Node.js, ¿para qué sirve el objeto `process.env`?",
+                pregunta: "En servidores web (ej. Express.js), ¿cuál es el propósito de un 'Middleware'?",
                 opciones: [
-                    "Para monitorear el consumo de CPU y memoria RAM del servidor.",
-                    "Para definir variables globales exclusivas del navegador cliente.",
-                    "Para acceder a las variables de entorno configuradas en el sistema operativo o en archivos `.env`.",
-                    "Para limpiar directorios temporales de manera automática."
+                    "Un programa externo que balancea la carga de red en el hosting.",
+                    "Una función intermedia que procesa, valida o modifica la solicitud antes de que llegue al controlador final.",
+                    "La base de datos de respaldo que se sincroniza cada medianoche.",
+                    "La hoja de estilos CSS de las páginas de error."
                 ],
-                correcta: 2,
-                explicacion: "`process.env` almacena la configuración y claves del entorno del sistema de ejecución de Node.js, siendo fundamental para resguardar secretos (como tokens de bases de datos o APIs) fuera del código fuente."
+                correcta: 1,
+                explicacion: "Los middlewares interceptan la petición entrante (por ejemplo para verificar tokens de sesión o formatear datos JSON) y deciden si continúan el flujo o responden inmediatamente."
+            }
+        ]
+    },
+    html_css: {
+        skillLabel: "HTML y CSS",
+        questions: [
+            {
+                pregunta: "¿Qué función cumple HTML en una página web?",
+                opciones: [
+                    "Dar estilos visuales, colores y animaciones complejas.",
+                    "Definir la estructura básica y el contenido del sitio mediante etiquetas.",
+                    "Conectarse a bases de datos relacionales en el servidor.",
+                    "Asegurar el cifrado y seguridad de los pagos en línea."
+                ],
+                correcta: 1,
+                explicacion: "HTML (HyperText Markup Language) es el esqueleto de la web, definiendo dónde van textos, títulos, imágenes, botones y enlaces."
+            },
+            {
+                pregunta: "¿Para qué se utiliza CSS?",
+                opciones: [
+                    "Para dar estilo visual, color, diseño responsivo y presentación a la estructura HTML.",
+                    "Para almacenar la información y registros de compras en tablas.",
+                    "Para programar la lógica del servidor de correos electrónicos.",
+                    "Para validar las contraseñas ingresadas por el usuario."
+                ],
+                correcta: 0,
+                explicacion: "CSS (Cascading Style Sheets) es el lenguaje de diseño gráfico que transforma elementos planos en experiencias de usuario atractivas y adaptadas a pantallas."
+            },
+            {
+                pregunta: "¿Qué etiqueta HTML se utiliza para insertar un enlace o hipervínculo?",
+                opciones: [
+                    "`<link>`",
+                    "`<a>`",
+                    "`<href>`",
+                    "`<anchor>`"
+                ],
+                correcta: 1,
+                explicacion: "La etiqueta `<a>` (anchor) con el atributo `href` se utiliza para redireccionar a los usuarios a otras páginas o secciones."
+            },
+            {
+                pregunta: "¿Cómo se aplica una regla de estilos a una clase específica en CSS?",
+                opciones: [
+                    "Poniendo un punto antes del nombre (ej: `.mi-clase { ... }`).",
+                    "Poniendo un numeral antes del nombre (ej: `#mi-clase { ... }`).",
+                    "Escribiendo el nombre directamente sin símbolos (ej: `mi-clase { ... }`).",
+                    "Escribiendo la etiqueta `@mi-clase { ... }`."
+                ],
+                correcta: 0,
+                explicacion: "Los selectores de clase en CSS comienzan con un punto `.`, mientras que los selectores de identificador único (ID) usan el numeral `#`."
+            }
+        ]
+    },
+    devops_cloud: {
+        skillLabel: "DevOps y Cloud",
+        questions: [
+            {
+                pregunta: "¿Qué es la computación en la nube (Cloud)?",
+                opciones: [
+                    "Alquilar y acceder a servidores, bases de datos y almacenamiento a través de Internet en vez de tenerlos físicamente.",
+                    "Un sistema de refrigeración por aire comprimido en los data centers.",
+                    "Una red satelital que funciona sin cableado estructurado.",
+                    "Un software que genera automáticamente el código de la aplicación."
+                ],
+                correcta: 0,
+                explicacion: "La nube provee recursos tecnológicos bajo demanda por internet, eliminando la necesidad de adquirir, mantener y configurar servidores locales."
+            },
+            {
+                pregunta: "¿Cuál es el beneficio de utilizar un sistema de control de versiones como Git?",
+                opciones: [
+                    "Permite rastrear cambios, colaborar en equipo y revertir código a versiones anteriores sin pérdida de información.",
+                    "Aumenta de forma directa la velocidad de internet de la oficina.",
+                    "Protege las computadoras contra fallas eléctricas locales.",
+                    "Elimina los errores de sintaxis del código de manera automática."
+                ],
+                correcta: 0,
+                explicacion: "Git registra el historial de modificaciones del código, facilitando el trabajo cooperativo mediante ramas e integraciones sin pisar el trabajo de otros."
+            },
+            {
+                pregunta: "¿Qué beneficio principal ofrece Docker en el despliegue de software?",
+                opciones: [
+                    "Aísla la aplicación y sus dependencias en un contenedor para que corra idéntico en cualquier computadora o servidor.",
+                    "Duplica la velocidad de los discos de almacenamiento físico.",
+                    "Permite realizar compras en línea con descuentos exclusivos.",
+                    "Genera automáticamente la documentación de desarrollo."
+                ],
+                correcta: 0,
+                explicacion: "Docker encapsula todo el entorno de ejecución del software de forma que se ejecute de manera predecible tanto en el ambiente de desarrollo como en la nube."
+            }
+        ]
+    },
+    ventas: {
+        skillLabel: "Ventas y Atención al Cliente",
+        questions: [
+            {
+                pregunta: "¿Cuál es el objetivo principal de la atención al cliente?",
+                opciones: [
+                    "Resolver dudas, brindar asistencia y lograr la satisfacción y fidelidad del cliente.",
+                    "Evitar que los clientes soliciten cambios de productos rotos.",
+                    "Vender a toda costa productos de mala calidad sin escuchar al cliente.",
+                    "Cobrar recargos adicionales ocultos en las facturas de venta."
+                ],
+                correcta: 0,
+                explicacion: "Brindar una buena atención al cliente genera relaciones de confianza a largo plazo, resolviendo problemas y mejorando la reputación de la marca."
+            },
+            {
+                pregunta: "En el área comercial, ¿a qué se refiere el 'cierre de ventas'?",
+                opciones: [
+                    "Terminar el horario de atención y cerrar las puertas de la tienda física.",
+                    "El acuerdo final donde el cliente confirma y realiza la compra del producto o servicio.",
+                    "Cancelar la cuenta de un cliente insatisfecho para evitar reclamos.",
+                    "Realizar el arqueo y conteo de la caja registradora de forma diaria."
+                ],
+                correcta: 1,
+                explicacion: "El cierre es la etapa del proceso de venta en la que se concreta la transacción comercial, logrando el compromiso del comprador."
+            },
+            {
+                pregunta: "¿Qué es un CRM y para qué sirve en una empresa?",
+                opciones: [
+                    "Un sistema para administrar los datos de los clientes y hacer un seguimiento de las oportunidades de venta.",
+                    "Una placa de hardware instalada dentro de los terminales de cobro electrónico.",
+                    "Una técnica contable para calcular el balance de impuestos mensuales.",
+                    "El sistema de seguridad contra incendios en oficinas corporativas."
+                ],
+                correcta: 0,
+                explicacion: "El software CRM (Customer Relationship Management) centraliza las interacciones con los clientes, optimizando el seguimiento comercial y postventa."
+            },
+            {
+                pregunta: "¿Cuál es la mejor actitud al recibir una queja de un cliente insatisfecho?",
+                opciones: [
+                    "Escuchar activamente con empatía, mantener la calma y proponer soluciones concretas.",
+                    "Ignorar el reclamo o discutir firmemente con el cliente para defender a la empresa.",
+                    "Pasarle la queja a otra área y cortar inmediatamente la comunicación.",
+                    "Decirle que debe realizar una denuncia formal por carta antes de escucharlo."
+                ],
+                correcta: 0,
+                explicacion: "La escucha activa y empatía desactivan tensiones y transforman un cliente insatisfecho en una oportunidad de mejora y fidelización."
+            }
+        ]
+    },
+    administracion: {
+        skillLabel: "Administración y Finanzas",
+        questions: [
+            {
+                pregunta: "¿Cuál es una tarea básica del sector administrativo de una empresa?",
+                opciones: [
+                    "Planificar, coordinar recursos, archivar documentación y organizar procesos internos.",
+                    "Desarrollar el backend del sitio web corporativo.",
+                    "Diseñar la gráfica de los folletos publicitarios del producto.",
+                    "Conducir los camiones de reparto o embalar mercaderías."
+                ],
+                correcta: 0,
+                explicacion: "La administración provee soporte organizativo, control y estructura a todas las áreas de la compañía."
+            },
+            {
+                pregunta: "En Excel, ¿para qué se utiliza principalmente la fórmula `SUMA`?",
+                opciones: [
+                    "Para sumar los valores numéricos de un conjunto de celdas seleccionadas.",
+                    "Para buscar datos específicos en una columna de texto.",
+                    "Para cambiar el diseño y color de las fuentes de la hoja.",
+                    "Para eliminar filas vacías en la hoja de cálculo."
+                ],
+                correcta: 0,
+                explicacion: "La función `=SUMA(rango)` realiza la adición aritmética rápida de números en las celdas especificadas."
+            },
+            {
+                pregunta: "¿Qué es la facturación en una empresa?",
+                opciones: [
+                    "El registro oficial de una venta de bienes o servicios detallando el importe, conceptos e impuestos aplicables.",
+                    "El contrato de trabajo que firman los nuevos empleados.",
+                    "La solicitud de un préstamo de dinero en una entidad bancaria.",
+                    "El proceso de selección de personal para las oficinas."
+                ],
+                correcta: 0,
+                explicacion: "La factura es el documento fiscal y legal obligatorio que respalda la realización de una transacción comercial entre partes."
+            },
+            {
+                pregunta: "¿Qué es una conciliación bancaria?",
+                opciones: [
+                    "Comparar la información contable de la empresa con el extracto bancario para garantizar la consistencia de los fondos.",
+                    "Pedir un descuento sobre las tasas de las tarjetas de crédito corporativas.",
+                    "Firmar un contrato para abrir una cuenta corriente empresarial.",
+                    "Cancelar deudas de impuestos de manera excepcional."
+                ],
+                correcta: 0,
+                explicacion: "La conciliación detecta discrepancias, depósitos en tránsito o cargos bancarios no registrados, manteniendo el control de caja."
+            }
+        ]
+    },
+    logistica: {
+        skillLabel: "Logística y Almacenamiento",
+        questions: [
+            {
+                pregunta: "¿Qué es el control de stock o inventario?",
+                opciones: [
+                    "Registrar y verificar la cantidad de mercadería disponible para evitar faltantes de ventas o excesos de compras.",
+                    "Ordenar alfabéticamente los correos de los clientes del área comercial.",
+                    "Lavar y pintar las cajas de cartón vacías de las mercaderías.",
+                    "Calcular la cotización del dólar para las ventas del día."
+                ],
+                correcta: 0,
+                explicacion: "Controlar el inventario asegura el nivel óptimo de mercaderías para cumplir con la demanda, reduciendo costos de almacenamiento."
+            },
+            {
+                pregunta: "¿Cuál es el fin del proceso de logística de distribución?",
+                opciones: [
+                    "Organizar y coordinar el transporte de productos para que lleguen al comprador final en tiempo y forma.",
+                    "Diseñar los logotipos y colores publicitarios de las cajas.",
+                    "Negociar el pago de salarios de los administrativos.",
+                    "Fabricar las materias primas dentro de la planta."
+                ],
+                correcta: 0,
+                explicacion: "La distribución abarca el almacenamiento, despacho y transporte, buscando la mayor eficiencia y puntualidad en la entrega."
+            },
+            {
+                pregunta: "En depósitos, ¿qué es la conducción de un autoelevador o Clark?",
+                opciones: [
+                    "Manejar un vehículo industrial de carga diseñado para levantar y transportar pallets pesados.",
+                    "Operar los softwares contables de administración del stock.",
+                    "Supervisar el tiempo de descarga de buques cargueros.",
+                    "Realizar tareas de soldadura eléctrica en estanterías rotas."
+                ],
+                correcta: 0,
+                explicacion: "Los autoelevadores mueven y apilan verticalmente cargas pesadas de forma segura y veloz dentro de almacenes."
+            },
+            {
+                pregunta: "En logística, ¿qué indica la regla FIFO (Primero en Entrar, Primero en Salir)?",
+                opciones: [
+                    "Los productos más antiguos en el stock deben venderse o despacharse primero para evitar su vencimiento o deterioro.",
+                    "El primer cliente que compra del día recibe un descuento adicional.",
+                    "Las facturas deben cobrarse de acuerdo al orden de numeración.",
+                    "El primer transportista que llega al muelle tiene prioridad de carga."
+                ],
+                correcta: 0,
+                explicacion: "FIFO (First In, First Out) es vital para la rotación de stock perecedero o susceptible de quedar obsoleto."
+            }
+        ]
+    },
+    gastronomia: {
+        skillLabel: "Gastronomía y Cocina",
+        questions: [
+            {
+                pregunta: "¿Por qué es tan importante la higiene y la manipulación segura de alimentos?",
+                opciones: [
+                    "Para evitar intoxicaciones alimentarias y cuidar la salud de los comensales.",
+                    "Para acelerar la cocción y que los platos salgan antes del tiempo habitual.",
+                    "Para que los platos tengan una presentación más brillante e vistosa.",
+                    "Para poder cobrar precios más elevados por el menú."
+                ],
+                correcta: 0,
+                explicacion: "Las buenas prácticas higiénicas eliminan o reducen riesgos biológicos, químicos y físicos en las comidas preparadas."
+            },
+            {
+                pregunta: "¿Qué significa el término gastronómico 'Mise en place'?",
+                opciones: [
+                    "Tener listos y organizados todos los ingredientes, cortes y utensilios antes de comenzar a cocinar.",
+                    "La limpieza profunda de las mesas y salones al finalizar la jornada.",
+                    "El momento en que se retiran los platos vacíos de la mesa del cliente.",
+                    "El menú especial del día recomendado por el chef."
+                ],
+                correcta: 0,
+                explicacion: "Traducido como 'poner en su lugar', la mise en place optimiza el flujo en cocinas profesionales evitando demoras u olvidos durante el servicio."
+            },
+            {
+                pregunta: "¿Qué tarea realiza principalmente un barista?",
+                opciones: [
+                    "Preparar, extraer y presentar cafés de alta calidad con técnicas específicas.",
+                    "Limpiar los vidrios y barras de los restaurantes.",
+                    "Fabricar cerveza artesanal en barriles de madera.",
+                    "Controlar los ingresos monetarios de las cajas registradoras."
+                ],
+                correcta: 0,
+                explicacion: "El barista se especializa en la preparación de expresos y el arte de la leche, conociendo sobre variedades y molido del grano."
+            }
+        ]
+    },
+    salud: {
+        skillLabel: "Salud y Cuidado",
+        questions: [
+            {
+                pregunta: "¿Qué es lo primero que se debe hacer al brindar Primeros Auxilios ante un accidente?",
+                opciones: [
+                    "Asegurar la zona para evitar que la víctima o nosotros mismos suframos más daños.",
+                    "Mover bruscamente a la persona herida a una zona despejada.",
+                    "Darle de beber abundante agua o alcohol de inmediato.",
+                    "Buscar medicamentos analgésicos en el botiquín sin saber qué le pasa."
+                ],
+                correcta: 0,
+                explicacion: "El protocolo PAS (Proteger, Alertar, Socorrer) indica que proteger el área y garantizar la seguridad propia y ajena es prioritario."
+            },
+            {
+                pregunta: "¿Qué significan las siglas RCP en reanimación de emergencia?",
+                opciones: [
+                    "Reanimación Cardiopulmonar.",
+                    "Revisión Corporal Preventiva.",
+                    "Registro Clínico del Pulso.",
+                    "Reanimación de Caminos y Puentes."
+                ],
+                correcta: 0,
+                explicacion: "La RCP es una técnica de emergencia que combina compresiones y ventilación para mantener la oxigenación ante un paro cardíaco."
+            },
+            {
+                pregunta: "¿Cuál es el propósito de realizar una desinfección y curación básica en una herida leve?",
+                opciones: [
+                    "Evitar infecciones y favorecer el inicio de una cicatrización limpia.",
+                    "Detener el flujo de sangre de forma permanente en un segundo.",
+                    "Quitar el dolor sin necesidad de vendajes o cremas.",
+                    "Darle un color estético a la piel alrededor del raspón."
+                ],
+                correcta: 0,
+                explicacion: "Limpiar con agua y antiséptico reduce la carga de microorganismos patógenos, previniendo complicaciones posteriores."
+            }
+        ]
+    },
+    oficios: {
+        skillLabel: "Construcción y Oficios",
+        questions: [
+            {
+                pregunta: "¿Qué medida de seguridad es indispensable al reparar una instalación eléctrica domiciliaria?",
+                opciones: [
+                    "Cortar el suministro eléctrico general desde la caja de térmicas/disyuntores.",
+                    "Usar guantes de algodón húmedos para disipar corriente estática.",
+                    "Sostener cables pelados con calzado sin suela de goma.",
+                    "Utilizar destornilladores comunes con mangos metálicos descubiertos."
+                ],
+                correcta: 0,
+                explicacion: "Trabajar sin tensión es la única forma 100% segura de evitar accidentes graves por electrocución."
+            },
+            {
+                pregunta: "En plomería, ¿cuál es la función de un sifón colocado debajo del lavatorio?",
+                opciones: [
+                    "Almacenar agua limpia de respaldo para cortes de red.",
+                    "Crear un tapón de agua constante que evita la salida de malos olores del desagüe.",
+                    "Aumentar la presión del agua fría que llega a la grifería.",
+                    "Filtrar el agua haciéndola bebible sin tratamiento previo."
+                ],
+                correcta: 1,
+                explicacion: "El diseño en U del sifón retiene agua limpia formando un sello hidráulico contra los gases provenientes de la cañería de desagüe."
+            },
+            {
+                pregunta: "¿Cuál es el objetivo principal del mantenimiento preventivo de herramientas o maquinarias?",
+                opciones: [
+                    "Realizar ajustes y limpiezas periódicas para evitar fallos futuros y alargar la vida útil.",
+                    "Arreglar las máquinas solo cuando dejan de funcionar por completo.",
+                    "Pintar las herramientas para cambiar su estética exterior.",
+                    "Reemplazar todas las piezas cada fin de mes sin importar su estado."
+                ],
+                correcta: 0,
+                explicacion: "El preventivo detecta desgastes de forma planificada antes de que se produzca una rotura imprevista y costosa en el taller."
+            }
+        ]
+    },
+    idiomas: {
+        skillLabel: "Idiomas y Comunicación",
+        questions: [
+            {
+                pregunta: "En inglés comercial o de negocios, ¿qué significa la sigla 'ASAP'?",
+                opciones: [
+                    "As Soon As Possible (Tan pronto como sea posible).",
+                    "Always Send Another Paper (Siempre envía otro reporte).",
+                    "Account Security Access Password (Clave de acceso y seguridad).",
+                    "After Sale Agreement Protocol (Protocolo posterior a la venta)."
+                ],
+                correcta: 0,
+                explicacion: "ASAP es un acrónimo muy utilizado en correos corporativos para denotar urgencia sobre una tarea."
+            },
+            {
+                pregunta: "¿A qué se refiere el término comercial de uso extendido 'Deadline'?",
+                opciones: [
+                    "La fecha y hora límite establecida para la entrega de un proyecto o tarea.",
+                    "El presupuesto total de gastos corrientes de la oficina.",
+                    "El despido programado de empleados al final de temporada.",
+                    "La línea telefónica directa con los directores de la empresa."
+                ],
+                correcta: 0,
+                explicacion: "Deadline es la fecha tope acordada para finalizar un entregable, hito o etapa de un trabajo profesional."
+            },
+            {
+                pregunta: "¿Qué significa el concepto de 'Feedback' en una comunicación profesional?",
+                opciones: [
+                    "Devolución, comentarios constructivos y opiniones sobre el desempeño de una tarea.",
+                    "Un correo automatizado confirmando que se leyó el mensaje.",
+                    "El contrato de confidencialidad que se firma al entrar a la empresa.",
+                    "La comida compartida al final de la jornada laboral."
+                ],
+                correcta: 0,
+                explicacion: "Dar feedback es retroalimentar a la otra persona, identificando puntos fuertes y oportunidades de mejora sobre sus tareas."
             }
         ]
     },
     default: {
-        skillLabel: "Desarrollo de Software",
+        skillLabel: "Desarrollo Profesional",
         questions: [
             {
-                pregunta: "En control de versiones con Git, ¿qué acción realiza el comando `git clone [url]`?",
+                pregunta: "¿Qué significa el término 'trabajo en equipo' en una oficina?",
                 opciones: [
-                    "Elimina permanentemente un repositorio de los servidores remotos de GitHub.",
-                    "Crea una copia de seguridad local y comprimida de toda tu computadora.",
-                    "Crea un clon local exacto de un repositorio remoto en tu sistema de archivos, incluyendo todo el historial de ramas y commits.",
-                    "Une los commits de dos ramas de trabajo distintas de forma destructiva."
-                ],
-                correcta: 2,
-                explicacion: "`git clone` descarga todo el repositorio remoto (historial, ramas y archivos) y lo configura localmente listo para trabajar de inmediato."
-            },
-            {
-                pregunta: "¿Cuál es el objetivo principal del evento 'Daily Scrum' (reunión diaria) en metodologías ágiles?",
-                opciones: [
-                    "Aprobar presupuestos financieros con directivos de la empresa.",
-                    "Realizar una reunión corta (generalmente 15 minutos) del equipo para sincronizar el trabajo del día, reportar bloqueos y alinear prioridades.",
-                    "Revisar y reescribir todo el código fuente de forma presencial.",
-                    "Entrevistar a nuevos candidatos para incorporarlos al equipo de trabajo."
-                ],
-                correcta: 1,
-                explicacion: "El Daily Scrum promueve la comunicación rápida del equipo de desarrollo analizando qué se hizo ayer, qué se hará hoy y qué impedimentos o bloqueos existen."
-            },
-            {
-                pregunta: "En Git, ¿cuál es el propósito de ejecutar `git checkout -b feature-nueva`?",
-                opciones: [
-                    "Crear una nueva rama local y cambiar inmediatamente el entorno de trabajo a ella.",
-                    "Borrar de forma definitiva e irrecuperable la rama en la que estás posicionado.",
-                    "Enviar todos tus cambios confirmados al servidor de GitHub.",
-                    "Descargar la última versión de la rama principal descartando tus archivos locales modificados."
+                    "La cooperación coordinada de personas para lograr un objetivo común, sumando talentos.",
+                    "Dejar que un solo miembro haga las tareas mientras los demás se enfocan en otros asuntos personales.",
+                    "Competir y ocultar información a los compañeros para sobresalir individualmente.",
+                    "Trabajar sin comunicarse con nadie del equipo para no perder el enfoque."
                 ],
                 correcta: 0,
-                explicacion: "La bandera `-b` en `git checkout` (o en el moderno `git switch -c`) le ordena a Git crear una nueva rama a partir del commit actual y posicionarte sobre ella en un solo paso."
+                explicacion: "El trabajo en equipo optimiza recursos y tiempos, mejorando los resultados a través del esfuerzo mutuo coordinado."
+            },
+            {
+                pregunta: "¿Cuál es la principal ventaja de utilizar sistemas de almacenamiento y edición en la nube (como Google Drive u Office 365)?",
+                opciones: [
+                    "Permitir la edición colaborativa de archivos en tiempo real desde cualquier dispositivo con internet.",
+                    "Proteger físicamente la oficina contra robos de mercadería.",
+                    "Eliminar toda la información una vez que se cierra la sesión en el navegador.",
+                    "Evitar que la empresa deba pagar los impuestos mensuales de software."
+                ],
+                correcta: 0,
+                explicacion: "Las herramientas cloud facilitan el trabajo remoto y la coautoría simultánea de reportes y hojas de datos en tiempo real."
+            },
+            {
+                pregunta: "¿Qué caracteriza a la comunicación asertiva en el trabajo?",
+                opciones: [
+                    "Expresar ideas, necesidades y críticas de forma clara, directa y respetuosa, con empatía.",
+                    "Gritar o presionar para imponer las ideas personales a los demás.",
+                    "Estar siempre de acuerdo con las decisiones de todos para evitar discusiones.",
+                    "Comunicarse únicamente a través de notas anónimas y no hablar en persona."
+                ],
+                correcta: 0,
+                explicacion: "La asertividad permite defender los puntos de vista personales respetando los de los demás, fomentando relaciones laborales sanas."
             }
         ]
     }
@@ -233,12 +719,13 @@ export const questionsBank = {
 
 /**
  * Recibe una lista de skills requeridas de una oferta y busca cuál coincide con nuestro banco.
+ * Elige 3 preguntas al azar de la categoría coincidente.
  * @param {Array} skillsList Lista de objetos u strings de skills de la oferta.
- * @returns {Object} El set de preguntas correspondiente (React, SQL, Python, etc.) o el set genérico.
+ * @returns {Object} El set de preguntas correspondiente con 3 preguntas aleatorias.
  */
 export function getQuestionsForSkills(skillsList = []) {
     if (!skillsList || skillsList.length === 0) {
-        return questionsBank.default;
+        return getRandomSubset(questionsBank.default);
     }
 
     // Normalizar nombres de skills requeridas
@@ -255,7 +742,16 @@ export function getQuestionsForSkills(skillsList = []) {
         { key: 'python', keywords: ['python', 'py', 'python3'] },
         { key: 'sql', keywords: ['sql', 'mysql', 'postgresql', 'postgres', 'sqlite', 'mariadb', 'oracle'] },
         { key: 'javascript', keywords: ['javascript', 'js', 'es6', 'typescript', 'ts'] },
-        { key: 'node', keywords: ['node', 'node.js', 'nodejs', 'express'] }
+        { key: 'node', keywords: ['node', 'node.js', 'nodejs', 'express'] },
+        { key: 'html_css', keywords: ['html', 'css', 'sass', 'tailwind', 'flexbox', 'grid', 'frontend'] },
+        { key: 'devops_cloud', keywords: ['docker', 'kubernetes', 'aws', 'azure', 'gcp', 'cloud', 'devops', 'ci/cd', 'git', 'github'] },
+        { key: 'ventas', keywords: ['venta', 'atencion al cliente', 'atención al cliente', 'atencion al publico', 'atención al público', 'cajero', 'telemarketing', 'negociacion', 'crm', 'salesforce'] },
+        { key: 'administracion', keywords: ['administracion', 'administración', 'contabilidad', 'excel', 'facturacion', 'facturación', 'cobranza', 'sueldo', 'nomina', 'nómina', 'sap', 'finanzas'] },
+        { key: 'logistica', keywords: ['logistica', 'logística', 'stock', 'inventario', 'almacen', 'almacén', 'deposito', 'depósito', 'distribucion', 'autoelevador', 'clark'] },
+        { key: 'gastronomia', keywords: ['cocina', 'gastronomia', 'gastronomía', 'pasteleria', 'pastelería', 'barman', 'barismo', 'chef', 'camarero', 'mozo', 'alimentos'] },
+        { key: 'salud', keywords: ['enfermeria', 'enfermería', 'medicina', 'primeros auxilios', 'rcp', 'kinesiologia', 'kinesiología', 'salud'] },
+        { key: 'oficios', keywords: ['electricidad', 'plomeria', 'plomería', 'carpinteria', 'carpintería', 'soldadura', 'refrigeracion', 'refrigeración', 'mecanica', 'mecánica', 'mantenimiento'] },
+        { key: 'idiomas', keywords: ['ingles', 'inglés', 'english', 'traduccion', 'traducción', 'idiomas', 'idioma'] }
     ];
 
     // Buscar coincidencia en orden de prioridad
@@ -264,10 +760,31 @@ export function getQuestionsForSkills(skillsList = []) {
             map.keywords.some(kw => skillName.includes(kw))
         );
         if (found) {
-            return questionsBank[map.key];
+            return getRandomSubset(questionsBank[map.key]);
         }
     }
 
-    // Si no coincide ninguna skill, retorna default (Software general / Git / Scrum)
-    return questionsBank.default;
+    // Si no coincide ninguna skill, retorna default (Desarrollo Profesional / Trabajo en equipo / Cloud)
+    return getRandomSubset(questionsBank.default);
+}
+
+/**
+ * Mezcla y devuelve un subconjunto aleatorio de preguntas del banco para evitar repeticiones.
+ */
+function getRandomSubset(skillBank, limit = 3) {
+    if (!skillBank || !skillBank.questions) {
+        return { skillLabel: "General", questions: [] };
+    }
+
+    // Mezclar copia del array de preguntas (Fisher-Yates Shuffle)
+    const shuffled = [...skillBank.questions];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    return {
+        skillLabel: skillBank.skillLabel,
+        questions: shuffled.slice(0, limit)
+    };
 }

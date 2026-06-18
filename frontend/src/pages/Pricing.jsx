@@ -1,14 +1,65 @@
-import React, { useState } from 'react';
-import { Check, Sparkles, Zap, Shield, ChevronRight, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, Sparkles, Zap, Shield, ChevronRight, Loader2, Crown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 
 export default function Pricing() {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const showAlert = useAlert();
     const [loadingPlan, setLoadingPlan] = useState(null);
     const [success, setSuccess] = useState(false);
+    const [candidatoData, setCandidatoData] = useState(null);
+    const [loadingCandidato, setLoadingCandidato] = useState(false);
+
+    const formatPremiumHasta = (dateStr) => {
+        if (!dateStr) return "tiempo ilimitado";
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime()) || date.getFullYear() <= 1970) {
+            return "tiempo ilimitado";
+        }
+        return date.toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
+    useEffect(() => {
+        if (user) {
+            setLoadingCandidato(true);
+            const fetchCandidato = async () => {
+                try {
+                    const { data, error } = await supabase
+                        .from('candidatos')
+                        .select('es_premium, premium_hasta')
+                        .eq('auth_id', user.id)
+                        .maybeSingle();
+                    if (!error && data) {
+                        setCandidatoData(data);
+                    }
+                } catch (err) {
+                    console.error("Error fetching candidate premium status:", err);
+                } finally {
+                    setLoadingCandidato(false);
+                }
+            };
+            fetchCandidato();
+        } else {
+            setCandidatoData(null);
+        }
+    }, [user]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('payment_status') === 'failure') {
+            showAlert("Hubo un problema al procesar tu pago. Por favor, intenta de nuevo.", "Error de pago", "error");
+            // Limpiar los parámetros de búsqueda de la URL
+            navigate('/pricing', { replace: true });
+        }
+    }, [showAlert, navigate]);
 
     const handleUpgrade = async (plan) => {
         if (!user) {
@@ -44,7 +95,7 @@ export default function Pricing() {
             }
         } catch (error) {
             console.error("Error al iniciar el pago:", error);
-            alert("Hubo un error al procesar la redirección a Mercado Pago.");
+            showAlert("Hubo un error al procesar la redirección a Mercado Pago.", "Error", "error");
             setLoadingPlan(null);
         }
     };
@@ -71,6 +122,8 @@ export default function Pricing() {
     ];
 
     const beneficios = [
+        "Adaptador de CV inteligente con IA adaptado a cada oferta laboral. (¡NUEVO!)",
+        "Estadísticas competitivas en tiempo real: postulantes totales, tu posición en el ranking de afinidad y comparativa de sueldos. (¡NUEVO!)",
         "Simulador de Entrevistas Técnicas con Inteligencia Artificial.",
         "Feedback personalizado y detallado de cada respuesta.",
         "Posicionamiento destacado en búsquedas de empresas.",
@@ -97,18 +150,53 @@ export default function Pricing() {
                 )}
             </div>
 
+            {candidatoData && candidatoData.es_premium && (
+                <div style={{
+                    background: 'linear-gradient(135deg, #FFF9EB 0%, #FFF3D6 100%)',
+                    border: '1px solid #FFE099',
+                    borderRadius: '16px',
+                    padding: '1.5rem 2rem',
+                    marginBottom: '3rem',
+                    boxShadow: '0 4px 15px rgba(255, 176, 32, 0.1)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '8px',
+                    maxWidth: '800px',
+                    width: '100%',
+                    textAlign: 'center',
+                    boxSizing: 'border-box'
+                }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#B27600', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                        <Crown size={20} color="#B27600" fill="#B27600" /> ¡Tu Membresía Premium está Activa!
+                    </div>
+                    <p style={{ color: '#665022', margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>
+                        Tienes acceso completo a todas las herramientas exclusivas de Inteligencia Artificial hasta el{' '}
+                        <strong>
+                            {formatPremiumHasta(candidatoData.premium_hasta)}
+                        </strong>.
+                    </p>
+                    <p style={{ color: '#8C6D30', margin: 0, fontSize: '0.85rem', fontStyle: 'italic', lineHeight: '1.5' }}>
+                        ¿Quieres extender tu suscripción? Puedes elegir cualquiera de los planes de abajo y se sumará acumulativamente a tu tiempo restante.
+                    </p>
+                </div>
+            )}
+
             <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '1100px', width: '100%' }}>
                 {planes.map((plan, index) => (
                     <div key={index} style={{
                         background: 'white',
                         borderRadius: '24px',
                         padding: '2.5rem',
-                        width: '320px',
+                        width: '100%',
+                        maxWidth: '320px',
                         position: 'relative',
                         boxShadow: plan.popular ? '0 20px 40px rgba(255,176,32,0.15)' : '0 10px 30px rgba(0,0,0,0.05)',
                         border: plan.popular ? '2px solid #FFB020' : '1px solid #EAEAEA',
                         display: 'flex',
-                        flexDirection: 'column'
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        minHeight: '260px'
                     }}>
                         {plan.popular && (
                             <div style={{ position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(90deg, #FFB020 0%, #FF9800 100%)', color: 'white', padding: '6px 16px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(255,176,32,0.3)', letterSpacing: '1px' }}>
@@ -116,20 +204,22 @@ export default function Pricing() {
                             </div>
                         )}
                         
-                        <h3 style={{ fontSize: '1.2rem', color: '#555', marginBottom: '10px' }}>
-                            Suscripción {plan.meses} {plan.meses === 1 ? 'Mes' : 'Meses'}
-                        </h3>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginBottom: '10px' }}>
-                            <span style={{ fontSize: '2.5rem', fontWeight: '900', color: '#333' }}>${plan.precio}</span>
-                            <span style={{ fontSize: '1rem', color: '#888' }}>ARS</span>
-                        </div>
-                        
-                        <div style={{ height: '24px', marginBottom: '1.5rem' }}>
-                            {plan.ahorro && (
-                                <span style={{ background: '#EAF9F1', color: '#00B159', padding: '4px 10px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                                    {plan.ahorro}
-                                </span>
-                            )}
+                        <div>
+                            <h3 style={{ fontSize: '1.2rem', color: '#555', marginBottom: '10px' }}>
+                                Suscripción {plan.meses} {plan.meses === 1 ? 'Mes' : 'Meses'}
+                            </h3>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginBottom: '10px' }}>
+                                <span style={{ fontSize: '2.5rem', fontWeight: '900', color: '#333' }}>${plan.precio}</span>
+                                <span style={{ fontSize: '1rem', color: '#888' }}>ARS</span>
+                            </div>
+                            
+                            <div style={{ height: '24px', marginBottom: '1.5rem' }}>
+                                {plan.ahorro && (
+                                    <span style={{ background: '#EAF9F1', color: '#00B159', padding: '4px 10px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                                        {plan.ahorro}
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         <button 
@@ -146,7 +236,6 @@ export default function Pricing() {
                                 fontSize: '1rem',
                                 cursor: (loadingPlan !== null || success) ? 'not-allowed' : 'pointer',
                                 transition: 'all 0.2s',
-                                marginBottom: '2rem',
                                 boxShadow: plan.popular ? '0 4px 15px rgba(255,176,32,0.3)' : 'none',
                                 opacity: (loadingPlan !== null || success) ? 0.7 : 1,
                                 display: 'flex',
@@ -155,24 +244,270 @@ export default function Pricing() {
                                 gap: '8px'
                             }}
                         >
-                            {loadingPlan === plan.meses ? <Loader2 size={20} className="spin" /> : 'Elegir Plan'}
+                            {loadingPlan === plan.meses ? (
+                                <Loader2 size={20} className="spin" />
+                            ) : candidatoData?.es_premium ? (
+                                `Extender ${plan.meses} ${plan.meses === 1 ? 'Mes' : 'Meses'}`
+                            ) : (
+                                'Elegir Plan'
+                            )}
                         </button>
+                    </div>
+                ))}
+            </div>
 
-                        <div style={{ borderTop: '1px solid #EAEAEA', paddingTop: '1.5rem', flex: 1 }}>
-                            <h4 style={{ fontSize: '0.9rem', color: '#333', marginBottom: '1rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Incluye:</h4>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {beneficios.map((ben, i) => (
-                                    <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                                        <div style={{ background: 'rgba(0, 214, 107, 0.1)', borderRadius: '50%', padding: '2px', color: 'var(--primary)', marginTop: '2px' }}>
-                                            <Check size={14} strokeWidth={3} />
-                                        </div>
-                                        <span style={{ fontSize: '0.9rem', color: '#555', lineHeight: '1.4' }}>{ben}</span>
-                                    </div>
-                                ))}
+            {/* Unified Benefits Section */}
+            <div style={{
+                marginTop: '4rem',
+                maxWidth: '960px',
+                width: '100%',
+                background: 'white',
+                borderRadius: '24px',
+                padding: '3rem 2.5rem',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
+                border: '1px solid #EAEAEA',
+                boxSizing: 'border-box'
+            }}>
+                <h3 style={{
+                    fontSize: '1.4rem',
+                    color: '#333',
+                    fontWeight: '800',
+                    marginBottom: '2rem',
+                    textAlign: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                }}>
+                    <Sparkles size={20} color="#FFB020" fill="#FFB020" /> ¿Qué incluye tu Membresía Premium?
+                </h3>
+                
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: '1.5rem'
+                }}>
+                    {beneficios.map((ben, i) => {
+                        const isNew = ben.includes("NUEVO");
+                        return (
+                            <div key={i} style={{
+                                display: 'flex',
+                                gap: '12px',
+                                alignItems: 'flex-start',
+                                padding: '1.2rem',
+                                borderRadius: '16px',
+                                background: isNew ? 'linear-gradient(135deg, rgba(255,176,32,0.08) 0%, rgba(255,176,32,0.02) 100%)' : '#FAFAFB',
+                                border: isNew ? '1px solid rgba(255,176,32,0.2)' : '1px solid rgba(0,0,0,0.03)'
+                            }}>
+                                <div style={{ 
+                                    background: isNew ? '#FFB020' : 'var(--primary)', 
+                                    borderRadius: '50%', 
+                                    width: '24px',
+                                    height: '24px',
+                                    color: 'white', 
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0
+                                }}>
+                                    <Check size={14} strokeWidth={3} />
+                                </div>
+                                <div>
+                                    <span style={{ 
+                                        fontSize: '0.95rem', 
+                                        color: '#333', 
+                                        lineHeight: '1.5',
+                                        fontWeight: isNew ? 'bold' : '500'
+                                    }}>
+                                        {ben}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Visual Preview Section */}
+            <div style={{
+                marginTop: '5rem',
+                maxWidth: '900px',
+                width: '100%',
+                background: 'linear-gradient(135deg, rgba(255,176,32,0.05) 0%, rgba(255,215,0,0.02) 100%)',
+                border: '1px solid rgba(255,176,32,0.15)',
+                borderRadius: '32px',
+                padding: '3rem 2.5rem',
+                boxSizing: 'border-box',
+                boxShadow: '0 15px 35px rgba(0,0,0,0.02)'
+            }}>
+                <h2 style={{
+                    fontSize: '1.8rem',
+                    color: '#333',
+                    textAlign: 'center',
+                    marginBottom: '1rem',
+                    fontWeight: '800',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px'
+                }}>
+                    <Sparkles size={24} color="#FFB020" fill="#FFB020" /> Características Premium en Acción
+                </h2>
+                <p style={{
+                    color: '#666',
+                    textAlign: 'center',
+                    maxWidth: '600px',
+                    margin: '0 auto 3rem auto',
+                    fontSize: '1rem',
+                    lineHeight: '1.6'
+                }}>
+                    Mira cómo las herramientas de Inteligencia Artificial de EmpleaT transforman tu postulación y te preparan para el éxito.
+                </p>
+
+                <div style={{
+                    display: 'flex',
+                    gap: '2.5rem',
+                    flexWrap: 'wrap',
+                    justifyContent: 'center'
+                }}>
+                    {/* Feature 1: CV Adaptator Preview */}
+                    <div style={{
+                        flex: '1 1 380px',
+                        background: 'white',
+                        borderRadius: '20px',
+                        padding: '2rem',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
+                        border: '1px solid #eaeaea'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.2rem' }}>
+                            <span style={{
+                                background: 'rgba(255,176,32,0.15)',
+                                color: '#D48800',
+                                padding: '4px 10px',
+                                borderRadius: '8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold'
+                            }}>
+                                NUEVO
+                            </span>
+                            <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#333', fontWeight: 'bold' }}>
+                                Adaptador de CV con IA
+                            </h3>
+                        </div>
+                        <p style={{ color: '#666', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1.5rem' }}>
+                            La IA analiza los requisitos específicos de cada vacante y genera un extracto adaptado a partir de tu perfil para maximizar tus posibilidades de ser contactado.
+                        </p>
+
+                        <div style={{
+                            background: '#F8F9FA',
+                            borderRadius: '12px',
+                            padding: '1rem',
+                            fontSize: '0.85rem',
+                            border: '1px dashed #ddd',
+                            lineHeight: '1.4'
+                        }}>
+                            <div style={{ color: '#888', fontWeight: 'bold', marginBottom: '4px' }}>Ejemplo de Extracto Sugerido:</div>
+                            <span style={{ fontStyle: 'italic', color: '#444' }}>
+                                "Desarrollador Full Stack con sólido dominio de React y Node.js. Experiencia optimizando bases de datos SQL y aplicando buenas prácticas de Scrum para acelerar el desarrollo del MVP solicitado por la empresa..."
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Feature 2: Interview Simulator Preview */}
+                    <div style={{
+                        flex: '1 1 380px',
+                        background: 'white',
+                        borderRadius: '20px',
+                        padding: '2rem',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
+                        border: '1px solid #eaeaea'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.2rem' }}>
+                            <span style={{
+                                background: '#E6F7FF',
+                                color: '#0084FF',
+                                padding: '4px 10px',
+                                borderRadius: '8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold'
+                            }}>
+                                IA EXCLUSIVA
+                            </span>
+                            <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#333', fontWeight: 'bold' }}>
+                                Simulador de Entrevista
+                            </h3>
+                        </div>
+                        <p style={{ color: '#666', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1.5rem' }}>
+                            Realiza simulacros de entrevistas técnicas con preguntas personalizadas sobre el rol al que aspiras y recibe feedback profesional inmediato en cada respuesta.
+                        </p>
+
+                        <div style={{
+                            background: '#F8F9FA',
+                            borderRadius: '12px',
+                            padding: '1rem',
+                            fontSize: '0.85rem',
+                            border: '1px dashed #ddd',
+                            lineHeight: '1.4'
+                        }}>
+                            <div style={{ color: '#00B159', fontWeight: 'bold', marginBottom: '4px' }}>Feedback IA en Tiempo Real:</div>
+                            <span style={{ color: '#444' }}>
+                                "Excelente explicación del Virtual DOM. Para sonar aún más profesional, menciona cómo React gestiona el proceso de reconciliación utilizando el algoritmo Diff."
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Feature 3: Competitive Stats Preview */}
+                    <div style={{
+                        flex: '1 1 380px',
+                        background: 'white',
+                        borderRadius: '20px',
+                        padding: '2rem',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.03)',
+                        border: '1px solid #eaeaea'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.2rem' }}>
+                            <span style={{
+                                background: '#E8F5E9',
+                                color: '#2E7D32',
+                                padding: '4px 10px',
+                                borderRadius: '8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold'
+                            }}>
+                                NUEVO
+                            </span>
+                            <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#333', fontWeight: 'bold' }}>
+                                Estadísticas de Competencia
+                            </h3>
+                        </div>
+                        <p style={{ color: '#666', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1.5rem' }}>
+                            Accede a información analítica de la vacante: cantidad de postulantes, tu posicionamiento estimado en el top de afinidad técnica y el salario promedio del mercado.
+                        </p>
+
+                        <div style={{
+                            background: '#F0FDF4',
+                            borderRadius: '12px',
+                            padding: '1.2rem',
+                            border: '1px dashed #A5D6A7',
+                            fontSize: '0.85rem',
+                            lineHeight: '1.4',
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '12px'
+                        }}>
+                            <div>
+                                <span style={{ color: '#666', fontSize: '0.75rem', display: 'block', fontWeight: 'bold' }}>POSICIONAMIENTO</span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 'bold', color: '#2E7D32', fontSize: '1.1rem' }}>
+                                    Top 25% de afinidad <Sparkles size={14} />
+                                </span>
+                            </div>
+                            <div>
+                                <span style={{ color: '#666', fontSize: '0.75rem', display: 'block', fontWeight: 'bold' }}>SUELDO VS MERCADO</span>
+                                <span style={{ fontWeight: 'bold', color: '#2E7D32', fontSize: '1.1rem' }}>+12% vs Promedio</span>
                             </div>
                         </div>
                     </div>
-                ))}
+                </div>
             </div>
 
             <div style={{ marginTop: '4rem', textAlign: 'center' }}>

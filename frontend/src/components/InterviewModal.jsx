@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Sparkles, Loader2, Send, CheckCircle } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -10,15 +10,29 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
     const [currentAnswer, setCurrentAnswer] = useState('');
     const [evaluacion, setEvaluacion] = useState(null);
     const [error, setError] = useState(null);
+    const [sessionId, setSessionId] = useState(null);
+    const isMountedRef = useRef(true);
+    const submittingRef = useRef(false);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => { isMountedRef.current = false; };
+    }, []);
 
     useEffect(() => {
         let isMounted = true;
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => {
+            abortController.abort();
+        }, 90000); // 90 seconds timeout (TC-08)
+
         const generateQuestions = async () => {
             try {
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) throw new Error("No hay sesión activa");
 
-                const response = await fetch('http://localhost:3000/api/premium/simular-entrevista', {
+                const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                const response = await fetch(`${backendUrl}/api/premium/simular-entrevista`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -26,10 +40,12 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
                     },
                     body: JSON.stringify({
                         oferta_id: ofertaId,
-                        candidato_id: candidatoId,
-                        porcentaje_match: porcentajeMatch
-                    })
+                        candidato_id: candidatoId
+                    }),
+                    signal: abortController.signal
                 });
+
+                clearTimeout(timeoutId);
 
                 if (!response.ok) {
                     const errorData = await response.json();
@@ -38,22 +54,33 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
 
                 const data = await response.json();
                 if (isMounted) {
-                    setPreguntas(data.preguntas);
+                    setPreguntas(Array.isArray(data?.preguntas) ? data.preguntas : []);
+                    setSessionId(data?.session_id || null);
                     setStep('asking');
                 }
             } catch (err) {
+                clearTimeout(timeoutId);
                 if (isMounted) {
-                    setError(err.message);
+                    if (err.name === 'AbortError') {
+                        setError("La IA tardó demasiado en responder (Tiempo de espera agotado). Por favor, intenta de nuevo.");
+                    } else {
+                        setError(err.message);
+                    }
                     setStep('error');
                 }
             }
         };
 
         generateQuestions();
-        return () => { isMounted = false; };
-    }, [candidatoId, ofertaId, porcentajeMatch]);
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+            abortController.abort();
+        };
+    }, [candidatoId, ofertaId]);
 
     const handleNextQuestion = () => {
+        if (submittingRef.current || step === 'evaluating') return;
         if (!currentAnswer.trim()) return;
 
         const newRespuestas = [...respuestas, currentAnswer];
@@ -63,12 +90,20 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
         if (currentIndex < preguntas.length - 1) {
             setCurrentIndex(currentIndex + 1);
         } else {
+            submittingRef.current = true;
             submitInterview(newRespuestas);
         }
     };
 
     const submitInterview = async (finalRespuestas) => {
+        if (step === 'evaluating') return;
         setStep('evaluating');
+
+        const abortController = new AbortController();
+        const timeoutId = setTimeout(() => {
+            abortController.abort();
+        }, 90000); // 90 seconds timeout (TC-08)
+
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("No hay sesión activa");
@@ -78,7 +113,8 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
                 respuesta: finalRespuestas[idx]
             }));
 
-            const response = await fetch('http://localhost:3000/api/premium/evaluar-respuesta', {
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${backendUrl}/api/premium/evaluar-respuesta`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -87,9 +123,13 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
                 body: JSON.stringify({
                     oferta_id: ofertaId,
                     candidato_id: candidatoId,
-                    q_a_pairs
-                })
+                    q_a_pairs,
+                    session_id: sessionId
+                }),
+                signal: abortController.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 const errorData = await response.json();
@@ -97,11 +137,21 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
             }
 
             const data = await response.json();
-            setEvaluacion(data);
-            setStep('results');
+            if (isMountedRef.current) {
+                setEvaluacion(data);
+                setStep('results');
+            }
         } catch (err) {
-            setError(err.message);
-            setStep('error');
+            clearTimeout(timeoutId);
+            submittingRef.current = false;
+            if (isMountedRef.current) {
+                if (err.name === 'AbortError') {
+                    setError("La IA tardó demasiado en evaluar tus respuestas (Tiempo de espera agotado). Por favor, intenta de nuevo.");
+                } else {
+                    setError(err.message);
+                }
+                setStep('error');
+            }
         }
     };
 
@@ -187,16 +237,16 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
                             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
                                 <button 
                                     onClick={handleNextQuestion}
-                                    disabled={!currentAnswer.trim()}
+                                    disabled={!currentAnswer.trim() || step === 'evaluating' || submittingRef.current}
                                     style={{
-                                        background: currentAnswer.trim() ? 'var(--primary)' : '#EAEAEA',
-                                        color: currentAnswer.trim() ? 'white' : '#999',
+                                        background: (currentAnswer.trim() && step !== 'evaluating' && !submittingRef.current) ? 'var(--primary)' : '#EAEAEA',
+                                        color: (currentAnswer.trim() && step !== 'evaluating' && !submittingRef.current) ? 'white' : '#999',
                                         padding: '12px 24px', borderRadius: '8px', border: 'none',
-                                        fontWeight: 'bold', fontSize: '1rem', cursor: currentAnswer.trim() ? 'pointer' : 'not-allowed',
+                                        fontWeight: 'bold', fontSize: '1rem', cursor: (currentAnswer.trim() && step !== 'evaluating' && !submittingRef.current) ? 'pointer' : 'not-allowed',
                                         display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s'
                                     }}
                                 >
-                                    {currentIndex === preguntas.length - 1 ? 'Finalizar' : 'Siguiente Pregunta'} <Send size={16} />
+                                    {(submittingRef.current || step === 'evaluating') ? 'Enviando...' : (currentIndex === preguntas.length - 1 ? 'Finalizar' : 'Siguiente Pregunta')} <Send size={16} />
                                 </button>
                             </div>
                         </div>

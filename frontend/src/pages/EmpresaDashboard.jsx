@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { Building2, PlusCircle, Briefcase, MapPin, Users, Settings, ArrowUpDown, CalendarDays, TrendingUp, TrendingDown } from 'lucide-react';
+import { Building2, PlusCircle, Briefcase, MapPin, Users, Settings, ArrowUpDown, CalendarDays, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
 import './Register.css'; // Reusing established styles for consistency
 
 export default function EmpresaDashboard() {
@@ -15,7 +15,19 @@ export default function EmpresaDashboard() {
     const [error, setError] = useState(null);
     const [sortBy, setSortBy] = useState('newest');
     const [filterEstado, setFilterEstado] = useState('todas');
-
+ 
+    // Multi-user company states
+    const [userRole, setUserRole] = useState(null);
+    const [miembros, setMiembros] = useState([]);
+    const [activeTab, setActiveTab] = useState('busquedas');
+ 
+    // Invitation states
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteRole, setInviteRole] = useState('reclutador');
+    const [inviteLoading, setInviteLoading] = useState(false);
+    const [inviteError, setInviteError] = useState(null);
+    const [inviteSuccess, setInviteSuccess] = useState(null);
+ 
     // Profile completion state
     const [isOnboarding, setIsOnboarding] = useState(false);
     const [onboardData, setOnboardData] = useState({
@@ -38,31 +50,74 @@ export default function EmpresaDashboard() {
 
         const fetchDashboardData = async () => {
             try {
-                // Check if company profile exists
-                const { data: empData, error: empError } = await supabase
-                    .from('empresas')
-                    .select('*')
+                // Query company membership first
+                const { data: miembroData, error: miembroError } = await supabase
+                    .from('empresa_miembros')
+                    .select('*, empresas(*)')
                     .eq('auth_id', user.id)
                     .maybeSingle();
 
-                if (empError) throw empError;
+                if (miembroError) throw miembroError;
 
-                if (!empData) {
-                    setIsOnboarding(true);
+                if (!miembroData) {
+                    // Fallback to direct check in case the trigger didn't run or legacy data
+                    const { data: empData, error: empError } = await supabase
+                        .from('empresas')
+                        .select('*')
+                        .eq('auth_id', user.id)
+                        .maybeSingle();
+
+                    if (empError) throw empError;
+
+                    if (!empData) {
+                        setIsOnboarding(true);
+                    } else {
+                        // Auto-create membership to fix legacy account
+                        const { data: newMiembro, error: insErr } = await supabase
+                            .from('empresa_miembros')
+                            .insert({
+                                auth_id: user.id,
+                                empresa_id: empData.id,
+                                rol: 'administrador'
+                            })
+                            .select('*, empresas(*)')
+                            .single();
+                        
+                        if (insErr) throw insErr;
+                        setEmpresa(newMiembro.empresas);
+                        setUserRole('administrador');
+                        
+                        // Load offers
+                        const { data: ofertasData, error: ofertasError } = await supabase
+                            .from('ofertas')
+                            .select(`
+                                id, titulo, modalidad, estado, creada_en, nombre_empresa_custom, ciudad,
+                                postulaciones (count)
+                            `)
+                            .eq('empresa_id', newMiembro.empresa_id)
+                            .order('creada_en', { ascending: false });
+                        
+                        if (ofertasError) throw ofertasError;
+                        setOfertas(ofertasData || []);
+                        await fetchMiembros(newMiembro.empresa_id);
+                    }
                 } else {
-                    setEmpresa(empData);
-                    // Fetch offers for this company
+                    setEmpresa(miembroData.empresas);
+                    setUserRole(miembroData.rol);
+                    
+                    // Load offers
                     const { data: ofertasData, error: ofertasError } = await supabase
                         .from('ofertas')
                         .select(`
                             id, titulo, modalidad, estado, creada_en, nombre_empresa_custom, ciudad,
                             postulaciones (count)
                         `)
-                        .eq('empresa_id', empData.id)
+                        .eq('empresa_id', miembroData.empresa_id)
                         .order('creada_en', { ascending: false });
                     
                     if (ofertasError) throw ofertasError;
                     setOfertas(ofertasData || []);
+                    await fetchMiembros(miembroData.empresa_id);
                 }
             } catch (err) {
                 console.error("Error al obtener datos:", err);
@@ -74,6 +129,123 @@ export default function EmpresaDashboard() {
 
         fetchDashboardData();
     }, [user, navigate]);
+
+    const fetchMiembros = async (empId) => {
+        try {
+            const { data, error } = await supabase
+                .rpc('get_company_members_details', { company_uuid: empId });
+            
+            if (error) throw error;
+            setMiembros(data || []);
+        } catch (err) {
+            console.error("Error al obtener miembros del equipo:", err);
+        }
+    };
+
+    const handleInviteMember = async (e) => {
+        e.preventDefault();
+        setInviteLoading(true);
+        setInviteError(null);
+        setInviteSuccess(null);
+
+        const emailClean = inviteEmail.trim().toLowerCase();
+        if (!emailClean) {
+            setInviteError("Por favor ingresa un correo electrónico.");
+            setInviteLoading(false);
+            return;
+        }
+
+        try {
+            // 1. Resolve email to user ID
+            const { data: userData, error: userError } = await supabase
+                .rpc('get_user_id_by_email', { email_address: emailClean });
+            
+            if (userError) throw userError;
+
+            if (!userData || userData.length === 0) {
+                throw new Error("El correo ingresado no está registrado en la plataforma. Pídele que se registre primero.");
+            }
+
+            const targetUser = userData[0];
+
+            // 2. Add as member
+            const { error: insertError } = await supabase
+                .from('empresa_miembros')
+                .insert({
+                    auth_id: targetUser.auth_id,
+                    empresa_id: empresa.id,
+                    rol: inviteRole
+                });
+
+            if (insertError) {
+                if (insertError.code === '23505') {
+                    throw new Error("Este usuario ya es miembro de tu empresa.");
+                }
+                throw insertError;
+            }
+
+            setInviteSuccess(`¡Usuario ${emailClean} agregado correctamente como ${inviteRole === 'administrador' ? 'Administrador' : 'Reclutador'}!`);
+            setInviteEmail('');
+            // Refresh member list
+            await fetchMiembros(empresa.id);
+        } catch (err) {
+            console.error("Error al invitar miembro:", err);
+            setInviteError(err.message || "No se pudo agregar al miembro.");
+        } finally {
+            setInviteLoading(false);
+        }
+    };
+
+    const handleUpdateMemberRole = async (miembroId, newRole) => {
+        try {
+            const { error } = await supabase
+                .from('empresa_miembros')
+                .update({ rol: newRole })
+                .eq('id', miembroId);
+            
+            if (error) throw error;
+            
+            // Refresh list
+            await fetchMiembros(empresa.id);
+        } catch (err) {
+            console.error("Error al actualizar rol del miembro:", err);
+            setError("No se pudo cambiar el rol: " + err.message);
+        }
+    };
+
+    const handleRemoveMember = async (miembro) => {
+        // Prevent deleting oneself
+        if (miembro.auth_id === user.id) {
+            setError("No puedes eliminarte a ti mismo del equipo.");
+            return;
+        }
+
+        // Prevent leaving company without admin
+        const adminsCount = miembros.filter(m => m.rol === 'administrador').length;
+        if (miembro.rol === 'administrador' && adminsCount <= 1) {
+            setError("No puedes eliminar al único administrador de la empresa. Promueve a otro miembro antes.");
+            return;
+        }
+
+        if (!window.confirm(`¿Estás seguro de que deseas eliminar a ${miembro.email} del equipo?`)) {
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from('empresa_miembros')
+                .delete()
+                .eq('id', miembro.miembro_id);
+            
+            if (error) throw error;
+            
+            // Refresh list
+            await fetchMiembros(empresa.id);
+        } catch (err) {
+            console.error("Error al remover miembro:", err);
+            setError("No se pudo remover al miembro: " + err.message);
+        }
+    };
 
     const handleLogoChange = (e) => {
         const file = e.target.files[0];
@@ -370,170 +542,296 @@ export default function EmpresaDashboard() {
                     boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
                     position: 'sticky', top: '2rem'
                 }}>
-                    {/* Ordenar */}
+                    {/* Secciones */}
                     <div style={{ marginBottom: '1.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-gray)', fontWeight: '700', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-                            <ArrowUpDown size={14} /> Ordenar
+                            <Settings size={14} /> Panel
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {[
-                                { key: 'newest', icon: <CalendarDays size={14}/>, label: 'Más reciente' },
-                                { key: 'oldest', icon: <CalendarDays size={14}/>, label: 'Más antigua' },
-                                { key: 'most_posts', icon: <TrendingUp size={14}/>, label: 'Más postulaciones' },
-                                { key: 'least_posts', icon: <TrendingDown size={14}/>, label: 'Menos postulaciones' },
-                            ].map(opt => (
-                                <button
-                                    key={opt.key}
-                                    onClick={() => setSortBy(opt.key)}
-                                    style={{
-                                        display: 'flex', alignItems: 'center', gap: '8px',
-                                        padding: '9px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                                        fontWeight: '600', fontSize: '0.88rem', transition: 'all 0.15s', textAlign: 'left',
-                                        background: sortBy === opt.key ? 'var(--primary)' : 'rgba(0,0,0,0.04)',
-                                        color: sortBy === opt.key ? 'white' : 'var(--text-gray)',
-                                    }}
-                                >
-                                    {opt.icon} {opt.label}
-                                </button>
-                            ))}
+                            <button
+                                onClick={() => setActiveTab('busquedas')}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    padding: '9px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                                    fontWeight: '600', fontSize: '0.88rem', transition: 'all 0.15s', textAlign: 'left',
+                                    background: activeTab === 'busquedas' ? 'var(--primary)' : 'rgba(0,0,0,0.04)',
+                                    color: activeTab === 'busquedas' ? 'white' : 'var(--text-gray)',
+                                }}
+                            >
+                                <Briefcase size={14} /> Mis Búsquedas
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('equipo')}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    padding: '9px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                                    fontWeight: '600', fontSize: '0.88rem', transition: 'all 0.15s', textAlign: 'left',
+                                    background: activeTab === 'equipo' ? 'var(--primary)' : 'rgba(0,0,0,0.04)',
+                                    color: activeTab === 'equipo' ? 'white' : 'var(--text-gray)',
+                                }}
+                            >
+                                <Users size={14} /> Gestionar Equipo
+                            </button>
                         </div>
                     </div>
 
                     {/* Separador */}
                     <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)', marginBottom: '1.5rem' }} />
 
-                    {/* Filtrar por estado */}
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-gray)', fontWeight: '700', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-                            <Briefcase size={14} /> Estado
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {[
-                                { key: 'todas', label: 'Todas' },
-                                { key: 'Publicada', label: 'Publicadas' },
-                                { key: 'Borrador', label: 'Borradores' },
-                                { key: 'Cerrada', label: 'Cerradas' },
-                            ].map(est => (
-                                <button
-                                    key={est.key}
-                                    onClick={() => setFilterEstado(est.key)}
-                                    style={{
-                                        padding: '9px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-                                        fontWeight: '600', fontSize: '0.88rem', transition: 'all 0.15s', textAlign: 'left',
-                                        background: filterEstado === est.key ? 'var(--secondary)' : 'rgba(0,0,0,0.04)',
-                                        color: filterEstado === est.key ? 'white' : 'var(--text-gray)',
-                                    }}
-                                >
-                                    {est.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Lista de Ofertas */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    {(() => {
-                        const filtered = ofertas.filter(o => filterEstado === 'todas' || o.estado === filterEstado);
-                        const sorted = [...filtered].sort((a, b) => {
-                            const pa = a.postulaciones[0]?.count || 0;
-                            const pb = b.postulaciones[0]?.count || 0;
-                            if (sortBy === 'newest') return new Date(b.creada_en) - new Date(a.creada_en);
-                            if (sortBy === 'oldest') return new Date(a.creada_en) - new Date(b.creada_en);
-                            if (sortBy === 'most_posts') return pb - pa;
-                            if (sortBy === 'least_posts') return pa - pb;
-                            return 0;
-                        });
-
-                        if (sorted.length === 0) return (
-                            <div style={{ textAlign: 'center', padding: '5rem 2rem', background: 'rgba(0,0,0,0.02)', borderRadius: '24px', border: '2px dashed rgba(0,0,0,0.1)' }}>
-                                <Briefcase size={64} color="var(--primary)" style={{ opacity: 0.5, marginBottom: '1.5rem' }} />
-                                <h3 style={{ fontSize: '1.8rem', color: 'var(--text-dark)', marginBottom: '1rem' }}>
-                                    {ofertas.length === 0 ? 'Aún no tienes búsquedas publicadas' : 'Sin resultados para este filtro'}
-                                </h3>
-                                <p style={{ color: 'var(--text-gray)', fontSize: '1.1rem', maxWidth: '500px', margin: '0 auto' }}>
-                                    {ofertas.length === 0
-                                        ? 'Crea tu primera oferta laboral definiendo el rol, rango salarial y las habilidades exactas que requieres de los candidatos.'
-                                        : 'Probá cambiando el filtro de estado.'}
-                                </p>
-                            </div>
-                        );
-
-                        return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                                {sorted.map((oferta) => {
-                                    const postulantesCount = oferta.postulaciones[0]?.count || 0;
-                                    return (
-                                        <div 
-                                            key={oferta.id}
-                                            onClick={() => navigate(`/oferta-empresa/${oferta.id}`)}
-                                            style={{ 
-                                                background: 'var(--bg-white)', borderRadius: '16px', padding: '1.8rem',
-                                                border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
-                                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                                cursor: 'pointer', transition: 'all 0.2s ease-in-out'
-                                            }}
-                                            onMouseOver={e => {
-                                                e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,214,107,0.1)';
-                                                e.currentTarget.style.borderColor = 'rgba(0,214,107,0.3)';
-                                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                            }}
-                                            onMouseOut={e => {
-                                                e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.03)';
-                                                e.currentTarget.style.borderColor = 'rgba(0,0,0,0.05)';
-                                                e.currentTarget.style.transform = 'translateY(0)';
+                    {activeTab === 'busquedas' && (
+                        <>
+                            {/* Ordenar */}
+                            <div style={{ marginBottom: '1.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-gray)', fontWeight: '700', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                                    <ArrowUpDown size={14} /> Ordenar
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {[
+                                        { key: 'newest', icon: <CalendarDays size={14}/>, label: 'Más reciente' },
+                                        { key: 'oldest', icon: <CalendarDays size={14}/>, label: 'Más antigua' },
+                                        { key: 'most_posts', icon: <TrendingUp size={14}/>, label: 'Más postulaciones' },
+                                        { key: 'least_posts', icon: <TrendingDown size={14}/>, label: 'Menos postulaciones' },
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.key}
+                                            onClick={() => setSortBy(opt.key)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                padding: '9px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                                                fontWeight: '600', fontSize: '0.88rem', transition: 'all 0.15s', textAlign: 'left',
+                                                background: sortBy === opt.key ? 'var(--primary)' : 'rgba(0,0,0,0.04)',
+                                                color: sortBy === opt.key ? 'white' : 'var(--text-gray)',
                                             }}
                                         >
-                                            <div style={{ minWidth: 0 }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px', flexWrap: 'wrap' }}>
-                                                    <h3 style={{ margin: 0, fontSize: '1.3rem', color: 'var(--text-dark)' }}>{oferta.titulo}</h3>
-                                                    <span style={{ 
-                                                        background: oferta.estado === 'Publicada' ? 'rgba(0,214,107,0.1)' : oferta.estado === 'Borrador' ? 'rgba(255,193,7,0.12)' : 'rgba(0,0,0,0.05)',
-                                                        color: oferta.estado === 'Publicada' ? 'var(--primary)' : oferta.estado === 'Borrador' ? '#d97706' : 'var(--text-gray)',
-                                                        padding: '3px 10px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: 'bold'
-                                                    }}>
-                                                        {oferta.estado}
-                                                    </span>
-                                                </div>
-                                                <div style={{ color: 'var(--text-gray)', fontSize: '0.95rem', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                        <Briefcase size={13}/> {oferta.modalidad}
-                                                    </span>
-                                                    {oferta.nombre_empresa_custom && (
-                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--secondary)', fontWeight: '600' }}>
-                                                            <Building2 size={13}/> {oferta.nombre_empresa_custom}
+                                            {opt.icon} {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Separador */}
+                            <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)', marginBottom: '1.5rem' }} />
+
+                            {/* Filtrar por estado */}
+                            <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-gray)', fontWeight: '700', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                                    <Briefcase size={14} /> Estado
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {[
+                                        { key: 'todas', label: 'Todas' },
+                                        { key: 'Publicada', label: 'Publicadas' },
+                                        { key: 'Borrador', label: 'Borradores' },
+                                        { key: 'Cerrada', label: 'Cerradas' },
+                                    ].map(est => (
+                                        <button
+                                            key={est.key}
+                                            onClick={() => setFilterEstado(est.key)}
+                                            style={{
+                                                padding: '9px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                                                fontWeight: '600', fontSize: '0.88rem', transition: 'all 0.15s', textAlign: 'left',
+                                                background: filterEstado === est.key ? 'var(--secondary)' : 'rgba(0,0,0,0.04)',
+                                                color: filterEstado === est.key ? 'white' : 'var(--text-gray)',
+                                            }}
+                                        >
+                                            {est.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {/* Main Content Area */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    {activeTab === 'busquedas' ? (
+                        (() => {
+                            const filtered = ofertas.filter(o => filterEstado === 'todas' || o.estado === filterEstado);
+                            const sorted = [...filtered].sort((a, b) => {
+                                const pa = a.postulaciones[0]?.count || 0;
+                                const pb = b.postulaciones[0]?.count || 0;
+                                if (sortBy === 'newest') return new Date(b.creada_en) - new Date(a.creada_en);
+                                if (sortBy === 'oldest') return new Date(a.creada_en) - new Date(b.creada_en);
+                                if (sortBy === 'most_posts') return pb - pa;
+                                if (sortBy === 'least_posts') return pa - pb;
+                                return 0;
+                            });
+
+                            if (sorted.length === 0) return (
+                                <div style={{ textAlign: 'center', padding: '5rem 2rem', background: 'rgba(0,0,0,0.02)', borderRadius: '24px', border: '2px dashed rgba(0,0,0,0.1)' }}>
+                                    <Briefcase size={64} color="var(--primary)" style={{ opacity: 0.5, marginBottom: '1.5rem' }} />
+                                    <h3 style={{ fontSize: '1.8rem', color: 'var(--text-dark)', marginBottom: '1rem' }}>
+                                        {ofertas.length === 0 ? 'Aún no tienes búsquedas publicadas' : 'Sin resultados para este filtro'}
+                                    </h3>
+                                    <p style={{ color: 'var(--text-gray)', fontSize: '1.1rem', maxWidth: '500px', margin: '0 auto' }}>
+                                        {ofertas.length === 0
+                                            ? 'Crea tu primera oferta laboral definiendo el rol, rango salarial y las habilidades exactas que requieres de los candidatos.'
+                                            : 'Probá cambiando el filtro de estado.'}
+                                    </p>
+                                </div>
+                            );
+
+                            return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                                    {sorted.map((oferta) => {
+                                        const postulantesCount = oferta.postulaciones[0]?.count || 0;
+                                        return (
+                                            <div 
+                                                key={oferta.id}
+                                                onClick={() => navigate(`/oferta-empresa/${oferta.id}`)}
+                                                style={{ 
+                                                    background: 'var(--bg-white)', borderRadius: '16px', padding: '1.8rem',
+                                                    border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
+                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                    cursor: 'pointer', transition: 'all 0.2s ease-in-out'
+                                                }}
+                                                onMouseOver={e => {
+                                                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,214,107,0.1)';
+                                                    e.currentTarget.style.borderColor = 'rgba(0,214,107,0.3)';
+                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                }}
+                                                onMouseOut={e => {
+                                                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.03)';
+                                                    e.currentTarget.style.borderColor = 'rgba(0,0,0,0.05)';
+                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                }}
+                                            >
+                                                <div style={{ minWidth: 0 }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                                                        <h3 style={{ margin: 0, fontSize: '1.3rem', color: 'var(--text-dark)' }}>{oferta.titulo}</h3>
+                                                        <span style={{ 
+                                                            background: oferta.estado === 'Publicada' ? 'rgba(0,214,107,0.1)' : oferta.estado === 'Borrador' ? 'rgba(255,193,7,0.12)' : 'rgba(0,0,0,0.05)',
+                                                            color: oferta.estado === 'Publicada' ? 'var(--primary)' : oferta.estado === 'Borrador' ? '#d97706' : 'var(--text-gray)',
+                                                            padding: '3px 10px', borderRadius: '20px', fontSize: '0.82rem', fontWeight: 'bold'
+                                                        }}>
+                                                            {oferta.estado}
                                                         </span>
-                                                    )}
-                                                    {oferta.ciudad && (
+                                                    </div>
+                                                    <div style={{ color: 'var(--text-gray)', fontSize: '0.95rem', display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
                                                         <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                            <MapPin size={13}/> {oferta.ciudad}
+                                                            <Briefcase size={13}/> {oferta.modalidad}
                                                         </span>
-                                                    )}
-                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                        <CalendarDays size={13}/> {new Date(oferta.creada_en).toLocaleDateString()}
-                                                    </span>
+                                                        {oferta.nombre_empresa_custom && (
+                                                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--secondary)', fontWeight: '600' }}>
+                                                                <Building2 size={13}/> {oferta.nombre_empresa_custom}
+                                                            </span>
+                                                        )}
+                                                        {oferta.ciudad && (
+                                                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                <MapPin size={13}/> {oferta.ciudad}
+                                                            </span>
+                                                        )}
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                            <CalendarDays size={13}/> {new Date(oferta.creada_en).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0, marginLeft: '1rem' }}>
+                                                    <div style={{ 
+                                                        display: 'flex', alignItems: 'center', gap: '8px', 
+                                                        background: postulantesCount > 0 ? 'rgba(0,214,107,0.08)' : 'rgba(0,0,0,0.03)', 
+                                                        padding: '8px 16px', borderRadius: '12px',
+                                                        color: postulantesCount > 0 ? 'var(--primary)' : 'var(--text-gray)',
+                                                        fontWeight: 'bold'
+                                                    }}>
+                                                        <Users size={18} />
+                                                        <span>{postulantesCount} Postulantes</span>
+                                                    </div>
+                                                    <span style={{ color: 'var(--primary)', fontSize: '0.88rem', fontWeight: 'bold' }}>Ver detalle →</span>
                                                 </div>
                                             </div>
-                                            
-                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0, marginLeft: '1rem' }}>
-                                                <div style={{ 
-                                                    display: 'flex', alignItems: 'center', gap: '8px', 
-                                                    background: postulantesCount > 0 ? 'rgba(0,214,107,0.08)' : 'rgba(0,0,0,0.03)', 
-                                                    padding: '8px 16px', borderRadius: '12px',
-                                                    color: postulantesCount > 0 ? 'var(--primary)' : 'var(--text-gray)',
-                                                    fontWeight: 'bold'
-                                                }}>
-                                                    <Users size={18} />
-                                                    <span>{postulantesCount} Postulantes</span>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })()
+                    ) : (
+                        <div style={{ background: 'var(--bg-white)', borderRadius: '24px', padding: '2.5rem', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+                                <div>
+                                    <h2 style={{ fontSize: '1.8rem', color: 'var(--text-dark)', margin: 0 }}>Miembros del Equipo</h2>
+                                    <p style={{ color: 'var(--text-gray)', marginTop: '4px', fontSize: '0.95rem' }}>
+                                        Gestiona quiénes tienen acceso al panel de selección de {empresa.nombre}.
+                                    </p>
+                                </div>
+                                <span style={{ background: 'rgba(0,214,107,0.1)', color: 'var(--primary)', padding: '6px 14px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                                    Tu Rol: {userRole === 'administrador' ? 'Administrador' : 'Reclutador'}
+                                </span>
+                            </div>
+
+
+
+                            {/* Members list */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {miembros.map((miembro) => {
+                                    const isMe = miembro.auth_id === user.id;
+                                    return (
+                                        <div 
+                                            key={miembro.miembro_id}
+                                            style={{ 
+                                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                padding: '1.2rem 1.5rem', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.05)',
+                                                background: '#fcfdfd', flexWrap: 'wrap', gap: '1rem'
+                                            }}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(0,214,107,0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                                                    {miembro.nombre_completo.charAt(0).toUpperCase()}
                                                 </div>
-                                                <span style={{ color: 'var(--primary)', fontSize: '0.88rem', fontWeight: 'bold' }}>Ver detalle →</span>
+                                                <div>
+                                                    <div style={{ fontWeight: 'bold', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        {miembro.nombre_completo}
+                                                        {isMe && <span style={{ fontSize: '0.75rem', background: 'rgba(0,0,0,0.06)', color: 'var(--text-gray)', padding: '2px 6px', borderRadius: '10px' }}>Tú</span>}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-gray)', marginTop: '2px' }}>
+                                                        {miembro.email} • Vinculado el {new Date(miembro.created_at).toLocaleDateString()}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                {/* Role Selector/Badge */}
+                                                {userRole === 'administrador' && !isMe ? (
+                                                    <select
+                                                        value={miembro.rol}
+                                                        onChange={e => handleUpdateMemberRole(miembro.miembro_id, e.target.value)}
+                                                        style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', background: 'white', fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-dark)', outline: 'none' }}
+                                                    >
+                                                        <option value="reclutador">Reclutador</option>
+                                                        <option value="administrador">Administrador</option>
+                                                    </select>
+                                                ) : (
+                                                    <span style={{ 
+                                                        background: miembro.rol === 'administrador' ? '#EBFDF2' : '#F4F7F6',
+                                                        color: miembro.rol === 'administrador' ? 'var(--primary)' : 'var(--text-gray)',
+                                                        padding: '4px 10px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: 'bold',
+                                                        textTransform: 'capitalize'
+                                                    }}>
+                                                        {miembro.rol}
+                                                    </span>
+                                                )}
+
+                                                {/* Delete Button for Admins */}
+                                                {userRole === 'administrador' && !isMe && (
+                                                    <button 
+                                                        onClick={() => handleRemoveMember(miembro)}
+                                                        style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', padding: '6px', borderRadius: '6px', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                        onMouseOver={e => e.currentTarget.style.background = 'rgba(211,47,47,0.05)'}
+                                                        onMouseOut={e => e.currentTarget.style.background = 'none'}
+                                                        title="Eliminar del equipo"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
-                        );
-                    })()}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

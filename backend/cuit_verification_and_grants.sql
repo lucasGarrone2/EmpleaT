@@ -16,6 +16,7 @@ GRANT ALL ON TABLE empresas TO postgres, service_role, anon, authenticated;
 GRANT ALL ON TABLE ofertas TO postgres, service_role, anon, authenticated;
 GRANT ALL ON TABLE oferta_skills TO postgres, service_role, anon, authenticated;
 GRANT ALL ON TABLE postulaciones TO postgres, service_role, anon, authenticated;
+GRANT ALL ON TABLE motivos_rechazo TO postgres, service_role, anon, authenticated;
 
 -- 4. Nos aseguramos de que las secuencias si existen también tengan permisos
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO postgres, service_role, anon, authenticated;

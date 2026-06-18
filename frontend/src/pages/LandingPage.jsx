@@ -166,7 +166,9 @@ const LandingPage = () => {
                     <div className="demo-name-row">
                       <h4>Sofia Dominguez</h4>
                       <span className="premium-label">PREMIUM</span>
-                      <span className="boost-label pulse">⚡ BOOSTED</span>
+                      <span className="boost-label pulse" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Zap size={10} fill="currentColor" /> BOOSTED
+                      </span>
                     </div>
                     <p>Desarrollador Full Stack · 3 años exp.</p>
                   </div>
@@ -185,46 +187,122 @@ const LandingPage = () => {
             </div>
 
             <div className="pricing-grid-landing">
-              <div className="price-card-landing">
-                <h3>Suscripción Mensual</h3>
-                <div className="price-val-landing">$5.000 <span className="currency">ARS</span></div>
-                <p className="price-desc-landing">Ideal para probar las funciones y preparar tus primeras entrevistas.</p>
-                <ul className="price-features-list">
-                  <li><Check size={16} /> Simulaciones con IA</li>
-                  <li><Check size={16} /> Quizzes de habilidades ilimitados</li>
-                  <li><Check size={16} /> Insignias para tu perfil</li>
-                  <li><Check size={16} /> Match Boost activado</li>
-                </ul>
+              <div className="price-card-landing" style={{ minHeight: '260px', justifyContent: 'space-between' }}>
+                <div>
+                  <h3>Suscripción Mensual</h3>
+                  <div className="price-val-landing">$5.000 <span className="currency">ARS</span></div>
+                  <p className="price-desc-landing">Ideal para probar las funciones y preparar tus primeras entrevistas.</p>
+                </div>
                 <button className="pricing-btn-landing" onClick={() => navigate('/pricing')}>Comenzar Ahora</button>
               </div>
 
-              <div className="price-card-landing featured-card-landing">
+              <div className="price-card-landing featured-card-landing" style={{ minHeight: '260px', justifyContent: 'space-between' }}>
                 <div className="best-tag">MÁS POPULAR · 17% AHORRO</div>
-                <h3>Suscripción 6 Meses</h3>
-                <div className="price-val-landing">$25.000 <span className="currency">ARS</span></div>
-                <p className="price-desc-landing">El plan recomendado para una búsqueda de empleo sólida y exitosa.</p>
-                <ul className="price-features-list">
-                  <li><Check size={16} /> Simulaciones con IA</li>
-                  <li><Check size={16} /> Quizzes de habilidades ilimitados</li>
-                  <li><Check size={16} /> Insignias para tu perfil</li>
-                  <li><Check size={16} /> Match Boost activado</li>
-                </ul>
+                <div>
+                  <h3>Suscripción 6 Meses</h3>
+                  <div className="price-val-landing">$25.000 <span className="currency">ARS</span></div>
+                  <p className="price-desc-landing">El plan recomendado para una búsqueda de empleo sólida y exitosa.</p>
+                </div>
                 <button className="pricing-btn-landing btn-featured-landing" onClick={() => navigate('/pricing')}>Comenzar Ahora</button>
               </div>
 
-              <div className="price-card-landing">
+              <div className="price-card-landing" style={{ minHeight: '260px', justifyContent: 'space-between' }}>
                 <div className="best-tag green-tag">25% AHORRO</div>
-                <h3>Suscripción Anual</h3>
-                <div className="price-val-landing">$45.000 <span className="currency">ARS</span></div>
-                <p className="price-desc-landing">Acceso a largo plazo para asegurar un desarrollo profesional continuo.</p>
-                <ul className="price-features-list">
-                  <li><Check size={16} /> Simulaciones con IA</li>
-                  <li><Check size={16} /> Quizzes de habilidades ilimitados</li>
-                  <li><Check size={16} /> Insignias para tu perfil</li>
-                  <li><Check size={16} /> Match Boost activado</li>
-                </ul>
+                <div>
+                  <h3>Suscripción Anual</h3>
+                  <div className="price-val-landing">$45.000 <span className="currency">ARS</span></div>
+                  <p className="price-desc-landing">Acceso a largo plazo para asegurar un desarrollo profesional continuo.</p>
+                </div>
                 <button className="pricing-btn-landing" onClick={() => navigate('/pricing')}>Comenzar Ahora</button>
               </div>
+            </div>
+
+            {/* Unified Benefits Grid in Landing */}
+            <div className="pricing-grid-benefits-landing" style={{
+                marginTop: '4rem',
+                maxWidth: '960px',
+                width: '100%',
+                background: 'white',
+                borderRadius: '24px',
+                padding: '3rem 2.5rem',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
+                border: '1px solid #E5E7EB',
+                boxSizing: 'border-box'
+            }}>
+                <h3 style={{
+                    fontSize: '1.4rem',
+                    color: 'var(--secondary)',
+                    fontWeight: '800',
+                    marginBottom: '2rem',
+                    textAlign: 'center',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                }}>
+                    <Sparkles size={20} color="#FFB020" fill="#FFB020" /> ¿Qué incluye tu Membresía Premium?
+                </h3>
+                
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: '1.5rem',
+                    textAlign: 'left'
+                }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '1.2rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(255,176,32,0.08) 0%, rgba(255,176,32,0.02) 100%)', border: '1px solid rgba(255,176,32,0.2)' }}>
+                        <div style={{ background: '#FFB020', borderRadius: '50%', width: '24px', height: '24px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={14} strokeWidth={3} /></div>
+                        <div>
+                            <span style={{ fontSize: '0.95rem', color: '#333', lineHeight: '1.5', fontWeight: 'bold' }}>
+                                Adaptador de CV con IA (¡NUEVO!)
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '1.2rem', borderRadius: '16px', background: '#FAFAFB', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ background: 'var(--primary)', borderRadius: '50%', width: '24px', height: '24px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={14} strokeWidth={3} /></div>
+                        <div>
+                            <span style={{ fontSize: '0.95rem', color: '#333', lineHeight: '1.5', fontWeight: '500' }}>
+                                Simulador de Entrevistas con IA
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '1.2rem', borderRadius: '16px', background: '#FAFAFB', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ background: 'var(--primary)', borderRadius: '50%', width: '24px', height: '24px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={14} strokeWidth={3} /></div>
+                        <div>
+                            <span style={{ fontSize: '0.95rem', color: '#333', lineHeight: '1.5', fontWeight: '500' }}>
+                                Quizzes de Habilidades Ilimitados
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '1.2rem', borderRadius: '16px', background: '#FAFAFB', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ background: 'var(--primary)', borderRadius: '50%', width: '24px', height: '24px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={14} strokeWidth={3} /></div>
+                        <div>
+                            <span style={{ fontSize: '0.95rem', color: '#333', lineHeight: '1.5', fontWeight: '500' }}>
+                                Insignias Exclusivas para tu Perfil
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '1.2rem', borderRadius: '16px', background: '#FAFAFB', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ background: 'var(--primary)', borderRadius: '50%', width: '24px', height: '24px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={14} strokeWidth={3} /></div>
+                        <div>
+                            <span style={{ fontSize: '0.95rem', color: '#333', lineHeight: '1.5', fontWeight: '500' }}>
+                                Match Boost (+5%) en Postulaciones
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', padding: '1.2rem', borderRadius: '16px', background: '#FAFAFB', border: '1px solid rgba(0,0,0,0.03)' }}>
+                        <div style={{ background: 'var(--primary)', borderRadius: '50%', width: '24px', height: '24px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={14} strokeWidth={3} /></div>
+                        <div>
+                            <span style={{ fontSize: '0.95rem', color: '#333', lineHeight: '1.5', fontWeight: '500' }}>
+                                Posicionamiento Destacado ante Reclutadores
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </div>
           </div>
         </section>

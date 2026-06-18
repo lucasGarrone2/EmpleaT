@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { Briefcase, Calendar, ExternalLink, Search, Filter, ArrowUpDown, ChevronRight, Check, X, Award } from 'lucide-react';
+import { Briefcase, Calendar, ExternalLink, Search, Filter, ArrowUpDown, ChevronRight, Check, X, Award, PartyPopper } from 'lucide-react';
 import './Register.css'; // Reusing established styling tokens
 
 export default function MisPostulaciones() {
@@ -51,6 +51,10 @@ export default function MisPostulaciones() {
                             id,
                             estado,
                             fecha_postulacion,
+                            motivo_rechazo_id,
+                            motivos_rechazo (
+                                descripcion
+                            ),
                             ofertas (
                                 id,
                                 titulo,
@@ -181,7 +185,9 @@ export default function MisPostulaciones() {
                     </div>
                     <div style={{ background: '#f0fdf4', border: '1px solid #dcfce7', padding: '1.5rem', borderRadius: '16px', textAlign: 'center' }}>
                         <span style={{ fontSize: '2.2rem', fontWeight: 'bold', color: 'var(--primary)', display: 'block', marginBottom: '5px' }}>{stats.seleccionado}</span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#15803d', textTransform: 'uppercase' }}>Seleccionado 🎉</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', fontWeight: 'bold', color: '#15803d', textTransform: 'uppercase' }}>
+                            Seleccionado <PartyPopper size={14} />
+                        </span>
                     </div>
                 </div>
 
@@ -289,7 +295,7 @@ export default function MisPostulaciones() {
                                             {(() => {
                                                 if (normalized === 'en_revision' || normalized === 'en revisión' || normalized === 'en revision') return <span style={{ padding: '6px 14px', background: '#fef3c7', color: '#b45309', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>CV Visto / En Revisión</span>;
                                                 if (normalized === 'entrevista') return <span style={{ padding: '6px 14px', background: '#f3e8ff', color: '#6b21a8', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>En Entrevista</span>;
-                                                if (normalized === 'seleccionado' || normalized === 'contratado') return <span style={{ padding: '6px 14px', background: '#dcfce7', color: '#15803d', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>¡Seleccionado! 🎉</span>;
+                                                if (normalized === 'seleccionado' || normalized === 'contratado') return <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 14px', background: '#dcfce7', color: '#15803d', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>¡Seleccionado! <PartyPopper size={12} /></span>;
                                                 if (normalized === 'rechazado') return <span style={{ padding: '6px 14px', background: '#fee2e2', color: '#b91c1c', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>Proceso Finalizado</span>;
                                                 return <span style={{ padding: '6px 14px', background: '#e0f2fe', color: '#0369a1', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold' }}>Enviado</span>;
                                             })()}
@@ -332,7 +338,7 @@ export default function MisPostulaciones() {
                                                 display: 'flex', justifyContent: 'center', alignItems: 'center',
                                                 fontWeight: 'bold', fontSize: '0.9rem', border: '3px solid white',
                                                 boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                                            }}>✓</div>
+                                            }}><Check size={14} /></div>
                                             <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-dark)', marginTop: '6px' }}>Enviado</span>
                                         </div>
 
@@ -345,7 +351,7 @@ export default function MisPostulaciones() {
                                                 display: 'flex', justifyContent: 'center', alignItems: 'center',
                                                 fontWeight: 'bold', fontSize: '0.9rem', border: '3px solid white',
                                                 boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                                            }}>{normalized === 'rechazado' ? '✗' : isEnRevisionOrHigher ? '✓' : '2'}</div>
+                                            }}>{normalized === 'rechazado' ? <X size={14} /> : isEnRevisionOrHigher ? <Check size={14} /> : '2'}</div>
                                             <span style={{ fontSize: '0.8rem', fontWeight: isEnRevisionOrHigher ? 'bold' : '500', color: isEnRevisionOrHigher ? 'var(--text-dark)' : 'var(--text-gray)', marginTop: '6px' }}>
                                                 {normalized === 'rechazado' ? 'Finalizado' : 'CV Visto'}
                                             </span>
@@ -360,7 +366,7 @@ export default function MisPostulaciones() {
                                                 display: 'flex', justifyContent: 'center', alignItems: 'center',
                                                 fontWeight: 'bold', fontSize: '0.9rem', border: '3px solid white',
                                                 boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                                            }}>{normalized === 'rechazado' ? '✗' : isEntrevistaOrHigher ? '✓' : '3'}</div>
+                                            }}>{normalized === 'rechazado' ? <X size={14} /> : isEntrevistaOrHigher ? <Check size={14} /> : '3'}</div>
                                             <span style={{ fontSize: '0.8rem', fontWeight: isEntrevistaOrHigher ? 'bold' : '500', color: isEntrevistaOrHigher ? 'var(--text-dark)' : 'var(--text-gray)', marginTop: '6px' }}>Entrevista</span>
                                         </div>
 
@@ -373,10 +379,27 @@ export default function MisPostulaciones() {
                                                 display: 'flex', justifyContent: 'center', alignItems: 'center',
                                                 fontWeight: 'bold', fontSize: '0.9rem', border: '3px solid white',
                                                 boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
-                                            }}>{(normalized === 'seleccionado' || normalized === 'contratado') ? '🎉' : normalized === 'rechazado' ? '✗' : '4'}</div>
+                                            }}>{(normalized === 'seleccionado' || normalized === 'contratado') ? <PartyPopper size={14} /> : normalized === 'rechazado' ? <X size={14} /> : '4'}</div>
                                             <span style={{ fontSize: '0.8rem', fontWeight: (normalized === 'seleccionado' || normalized === 'contratado') ? 'bold' : '500', color: (normalized === 'seleccionado' || normalized === 'contratado') ? '#166534' : 'var(--text-gray)', marginTop: '6px' }}>Seleccionado</span>
                                         </div>
                                     </div>
+                                    {normalized === 'rechazado' && post.motivos_rechazo && (
+                                        <div style={{
+                                            marginTop: '1.5rem',
+                                            padding: '1rem 1.2rem',
+                                            backgroundColor: '#fef2f2',
+                                            border: '1px solid #fee2e2',
+                                            borderRadius: '12px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '4px'
+                                        }}>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Retroalimentación del Proceso</span>
+                                            <p style={{ margin: 0, fontSize: '0.92rem', color: '#b91c1c', fontWeight: '500' }}>
+                                                Motivo de descarte: <span style={{ fontWeight: 'normal', color: '#7f1d1d' }}>{post.motivos_rechazo.descripcion}</span>
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}

@@ -1,19 +1,50 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
-import { Info, FileText, BrainCircuit, Target, X, Edit3 } from 'lucide-react';
+import { Info, FileText, BrainCircuit, Target, X, Edit3, Sparkles, Brain, Cpu, Database, RefreshCw } from 'lucide-react';
 import './Register.css';
 
+const loadingIcons = [
+    { Icon: FileText },
+    { Icon: Brain },
+    { Icon: Cpu },
+    { Icon: Database },
+    { Icon: Sparkles }
+];
+
 export default function PerfilCandidato() {
+    const isMountedRef = useRef(true);
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
     const [archivoPDF, setArchivoPDF] = useState(null);
     const [loading, setLoading] = useState(false);
     const [loadingText, setLoadingText] = useState("");
+    const [loadingIconIndex, setLoadingIconIndex] = useState(0);
+
+    useEffect(() => {
+        let intervalId;
+        if (loading) {
+            intervalId = setInterval(() => {
+                setLoadingIconIndex(prev => (prev + 1) % loadingIcons.length);
+            }, 1200);
+        } else {
+            setLoadingIconIndex(0);
+        }
+        return () => clearInterval(intervalId);
+    }, [loading]);
     const [datosExtraidos, setDatosExtraidos] = useState(null);
     const [pdfPath, setPdfPath] = useState(null);
     const [error, setError] = useState(null);
     const [guardando, setGuardando] = useState(false);
     const [guardadoExito, setGuardadoExito] = useState(false);
+    const showAlert = useAlert();
 
     const handleExtraidoChange = (campo, valor) => {
         setDatosExtraidos({ ...datosExtraidos, [campo]: valor });
@@ -43,6 +74,7 @@ export default function PerfilCandidato() {
 
     const handleSubirCV = async (e) => {
         e.preventDefault();
+        if (loading) return;
         if (!archivoPDF) {
             setError("Por favor, selecciona un archivo PDF primero");
             return;
@@ -65,8 +97,8 @@ export default function PerfilCandidato() {
             const token = session?.access_token;
             if (!token) throw new Error("Sesión expirada. Por favor, vuelve a iniciar sesión.");
 
-            // 1. Subir a Supabase Storage
-            setLoadingText("⏳ Subiendo PDF a la nube...");
+            // 1. Subir a Supabase Storage y comenzar procesamiento
+            setLoadingText("Subiendo PDF...");
             const resUpload = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/upload-cv`, {
                 method: 'POST',
                 headers: {
@@ -81,33 +113,79 @@ export default function PerfilCandidato() {
             }
             
             const uploadJSON = await resUpload.json();
-            setPdfPath(uploadJSON.path);
+            const jobId = uploadJSON.job_id;
 
-            // 2. Analizar con Gemini
-            setLoadingText("⏳ Analizando con IA... puede tardar hasta 90 segundos");
-            const respuesta = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/analyze-cv`, {
-                method: 'POST',
-                body: formData
-            });
+            // 2. Realizar Polling sobre el job para seguir el estado de la extracción con IA
+            let jobCompleted = false;
+            let jobDetails = null;
+            let pollingAttempts = 0;
+            const maxAttempts = 40; // 40 * 2.5s = 100s de timeout máximo
 
-            if (!respuesta.ok) {
-                const errData = await respuesta.json().catch(() => ({}));
-                throw new Error(errData.error || "Error al analizar el CV");
+            while (!jobCompleted && pollingAttempts < maxAttempts) {
+                if (!isMountedRef.current) return;
+                pollingAttempts++;
+                setLoadingText("Analizando tu CV con Inteligencia Artificial...");
+                
+                await new Promise(resolve => setTimeout(resolve, 2500));
+
+                if (!isMountedRef.current) return;
+
+                const { data, error: pollError } = await supabase
+                    .from('cv_processing_jobs')
+                    .select('*')
+                    .eq('id', jobId)
+                    .single();
+
+                if (!isMountedRef.current) return;
+
+                if (pollError) {
+                    console.warn("Error consultando el estado del job (reintentando):", pollError);
+                    continue;
+                }
+
+                if (data) {
+                    if (data.status === 'completado') {
+                        jobCompleted = true;
+                        jobDetails = data;
+                    } else if (data.status === 'fallido') {
+                        throw new Error(data.error_message || "La extracción de datos del CV con IA ha fallado.");
+                    }
+                }
             }
-            const data = await respuesta.json();
-            setDatosExtraidos(data);
+
+            if (!isMountedRef.current) return;
+
+            if (!jobCompleted) {
+                throw new Error("El procesamiento de tu CV está tardando más de lo esperado. Por favor, intenta de nuevo.");
+            }
+
+            // Guardar resultados extraídos
+            setPdfPath(jobDetails.cv_url);
+            setDatosExtraidos(jobDetails.resultado);
+            showAlert("¡Tu currículum ha sido procesado con éxito por la IA! Revisa la información extraída abajo antes de guardar.", "¡Procesado!", "success");
         }
         catch (err) {
-            console.error(err);
-            setError(err.message || "Hubo un problema al extraer la informacion");
+            if (isMountedRef.current) {
+                console.error(err);
+                setError(err.message || "Hubo un problema al extraer la informacion");
+                showAlert(err.message || "Hubo un problema al extraer la informacion", "Error de Procesamiento", "error");
+            }
         }
         finally {
-            setLoading(false);
-            setLoadingText("");
+            if (isMountedRef.current) {
+                setLoading(false);
+                setLoadingText("");
+            }
         }
     };
 
+    const sanitizeText = (str) => {
+        if (!str) return '';
+        return str.replace(/<[^>]*>/g, '');
+    };
+
     const handleGuardarPerfil = async () => {
+        if (guardando) return;
         if (!user) {
             setError("Debes iniciar sesión para guardar tu perfil");
             return;
@@ -122,10 +200,10 @@ export default function PerfilCandidato() {
                 .from('candidatos')
                 .upsert({
                     auth_id: user.id,
-                    nombre_completo: datosExtraidos.nombre,
-                    titulo_profesional: datosExtraidos.profesion,
+                    nombre_completo: sanitizeText(datosExtraidos.nombre),
+                    titulo_profesional: sanitizeText(datosExtraidos.profesion),
                     anios_experiencia: datosExtraidos.experiencia_anios,
-                    sobre_mi: bio, // Este campo se carga desde el textarea manual
+                    sobre_mi: sanitizeText(bio), // Este campo se carga desde el textarea manual
                     email: user.email, // Guardamos el email para contacto del reclutador
                     ...(pdfPath ? { cv_url: pdfPath } : {})
                 }, { onConflict: 'auth_id' })
@@ -137,7 +215,9 @@ export default function PerfilCandidato() {
             const candidatoId = candidatoData.id;
 
             // Paso B: Procesar Skills (Migrado a ESCO con Fuzzy Match) - PROCESO POR LOTES (BATCHING)
-            const nombresSkillsGemini = datosExtraidos.skills.map(s => s.nombre);
+            const nombresSkillsGemini = Array.isArray(datosExtraidos?.skills) 
+                ? datosExtraidos.skills.map(s => s.nombre || '').filter(Boolean) 
+                : [];
             let matchedSkills = [];
             const BATCH_SIZE = 5;
 
@@ -220,12 +300,14 @@ export default function PerfilCandidato() {
 
             // Paso C: Exito y redirección
             setGuardadoExito(true);
+            showAlert("Tu perfil ha sido procesado y guardado correctamente.", "¡Éxito!", "success");
             setTimeout(() => {
                 navigate('/ofertas');
-            }, 1800);
+            }, 2000);
         } catch (err) {
             console.error("Error guardando perfil:", err);
             setError(err.message);
+            showAlert(err.message, "Error al guardar", "error");
         } finally {
             setGuardando(false);
         }
@@ -240,7 +322,7 @@ export default function PerfilCandidato() {
             <div className="bg-shape shape-1"></div>
             <div className="bg-shape shape-2"></div>
 
-            <div style={{
+            <div className="profile-card-container" style={{
                 position: 'relative',
                 width: '100%',
                 maxWidth: '1200px',
@@ -335,8 +417,24 @@ export default function PerfilCandidato() {
                                 disabled={loading || !archivoPDF || !aceptoTerminos}
                                 style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', padding: '18px', fontSize: '1.2rem', boxShadow: '0 8px 25px rgba(0,214,107,0.25)', opacity: (!archivoPDF || !aceptoTerminos) ? 0.6 : 1, cursor: (!archivoPDF || !aceptoTerminos) ? 'not-allowed' : 'pointer' }}
                             >
-                                {loading ? (loadingText || '⏳ Cargando...') : 'Extraer Perfil Mágico'}
+                                {loading ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        {(() => {
+                                            const CurrentIcon = loadingIcons[loadingIconIndex].Icon;
+                                            return <CurrentIcon size={22} style={{ animation: 'pulse-slow-icon 1.2s ease-in-out infinite' }} />;
+                                        })()}
+                                        <span>{loadingText || 'Cargando...'}</span>
+                                    </div>
+                                ) : 'Extraer Perfil Mágico'}
                             </button>
+                            {loading && (
+                                <style>{`
+                                    @keyframes pulse-slow-icon {
+                                        0%, 100% { transform: scale(1); opacity: 0.8; }
+                                        50% { transform: scale(1.22); opacity: 1; }
+                                    }
+                                `}</style>
+                            )}
                         </form>
 
                         {error && (
@@ -355,88 +453,42 @@ export default function PerfilCandidato() {
 
                         <div style={{ display: 'flex', gap: '4rem', flexWrap: 'wrap' }}>
 
-                            {/* Bloque Izquierdo: Lo que extrajo Gemini */}
+                            {/* Bloque Izquierdo: Información Básica */}
                             <div style={{ flex: '1 1 450px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                                    <h3 style={{ color: 'var(--secondary)', margin: 0, fontSize: '1.5rem' }}>Información Extraída</h3>
+                                    <h3 style={{ color: 'var(--secondary)', margin: 0, fontSize: '1.5rem' }}>Información Básica</h3>
                                     <span style={{ fontSize: '0.85rem', color: 'var(--primary)', background: 'rgba(0,214,107,0.1)', padding: '4px 10px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                         <Edit3 size={14} /> Verifica y Edita
                                     </span>
                                 </div>
-                                <div style={{ background: 'rgba(0,214,107,0.03)', padding: '2.5rem', borderRadius: '20px', border: '1px solid rgba(0,214,107,0.1)' }}>
-
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', color: 'var(--text-gray)', fontSize: '1.15rem', marginBottom: '2.5rem' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <strong style={{ color: 'var(--text-dark)', width: '120px' }}>Nombre:</strong> 
-                                            <input type="text" value={datosExtraidos.nombre} onChange={(e) => handleExtraidoChange('nombre', e.target.value)} style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1rem', outline: 'none' }} />
+                                <div style={{ background: 'rgba(0,214,107,0.03)', padding: '2.5rem', borderRadius: '20px', border: '1px solid rgba(0,214,107,0.1)', height: '100%', boxSizing: 'border-box' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', color: 'var(--text-gray)', fontSize: '1.15rem' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
+                                            <strong style={{ color: 'var(--text-dark)', minWidth: '100px' }}>Nombre:</strong> 
+                                            <input type="text" value={datosExtraidos.nombre} onChange={(e) => handleExtraidoChange('nombre', e.target.value)} style={{ flex: '1 1 200px', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1rem', outline: 'none' }} />
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <strong style={{ color: 'var(--text-dark)', width: '120px' }}>Profesión:</strong> 
-                                            <input type="text" value={datosExtraidos.profesion} onChange={(e) => handleExtraidoChange('profesion', e.target.value)} style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1rem', outline: 'none' }} />
+                                        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
+                                            <strong style={{ color: 'var(--text-dark)', minWidth: '100px' }}>Profesión:</strong> 
+                                            <input type="text" value={datosExtraidos.profesion} onChange={(e) => handleExtraidoChange('profesion', e.target.value)} style={{ flex: '1 1 200px', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1rem', outline: 'none' }} />
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <strong style={{ color: 'var(--text-dark)', width: '120px' }}>Experiencia:</strong> 
-                                            <input type="number" min="0" value={datosExtraidos.experiencia_anios} onChange={(e) => handleExtraidoChange('experiencia_anios', parseInt(e.target.value) || 0)} style={{ width: '80px', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1rem', outline: 'none' }} />
-                                            <span style={{ fontSize: '0.95rem' }}>años</span>
-                                        </div>
-                                    </div>
-
-                                    <h4 style={{ marginTop: '0', marginBottom: '20px', color: 'var(--text-dark)', fontSize: '1.2rem' }}>Skills Detectadas (Elimina posibles errores):</h4>
-                                    <div style={{ 
-                                        display: 'flex', 
-                                        flexWrap: 'wrap',
-                                        gap: '10px' 
-                                    }}>
-                                        {datosExtraidos.skills.map((skill, index) => (
-                                            <div key={index} style={{
-                                                backgroundColor: 'white',
-                                                padding: '8px 10px 8px 16px',
-                                                borderRadius: '30px',
-                                                fontSize: '0.9rem',
-                                                fontWeight: '600',
-                                                color: 'var(--primary)',
-                                                border: '1px solid rgba(0,214,107,0.25)',
-                                                boxShadow: '0 3px 8px rgba(0,0,0,0.02)',
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: '8px',
-                                                transition: 'all 0.2s ease'
-                                            }}>
-                                                <span>{skill.nombre}</span>
-                                                <span style={{
-                                                    backgroundColor: 'var(--primary)',
-                                                    color: 'white',
-                                                    padding: '3px 10px',
-                                                    borderRadius: '12px',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: 'bold',
-                                                    flexShrink: 0
-                                                }}>
-                                                    Lvl {skill.nivel}
-                                                </span>
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => handleEliminarSkill(index)}
-                                                    style={{ background: 'rgba(255,0,0,0.06)', color: '#d32f2f', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}
-                                                    title="Eliminar esta habilidad"
-                                                >
-                                                    <X size={13} />
-                                                </button>
+                                        <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
+                                            <strong style={{ color: 'var(--text-dark)', minWidth: '100px' }}>Experiencia:</strong> 
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 200px' }}>
+                                                <input type="number" min="0" value={datosExtraidos.experiencia_anios} onChange={(e) => handleExtraidoChange('experiencia_anios', parseInt(e.target.value) || 0)} style={{ width: '80px', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(0,0,0,0.1)', fontSize: '1rem', outline: 'none' }} />
+                                                <span style={{ fontSize: '0.95rem' }}>años</span>
                                             </div>
-                                        ))}
+                                        </div>
                                     </div>
-                                    {datosExtraidos.skills.length === 0 && <p style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9rem', margin: 0 }}>Sin habilidades cargadas.</p>}
                                 </div>
                             </div>
 
-                            {/* Bloque Derecho: Toque personal y Guardado */}
+                            {/* Bloque Derecho: Biografía */}
                             <div style={{ flex: '1 1 450px', display: 'flex', flexDirection: 'column' }}>
-                                <h3 style={{ color: 'var(--secondary)', marginBottom: '1rem', fontSize: '1.5rem' }}>Tu Toque Personal <span style={{ fontWeight: 'normal', color: 'var(--text-gray)' }}>(Opcional)</span></h3>
+                                <h3 style={{ color: 'var(--secondary)', marginBottom: '1.5rem', fontSize: '1.5rem' }}>Tu Toque Personal <span style={{ fontWeight: 'normal', color: 'var(--text-gray)' }}>(Opcional)</span></h3>
                                 <p style={{ fontSize: '1.1rem', color: 'var(--text-gray)', marginBottom: '1.5rem', lineHeight: '1.6' }}>
-                                    La IA ya hizo el trabajo pesado descifrando tu trayectoria, pero nadie habla tan bien de ti como tú mismo. Escribe algo extra para destacarte ante los reclutadores.
+                                    Introduce tu biografía o resumen profesional para destacar tu perfil único ante los reclutadores.
                                 </p>
-
-                                <div style={{ width: '100%', maxWidth: '700px' }}>
+                                <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
                                     <textarea maxLength="2500"
                                         value={bio}
                                         onChange={(e) => setBio(e.target.value)}
@@ -450,24 +502,80 @@ export default function PerfilCandidato() {
                                             fontFamily: 'inherit', 
                                             fontSize: '1.1rem', 
                                             boxSizing: 'border-box', 
-                                            minHeight: '200px',
+                                            minHeight: '160px',
+                                            flex: 1,
                                             display: 'block'
                                         }}
                                     ></textarea>
                                 </div>
-
-                                <button
-                                    type="button"
-                                    onClick={handleGuardarPerfil}
-                                    disabled={guardando || guardadoExito}
-                                    className="submit-btn"
-                                    style={{ marginTop: '2.5rem', width: '100%', padding: '20px', fontSize: '1.3rem', boxShadow: '0 10px 35px rgba(0,214,107,0.3)' }}
-                                >
-                                    {guardadoExito ? '¡Perfil Guardado Exitosamente!' : (guardando ? 'Guardando Perfil Definitivo...' : 'Confirmar y Guardar Perfil')}
-                                </button>
                             </div>
 
                         </div>
+
+                        {/* Bloque Inferior: Habilidades Detectadas (Skills) */}
+                        <div style={{ width: '100%', marginTop: '3.5rem' }}>
+                            <h3 style={{ color: 'var(--secondary)', marginBottom: '1.5rem', fontSize: '1.5rem' }}>Skills Detectadas (Elimina posibles errores)</h3>
+                            <div style={{ background: 'rgba(0,214,107,0.03)', padding: '2.5rem', borderRadius: '20px', border: '1px solid rgba(0,214,107,0.1)' }}>
+                                <div style={{ 
+                                    display: 'flex', 
+                                    flexWrap: 'wrap',
+                                    gap: '10px' 
+                                }}>
+                                    {(Array.isArray(datosExtraidos?.skills) ? datosExtraidos.skills : []).map((skill, index) => (
+                                        <div key={index} style={{
+                                            backgroundColor: 'white',
+                                            padding: '8px 10px 8px 16px',
+                                            borderRadius: '30px',
+                                            fontSize: '0.9rem',
+                                            fontWeight: '600',
+                                            color: 'var(--primary)',
+                                            border: '1px solid rgba(0,214,107,0.25)',
+                                            boxShadow: '0 3px 8px rgba(0,0,0,0.02)',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            transition: 'all 0.2s ease'
+                                        }}>
+                                            <span>{skill.nombre}</span>
+                                            <span style={{
+                                                backgroundColor: 'var(--primary)',
+                                                color: 'white',
+                                                padding: '3px 10px',
+                                                borderRadius: '12px',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 'bold',
+                                                flexShrink: 0
+                                            }}>
+                                                Lvl {skill.nivel}
+                                            </span>
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleEliminarSkill(index)}
+                                                style={{ background: 'rgba(255,0,0,0.06)', color: '#d32f2f', border: 'none', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}
+                                                title="Eliminar esta habilidad"
+                                            >
+                                                <X size={13} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                {(Array.isArray(datosExtraidos?.skills) ? datosExtraidos.skills : []).length === 0 && <p style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9rem', margin: 0 }}>Sin habilidades cargadas.</p>}
+                            </div>
+                        </div>
+
+                        {/* Botón Guardar en la parte inferior */}
+                        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '3.5rem' }}>
+                            <button
+                                type="button"
+                                onClick={handleGuardarPerfil}
+                                disabled={guardando || guardadoExito}
+                                className="submit-btn"
+                                style={{ width: '100%', maxWidth: '500px', padding: '20px', fontSize: '1.3rem', boxShadow: '0 10px 35px rgba(0,214,107,0.3)' }}
+                            >
+                                {guardadoExito ? '¡Perfil Guardado Exitosamente!' : (guardando ? 'Guardando Perfil Definitivo...' : 'Confirmar y Guardar Perfil')}
+                            </button>
+                        </div>
+
                     </div>
                 )}
             </div>
