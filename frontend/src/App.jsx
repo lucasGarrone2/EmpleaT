@@ -25,6 +25,11 @@ import AdminDashboard from './pages/AdminDashboard';
 import SkillQuiz from './pages/SkillQuiz';
 import Pricing from './pages/Pricing';
 import MisPostulaciones from './pages/MisPostulaciones';
+import TermsOfService from './pages/TermsOfService';
+import MisChats from './pages/MisChats';
+import EmpresaAnalytics from './pages/EmpresaAnalytics';
+import BusquedaCandidatos from './pages/BusquedaCandidatos';
+import EmpresaPricing from './pages/EmpresaPricing';
 
 function RecoveryGuard() {
   const location = useLocation();
@@ -59,7 +64,9 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/auth/callback" element={<GoogleCallback/>} />
           <Route path="/terminos-legales" element={<TerminosLegales/>} />
+          <Route path="/terms-of-service" element={<TermsOfService/>} />
           <Route path="/pricing" element={<Pricing />} />
+          <Route path="/pricing-empresa" element={<EmpresaPricing />} />
 
           {/* Rutas exclusivas para invitados (no logueados) */}
           <Route element={<PublicOnlyRoute />}>
@@ -69,8 +76,9 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
           </Route>
 
-          {/* Rutas para cualquier autenticado. Eliminada /ofertas hacia rutas especificas */}
+          {/* Rutas para cualquier autenticado */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/mis-chats" element={<MisChats />} />
           </Route>
 
           {/* Rutas protegidas: solo candidatos */}
@@ -89,6 +97,8 @@ function App() {
             <Route path="/editar-oferta/:id" element={<EditarOferta />} />
             <Route path="/oferta-empresa/:id" element={<OfertaDetalleEmpresa />} />
             <Route path="/oferta-empresa/:ofertaId/candidato/:candidatoId" element={<PerfilCandidatoParaEmpresa />} />
+            <Route path="/empresa-analytics/:ofertaId" element={<EmpresaAnalytics />} />
+            <Route path="/buscar-candidatos" element={<BusquedaCandidatos />} />
           </Route>
 
           {/* Rutas protegidas: solo administradores */}

@@ -28,7 +28,7 @@ export default function AdaptarCvModal({ isOpen, onClose, candidatoId, ofertaId 
             }
             const token = session.access_token;
 
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
             const response = await fetch(`${backendUrl}/api/premium/adaptar-cv`, {
                 method: 'POST',
                 headers: {

@@ -59,6 +59,7 @@ export default function PerfilCandidato() {
     // Nuevo estado opcional escrito por el usuario
     const [bio, setBio] = useState("");
     const [aceptoTerminos, setAceptoTerminos] = useState(false);
+    const [disponibleBusqueda, setDisponibleBusqueda] = useState(true);
 
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -99,7 +100,7 @@ export default function PerfilCandidato() {
 
             // 1. Subir a Supabase Storage y comenzar procesamiento
             setLoadingText("Subiendo PDF...");
-            const resUpload = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/upload-cv`, {
+            const resUpload = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/upload-cv`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -205,6 +206,7 @@ export default function PerfilCandidato() {
                     anios_experiencia: datosExtraidos.experiencia_anios,
                     sobre_mi: sanitizeText(bio), // Este campo se carga desde el textarea manual
                     email: user.email, // Guardamos el email para contacto del reclutador
+                    disponible_busqueda: disponibleBusqueda,
                     ...(pdfPath ? { cv_url: pdfPath } : {})
                 }, { onConflict: 'auth_id' })
                 .select('id')
@@ -561,6 +563,72 @@ export default function PerfilCandidato() {
                                 </div>
                                 {(Array.isArray(datosExtraidos?.skills) ? datosExtraidos.skills : []).length === 0 && <p style={{ color: '#888', fontStyle: 'italic', fontSize: '0.9rem', margin: 0 }}>Sin habilidades cargadas.</p>}
                             </div>
+                        </div>
+
+                        {/* 🌟 Opt-in Toggle de Búsqueda de Talento */}
+                        <div style={{ 
+                            marginTop: '3.5rem', 
+                            padding: '2.5rem', 
+                            background: 'rgba(0,214,107,0.03)', 
+                            borderRadius: '20px', 
+                            border: '1px solid rgba(0,214,107,0.15)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            textAlign: 'center',
+                            gap: '15px'
+                        }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                <label style={{ color: 'var(--secondary)', fontSize: '1.25rem', fontWeight: 'bold' }}>Búsqueda de Talento (Opt-in)</label>
+                                <p style={{ margin: 0, color: 'var(--text-gray)', fontSize: '0.95rem', maxWidth: '600px', lineHeight: '1.5' }}>
+                                    Activá esta opción para que empresas premium puedan encontrarte en búsquedas avanzadas. Podrás cambiar esto en cualquier momento desde tu perfil.
+                                </p>
+                            </div>
+                            
+                            <button
+                                type="button"
+                                onClick={() => setDisponibleBusqueda(prev => !prev)}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '15px',
+                                    background: 'none', border: 'none', cursor: 'pointer',
+                                    padding: '10px 20px', borderRadius: '30px',
+                                    backgroundColor: 'white', boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
+                                    border: '1px solid rgba(0,214,107,0.1)'
+                                }}
+                                title={disponibleBusqueda ? 'Haz clic para desactivar la visibilidad' : 'Haz clic para activar la visibilidad'}
+                            >
+                                {/* Toggle track */}
+                                <span style={{
+                                    position: 'relative',
+                                    display: 'inline-flex',
+                                    width: '46px', height: '26px',
+                                    borderRadius: '13px',
+                                    background: disponibleBusqueda ? 'var(--primary)' : '#cbd5e1',
+                                    transition: 'background 0.2s',
+                                    flexShrink: 0
+                                }}>
+                                    <span style={{
+                                        position: 'absolute',
+                                        top: '3px',
+                                        left: disponibleBusqueda ? '23px' : '3px',
+                                        width: '20px', height: '20px',
+                                        borderRadius: '50%',
+                                        background: 'white',
+                                        boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                                        transition: 'left 0.2s'
+                                    }} />
+                                </span>
+                                <span style={{
+                                    fontWeight: '600',
+                                    color: disponibleBusqueda ? 'var(--primary)' : '#94a3b8',
+                                    fontSize: '1.05rem',
+                                    transition: 'color 0.2s'
+                                }}>
+                                    {disponibleBusqueda
+                                        ? 'Visible para empresas (Recomendado)'
+                                        : 'No visible en búsquedas'}
+                                </span>
+                            </button>
                         </div>
 
                         {/* Botón Guardar en la parte inferior */}

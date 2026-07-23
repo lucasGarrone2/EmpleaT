@@ -13,6 +13,7 @@ export default function Pricing() {
     const [success, setSuccess] = useState(false);
     const [candidatoData, setCandidatoData] = useState(null);
     const [loadingCandidato, setLoadingCandidato] = useState(false);
+    const [procesandoArrepentimiento, setProcesandoArrepentimiento] = useState(false);
 
     const formatPremiumHasta = (dateStr) => {
         if (!dateStr) return "tiempo ilimitado";
@@ -61,6 +62,44 @@ export default function Pricing() {
         }
     }, [showAlert, navigate]);
 
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+    const handleArrepentimiento = () => {
+        setShowConfirmModal(true);
+    };
+
+    const ejecutarArrepentimiento = async () => {
+        setShowConfirmModal(false);
+        setProcesandoArrepentimiento(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("No hay sesión activa");
+
+            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/premium/arrepentimiento`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                }
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || "No se pudo procesar la solicitud de arrepentimiento.");
+            }
+
+            if (data.success) {
+                setCandidatoData(prev => ({ ...prev, es_premium: false, premium_hasta: null }));
+                showAlert(`¡Suscripción Premium revocada con éxito! Código de trámite: ${data.codigo_tramite}. El reembolso de tu pago se procesará a través de Mercado Pago.`, "Arrepentimiento Ejercido", "success");
+            }
+        } catch (err) {
+            console.error("Error al revocar suscripción:", err);
+            showAlert(err.message || "Ocurrió un error al intentar cancelar la suscripción.", "Error", "error");
+        } finally {
+            setProcesandoArrepentimiento(false);
+        }
+    };
+
     const handleUpgrade = async (plan) => {
         if (!user) {
             navigate('/register');
@@ -72,7 +111,7 @@ export default function Pricing() {
             const { data: session } = await supabase.auth.getSession();
             const token = session.session.access_token;
 
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/create-preference`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/create-preference`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -87,9 +126,21 @@ export default function Pricing() {
 
             const data = await response.json();
             
-            // Redirigir al usuario al Checkout Pro de Mercado Pago
+            // SEC-20: Validar que el dominio del link de pago sea realmente Mercado Pago
             if (data.init_point) {
-                window.location.href = data.init_point;
+                const ALLOWED_MP_DOMAINS = ['mercadopago.com', 'mercadolibre.com', 'mercadopago.com.ar'];
+                try {
+                    const url = new URL(data.init_point);
+                    const isAllowed = ALLOWED_MP_DOMAINS.some(d => url.hostname === d || url.hostname.endsWith('.' + d));
+                    if (!isAllowed) {
+                        throw new Error('Dominio de pago no autorizado: ' + url.hostname);
+                    }
+                    window.location.href = data.init_point;
+                } catch (urlErr) {
+                    console.error('SEC-20: Link de pago inválido:', urlErr.message);
+                    showAlert("Link de pago inválido. Por favor, contactá soporte.", "Error de seguridad", "error");
+                    setLoadingPlan(null);
+                }
             } else {
                 throw new Error("Falta el link de pago");
             }
@@ -510,6 +561,65 @@ export default function Pricing() {
                 </div>
             </div>
 
+            {/* Gestión de Suscripción y Botón de Arrepentimiento */}
+            {candidatoData?.es_premium && (
+                <div style={{ 
+                    marginTop: '5rem', 
+                    maxWidth: '900px', 
+                    width: '100%', 
+                    background: '#FFFbeb', 
+                    border: '1px solid #Fef3c7', 
+                    borderRadius: '24px', 
+                    padding: '2.5rem', 
+                    boxSizing: 'border-box',
+                    textAlign: 'center',
+                    boxShadow: '0 10px 30px rgba(251,191,36,0.05)'
+                }}>
+                    <h3 style={{
+                        fontSize: '1.4rem',
+                        color: '#b45309',
+                        fontWeight: '800',
+                        marginBottom: '1rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                    }}>
+                        <Crown size={20} color="#b45309" fill="#b45309" /> Gestión de Membresía Premium
+                    </h3>
+                    <p style={{
+                        color: '#78350f',
+                        maxWidth: '700px',
+                        margin: '0 auto 2rem auto',
+                        fontSize: '1rem',
+                        lineHeight: '1.6'
+                    }}>
+                        De acuerdo a la legislación argentina (Ley N° 24.240), tienes derecho a revocar la contratación de tu plan Premium dentro de los 10 (diez) días corridos desde tu pago inicial si no has realizado un consumo sustancial del servicio (exámenes/simulaciones de entrevista).
+                    </p>
+                    <button
+                        onClick={handleArrepentimiento}
+                        disabled={procesandoArrepentimiento}
+                        style={{
+                            background: 'linear-gradient(90deg, #d97706 0%, #b45309 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '14px 28px',
+                            borderRadius: '12px',
+                            fontWeight: 'bold',
+                            fontSize: '1rem',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 15px rgba(217,119,6,0.3)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        {procesandoArrepentimiento ? 'Procesando Reembolso...' : 'Botón de Arrepentimiento (Revocar Suscripción)'}
+                    </button>
+                </div>
+            )}
+
             <div style={{ marginTop: '4rem', textAlign: 'center' }}>
                 <button 
                     onClick={() => navigate('/ofertas')}
@@ -517,9 +627,96 @@ export default function Pricing() {
                     Volver a las ofertas <ChevronRight size={18} />
                 </button>
             </div>
+            {/* Modal de Confirmación Estilizado */}
+            {showConfirmModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    animation: 'fadeIn 0.2s ease-out'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '24px',
+                        padding: '2.5rem',
+                        maxWidth: '500px',
+                        width: '90%',
+                        boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+                        border: '1px solid rgba(0,0,0,0.08)',
+                        textAlign: 'center',
+                        animation: 'scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    }}>
+                        <div style={{
+                            background: '#FEF3C7',
+                            color: '#D97706',
+                            width: '60px',
+                            height: '60px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 1.5rem auto'
+                        }}>
+                            <Shield size={32} />
+                        </div>
+                        <h3 style={{ fontSize: '1.5rem', color: '#111827', fontWeight: '800', marginBottom: '1rem' }}>
+                            ¿Confirmas ejercer el arrepentimiento?
+                        </h3>
+                        <p style={{ color: '#4B5563', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '2rem' }}>
+                            Esta acción cancelará tu membresía Premium de forma inmediata y solicitará el reembolso automático de tu dinero en Mercado Pago. **Esta acción es irreversible.**
+                        </p>
+                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                            <button
+                                onClick={() => setShowConfirmModal(false)}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px',
+                                    borderRadius: '10px',
+                                    border: '1px solid #D1D5DB',
+                                    background: 'white',
+                                    color: '#374151',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    transition: 'background 0.2s'
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={ejecutarArrepentimiento}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px',
+                                    borderRadius: '10px',
+                                    border: 'none',
+                                    background: 'linear-gradient(90deg, #D97706 0%, #B45309 100%)',
+                                    color: 'white',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 10px rgba(217,119,6,0.25)',
+                                    transition: 'opacity 0.2s'
+                                }}
+                            >
+                                Confirmar Reembolso
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <style>{`
                 .spin { animation: spin 1s linear infinite; }
                 @keyframes spin { 100% { transform: rotate(360deg); } }
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes scaleUp { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
             `}</style>
         </div>
     );

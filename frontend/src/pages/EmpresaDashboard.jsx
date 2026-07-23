@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { Building2, PlusCircle, Briefcase, MapPin, Users, Settings, ArrowUpDown, CalendarDays, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
+import { Building2, PlusCircle, Briefcase, MapPin, Users, Settings, ArrowUpDown, CalendarDays, TrendingUp, TrendingDown, Trash2, AlertCircle, Sparkles, Crown, Zap, Lock } from 'lucide-react';
 import './Register.css'; // Reusing established styles for consistency
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function EmpresaDashboard() {
     const { user } = useAuth();
@@ -15,6 +17,9 @@ export default function EmpresaDashboard() {
     const [error, setError] = useState(null);
     const [sortBy, setSortBy] = useState('newest');
     const [filterEstado, setFilterEstado] = useState('todas');
+
+    // Retention widget: postulaciones sin acción > 3 días
+    const [pendientes, setPendientes] = useState({ total: 0, postulaciones: [] });
  
     // Multi-user company states
     const [userRole, setUserRole] = useState(null);
@@ -128,6 +133,22 @@ export default function EmpresaDashboard() {
         };
 
         fetchDashboardData();
+
+        // Cargar widget de pendientes una sola vez (no polling)
+        const fetchPendientes = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.access_token) return;
+                const res = await fetch(`${API_URL}/api/empresa/pendientes`, {
+                    headers: { Authorization: `Bearer ${session.access_token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setPendientes(data);
+                }
+            } catch (_) { /* silenciar: no crítico */ }
+        };
+        fetchPendientes();
     }, [user, navigate]);
 
     const fetchMiembros = async (empId) => {
@@ -156,35 +177,28 @@ export default function EmpresaDashboard() {
         }
 
         try {
-            // 1. Resolve email to user ID
-            const { data: userData, error: userError } = await supabase
-                .rpc('get_user_id_by_email', { email_address: emailClean });
-            
-            if (userError) throw userError;
-
-            if (!userData || userData.length === 0) {
-                throw new Error("El correo ingresado no está registrado en la plataforma. Pídele que se registre primero.");
+            // Obtener token JWT de Supabase
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) {
+                throw new Error("No se pudo obtener la sesión activa.");
             }
 
-            const targetUser = userData[0];
+            // Realizar llamada segura al backend
+            const res = await fetch(`${API_URL}/api/empresa/miembros/invitar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({ email: emailClean, rol: inviteRole })
+            });
 
-            // 2. Add as member
-            const { error: insertError } = await supabase
-                .from('empresa_miembros')
-                .insert({
-                    auth_id: targetUser.auth_id,
-                    empresa_id: empresa.id,
-                    rol: inviteRole
-                });
-
-            if (insertError) {
-                if (insertError.code === '23505') {
-                    throw new Error("Este usuario ya es miembro de tu empresa.");
-                }
-                throw insertError;
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || "Ocurrió un error al agregar al miembro.");
             }
 
-            setInviteSuccess(`¡Usuario ${emailClean} agregado correctamente como ${inviteRole === 'administrador' ? 'Administrador' : 'Reclutador'}!`);
+            setInviteSuccess(`¡Usuario ${emailClean} agregado correctamente como ${inviteRole === 'administrador' ? 'Administrador' : (inviteRole === 'reclutador' ? 'Reclutador' : 'Solo Lectura')}!`);
             setInviteEmail('');
             // Refresh member list
             await fetchMiembros(empresa.id);
@@ -289,7 +303,7 @@ export default function EmpresaDashboard() {
 
                 const { data: { session } } = await supabase.auth.getSession();
                 
-                const upRes = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/upload-image`, {
+                const upRes = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/upload-image`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${session.access_token}` },
                     body: formData
@@ -500,33 +514,43 @@ export default function EmpresaDashboard() {
                         Mis Búsquedas Activas
                     </h1>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-gray)', fontSize: '1.1rem' }}>
-                        <Building2 size={18} /> <span style={{fontWeight: '600', color: 'var(--primary)'}}>{empresa.nombre}</span>
+                        <Building2 size={18} /> 
+                        <span style={{fontWeight: '600', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '6px'}}>
+                            {empresa.nombre}
+                            {empresa.plan === 'premium' && empresa.premium_hasta && new Date(empresa.premium_hasta) > new Date() && (
+                                <span style={{ background: 'linear-gradient(90deg, #FFB020, #FF9800)', color: 'white', padding: '2px 8px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    <Crown size={12} fill="white" /> Premium
+                                </span>
+                            )}
+                        </span>
                         {empresa.ubicacion && <><span style={{margin: '0 5px'}}>•</span><MapPin size={18} /> {empresa.ubicacion}</>}
                     </div>
                 </div>
                 
-                <button 
-                    onClick={() => navigate('/crear-oferta')}
-                    style={{ 
-                        background: 'var(--primary)', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '12px', 
-                        padding: '14px 24px', 
-                        fontSize: '1.1rem',
-                        fontWeight: 'bold', 
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        boxShadow: '0 8px 20px rgba(0,214,107,0.3)',
-                        transition: 'transform 0.2s'
-                    }}
-                    onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                    onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
-                >
-                    <PlusCircle size={22} /> Publicar Nueva Oferta
-                </button>
+                {userRole !== 'solo_lectura' && (
+                    <button 
+                        onClick={() => navigate('/crear-oferta')}
+                        style={{ 
+                            background: 'var(--primary)', 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: '12px', 
+                            padding: '14px 24px', 
+                            fontSize: '1.1rem',
+                            fontWeight: 'bold', 
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            boxShadow: '0 8px 20px rgba(0,214,107,0.3)',
+                            transition: 'transform 0.2s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                        onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                        <PlusCircle size={22} /> Publicar Nueva Oferta
+                    </button>
+                )}
             </div>
 
             {error && <div className="message error" style={{marginBottom: '2rem'}}>{error}</div>}
@@ -571,6 +595,30 @@ export default function EmpresaDashboard() {
                                 }}
                             >
                                 <Users size={14} /> Gestionar Equipo
+                            </button>
+                            <button
+                                onClick={() => navigate('/buscar-candidatos')}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    padding: '9px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                                    fontWeight: '600', fontSize: '0.88rem', transition: 'all 0.15s', textAlign: 'left',
+                                    background: 'rgba(0,0,0,0.04)',
+                                    color: 'var(--text-gray)',
+                                }}
+                            >
+                                <Sparkles size={14} color="#FFB020" /> Buscar Talentos
+                            </button>
+                            <button
+                                onClick={() => navigate('/pricing-empresa')}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    padding: '9px 12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                                    fontWeight: '600', fontSize: '0.88rem', transition: 'all 0.15s', textAlign: 'left',
+                                    background: 'rgba(0,0,0,0.04)',
+                                    color: 'var(--text-gray)',
+                                }}
+                            >
+                                <Crown size={14} color="#FFB020" /> Suscripción Premium
                             </button>
                         </div>
                     </div>
@@ -674,6 +722,45 @@ export default function EmpresaDashboard() {
 
                             return (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                                    {/* Widget de retención: candidatos esperando respuesta */}
+                                    {pendientes.total > 0 && (
+                                        <div style={{
+                                            display: 'flex', alignItems: 'center', gap: '14px',
+                                            background: 'linear-gradient(135deg, #fff7ed, #fef3c7)',
+                                            border: '1px solid #fcd34d',
+                                            borderRadius: '16px', padding: '1rem 1.4rem',
+                                        }}>
+                                            <AlertCircle size={22} color="#d97706" style={{ flexShrink: 0 }} />
+                                            <div style={{ flex: 1 }}>
+                                                <p style={{ margin: 0, fontWeight: 'bold', color: '#92400e', fontSize: '0.95rem' }}>
+                                                    {pendientes.total} candidato{pendientes.total !== 1 ? 's' : ''} esperando respuesta hace más de 3 días
+                                                </p>
+                                                <p style={{ margin: '2px 0 0', color: '#b45309', fontSize: '0.82rem' }}>
+                                                    Respondé pronto para mantener el interés. Los candidatos sin respuesta suelen desactivarse o postularse a otros procesos.
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => navigate('/mis-chats')}
+                                                style={{
+                                                    flexShrink: 0,
+                                                    background: '#d97706',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '10px',
+                                                    padding: '8px 16px',
+                                                    fontWeight: 'bold',
+                                                    fontSize: '0.82rem',
+                                                    cursor: 'pointer',
+                                                    whiteSpace: 'nowrap',
+                                                    transition: 'all 0.15s'
+                                                }}
+                                                onMouseEnter={e => e.currentTarget.style.background = '#b45309'}
+                                                onMouseLeave={e => e.currentTarget.style.background = '#d97706'}
+                                            >
+                                                Ir a Chats →
+                                            </button>
+                                        </div>
+                                    )}
                                     {sorted.map((oferta) => {
                                         const postulantesCount = oferta.postulaciones[0]?.count || 0;
                                         return (
@@ -757,9 +844,56 @@ export default function EmpresaDashboard() {
                                     </p>
                                 </div>
                                 <span style={{ background: 'rgba(0,214,107,0.1)', color: 'var(--primary)', padding: '6px 14px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                                    Tu Rol: {userRole === 'administrador' ? 'Administrador' : 'Reclutador'}
+                                    Tu Rol: {userRole === 'administrador' ? 'Administrador' : (userRole === 'solo_lectura' ? 'Solo Lectura' : 'Reclutador')}
                                 </span>
                             </div>
+
+                            {/* Invitation Form (Admins only) */}
+                            {userRole === 'administrador' && (
+                                <form onSubmit={handleInviteMember} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem', padding: '1.5rem', background: '#F9FBF9', borderRadius: '16px', border: '1px solid rgba(0,214,107,0.15)' }}>
+                                    <div style={{ flex: 1, minWidth: '200px' }}>
+                                        <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-gray)', marginBottom: '5px', fontWeight: 'bold' }}>Invitar miembro por email</label>
+                                        <input 
+                                            type="email"
+                                            required
+                                            value={inviteEmail}
+                                            onChange={e => setInviteEmail(e.target.value)}
+                                            placeholder="ejemplo@empresa.com"
+                                            style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box' }}
+                                        />
+                                    </div>
+                                    <div style={{ width: '180px' }}>
+                                        <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-gray)', marginBottom: '5px', fontWeight: 'bold' }}>Rol</label>
+                                        <select 
+                                            value={inviteRole}
+                                            onChange={e => setInviteRole(e.target.value)}
+                                            style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '0.95rem', outline: 'none', boxSizing: 'border-box', background: 'white' }}
+                                        >
+                                            <option value="reclutador">Reclutador</option>
+                                            <option value="administrador">Administrador</option>
+                                            <option value="solo_lectura">Solo Lectura</option>
+                                        </select>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                        <button 
+                                            type="submit" 
+                                            disabled={inviteLoading}
+                                            className="submit-btn" 
+                                            style={{ padding: '10px 20px', width: 'auto', boxShadow: 'none', margin: 0 }}
+                                        >
+                                            {inviteLoading ? 'Invitando...' : 'Invitar'}
+                                        </button>
+                                    </div>
+                                    {inviteError && <div style={{ color: '#d32f2f', fontSize: '0.88rem', width: '100%', marginTop: '5px', fontWeight: 'bold' }}>{inviteError}</div>}
+                                    {inviteSuccess && <div style={{ color: 'var(--primary)', fontSize: '0.88rem', width: '100%', marginTop: '5px', fontWeight: 'bold' }}>{inviteSuccess}</div>}
+                                    
+                                    {!(empresa && empresa.plan === 'premium' && empresa.premium_hasta && new Date(empresa.premium_hasta) > new Date()) && (
+                                        <div style={{ fontSize: '0.82rem', color: '#b45309', width: '100%', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                            <AlertCircle size={14} /> Plan gratuito: limitado a 2 miembros máximo. Vinculados actualmente: {miembros.length}/2. <Link to="/pricing-empresa" style={{ color: '#b45309', fontWeight: 'bold', textDecoration: 'underline' }}>Hazte Premium para tener miembros ilimitados.</Link>
+                                        </div>
+                                    )}
+                                </form>
+                            )}
 
 
 
@@ -801,6 +935,7 @@ export default function EmpresaDashboard() {
                                                     >
                                                         <option value="reclutador">Reclutador</option>
                                                         <option value="administrador">Administrador</option>
+                                                        <option value="solo_lectura">Solo Lectura</option>
                                                     </select>
                                                 ) : (
                                                     <span style={{ 

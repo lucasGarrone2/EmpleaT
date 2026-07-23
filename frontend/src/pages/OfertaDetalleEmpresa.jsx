@@ -1,16 +1,22 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
 import { Briefcase, ArrowLeft, Users, Zap, MapPin, Trash2, PauseCircle, PlayCircle, Edit, Kanban, List } from 'lucide-react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function OfertaDetalleEmpresa() {
     const { id } = useParams();
     const { user } = useAuth();
     const navigate = useNavigate();
+    const showAlert = useAlert();
 
     const [empresaId, setEmpresaId] = useState(null);
     const [userRole, setUserRole] = useState(null);
+    const [empresa, setEmpresa] = useState(null);
+    const [boostLoading, setBoostLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [oferta, setOferta] = useState(null);
     const [postulantes, setPostulantes] = useState([]);
@@ -104,19 +110,20 @@ export default function OfertaDetalleEmpresa() {
             try {
                 const { data: miembroData } = await supabase
                     .from('empresa_miembros')
-                    .select('empresa_id, rol')
+                    .select('empresa_id, rol, empresas(plan, premium_hasta)')
                     .eq('auth_id', user.id)
                     .maybeSingle();
                 
                 if (!miembroData) throw new Error("Perfil de empresa no encontrado");
                 setEmpresaId(miembroData.empresa_id);
                 setUserRole(miembroData.rol);
+                setEmpresa(miembroData.empresas);
 
                 // Obtener datos de la oferta
                 const { data: ofData, error: ofError } = await supabase
                     .from('ofertas')
                     .select(`
-                        id, empresa_id, titulo, modalidad, descripcion, estado, creada_en, seniority,
+                        id, empresa_id, titulo, modalidad, descripcion, estado, creada_en, seniority, destacada, destacada_hasta,
                         oferta_skills (
                             skill_id,
                             nombre_original,
@@ -279,6 +286,10 @@ export default function OfertaDetalleEmpresa() {
     };
 
     const handleMoveCandidate = async (postulacionId, targetStatus, currentStatus) => {
+        if (userRole === 'solo_lectura') {
+            setError("Tu rol de Solo Lectura no te permite modificar el estado de los candidatos.");
+            return;
+        }
         if (targetStatus === currentStatus) return;
 
         if (targetStatus === 'Rechazado') {
@@ -308,6 +319,10 @@ export default function OfertaDetalleEmpresa() {
     };
 
     const handleConfirmRejection = async () => {
+        if (userRole === 'solo_lectura') {
+            setError("Tu rol de Solo Lectura no te permite rechazar candidatos.");
+            return;
+        }
         if (!selectedReasonId || !selectedPostulacionId) return;
         setIsSubmittingRejection(true);
 
@@ -346,6 +361,10 @@ export default function OfertaDetalleEmpresa() {
     };
 
     const togglePause = async () => {
+        if (userRole === 'solo_lectura') {
+            setError("Tu rol de Solo Lectura no te permite pausar o publicar búsquedas.");
+            return;
+        }
         setModalActionLoading(true);
         const nuevoEstado = oferta.estado === 'Publicada' ? 'Cerrada' : 'Publicada';
         
@@ -367,6 +386,10 @@ export default function OfertaDetalleEmpresa() {
     };
 
     const confirmEliminar = async () => {
+        if (userRole === 'solo_lectura') {
+            setError("Tu rol de Solo Lectura no te permite eliminar búsquedas.");
+            return;
+        }
         setModalActionLoading(true);
         try {
             const { error: delErr } = await supabase
@@ -382,6 +405,57 @@ export default function OfertaDetalleEmpresa() {
             setShowDeleteModal(false);
         } finally {
             setModalActionLoading(false);
+        }
+    };
+
+    const handleToggleBoost = async () => {
+        if (userRole === 'solo_lectura') {
+            setError("Tu rol de Solo Lectura no te permite destacar ofertas.");
+            return;
+        }
+
+        const isPremium = empresa && empresa.plan === 'premium' && empresa.premium_hasta && new Date(empresa.premium_hasta) > new Date();
+        if (!isPremium) {
+            await showAlert("Esta función requiere una suscripción Premium activa. Serás redirigido a la sección de planes.", "Se requiere Premium", "warning");
+            navigate('/pricing-empresa');
+            return;
+        }
+
+        setBoostLoading(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(`${API_URL}/api/empresas/${empresaId}/ofertas/${id}/destacar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                }
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || "No se pudo destacar la oferta");
+            }
+
+            const resData = await res.json();
+            setOferta(prev => ({
+                ...prev,
+                destacada: resData.destacada,
+                destacada_hasta: resData.destacada_hasta
+            }));
+            
+            showAlert(
+                resData.destacada 
+                    ? "¡Oferta destacada con éxito! Aparecerá al inicio de las búsquedas por 7 días." 
+                    : "Se ha removido el destacado de la oferta.",
+                resData.destacada ? "¡Listo!" : "Destacado removido",
+                resData.destacada ? "success" : "info"
+            );
+        } catch (err) {
+            console.error("Error al destacar oferta:", err);
+            showAlert(err.message || "Error al destacar la oferta.", "Error", "error");
+        } finally {
+            setBoostLoading(false);
         }
     };
 
@@ -430,7 +504,7 @@ export default function OfertaDetalleEmpresa() {
                             <h1 style={{ fontSize: '2.2rem', color: 'var(--text-dark)', margin: '0 0 10px 0', letterSpacing: '-0.5px' }}>
                                 {oferta.titulo}
                             </h1>
-                            <div style={{ display: 'flex', gap: '15px', color: 'var(--text-gray)', fontSize: '1.05rem', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: '15px', color: 'var(--text-gray)', fontSize: '1.05rem', alignItems: 'center', flexWrap: 'wrap' }}>
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Briefcase size={18}/> {oferta.modalidad}</span>
                                 {(oferta.seniority && oferta.seniority !== 'Indistinto') && (
                                     <>
@@ -451,60 +525,110 @@ export default function OfertaDetalleEmpresa() {
                                 }}>
                                     {oferta.estado}
                                 </span>
+                                {oferta.destacada && (
+                                    <>
+                                        <span>•</span>
+                                        <span style={{ 
+                                            background: 'linear-gradient(90deg, #FFB020, #FF9800)', color: 'white', padding: '4px 12px', 
+                                            borderRadius: '15px', fontSize: '0.85rem', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                                        }}>
+                                            <Zap size={12} fill="white" /> Destacada {oferta.destacada_hasta ? `hasta ${new Date(oferta.destacada_hasta).toLocaleDateString()}` : ''}
+                                        </span>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}
                     
                     {/* Botones de Acción */}
                     {!loading && (
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                        <button 
-                            onClick={() => navigate(`/editar-oferta/${id}`)}
-                            style={{ 
-                                display: 'flex', alignItems: 'center', gap: '8px',
-                                padding: '10px 18px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)',
-                                background: 'white', color: 'var(--primary)', fontWeight: 'bold',
-                                cursor: 'pointer', transition: 'all 0.2s'
-                            }}
-                            onMouseOver={e => { e.currentTarget.style.background = 'rgba(0,214,107,0.05)'; }}
-                            onMouseOut={e => { e.currentTarget.style.background = 'white'; }}
-                        >
-                            <Edit size={18} /> Editar
-                        </button>
-                        
-                        <button 
-                            onClick={() => setShowPauseModal(true)}
-                            style={{ 
-                                display: 'flex', alignItems: 'center', gap: '8px',
-                                padding: '10px 18px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)',
-                                background: 'white', color: 'var(--text-gray)', fontWeight: 'bold',
-                                cursor: 'pointer', transition: 'all 0.2s'
-                            }}
-                            onMouseOver={e => { e.currentTarget.style.background = '#f5f5f5'; }}
-                            onMouseOut={e => { e.currentTarget.style.background = 'white'; }}
-                        >
-                            {oferta.estado === 'Publicada' ? 
-                                <><PauseCircle size={18} /> Pausar</> : 
-                                <><PlayCircle size={18} color="var(--primary)" /> {oferta.estado === 'Borrador' ? 'Publicar' : 'Reanudar'}</>
-                            }
-                        </button>
-                        
-                        {userRole === 'administrador' && (
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                             <button 
-                                onClick={() => setShowDeleteModal(true)}
+                                onClick={() => navigate(`/empresa-analytics/${id}`)}
                                 style={{ 
                                     display: 'flex', alignItems: 'center', gap: '8px',
-                                    padding: '10px 18px', borderRadius: '12px', border: 'none',
-                                    background: 'rgba(211, 47, 47, 0.1)', color: '#d32f2f', fontWeight: 'bold',
-                                    cursor: 'pointer', transition: 'background 0.2s'
+                                    padding: '10px 18px', borderRadius: '12px', border: '1px solid rgba(2,132,199,0.2)',
+                                    background: 'white', color: '#0284c7', fontWeight: 'bold',
+                                    cursor: 'pointer', transition: 'all 0.2s'
                                 }}
-                                onMouseOver={e => { e.currentTarget.style.background = 'rgba(211, 47, 47, 0.15)'; }}
-                                onMouseOut={e => { e.currentTarget.style.background = 'rgba(211, 47, 47, 0.1)'; }}
+                                onMouseOver={e => { e.currentTarget.style.background = 'rgba(2,132,199,0.05)'; }}
+                                onMouseOut={e => { e.currentTarget.style.background = 'white'; }}
                             >
-                                <Trash2 size={18} /> Eliminar
+                                Ver Métricas
                             </button>
-                        )}
-                    </div>
+
+                            {userRole !== 'solo_lectura' && (
+                                <button 
+                                    onClick={handleToggleBoost}
+                                    disabled={boostLoading}
+                                    style={{ 
+                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                        padding: '10px 18px', borderRadius: '12px', 
+                                        border: oferta.destacada ? 'none' : '1px solid #FFB020',
+                                        background: oferta.destacada ? 'linear-gradient(90deg, #FFB020, #FF9800)' : 'white', 
+                                        color: oferta.destacada ? 'white' : '#FF9800', 
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer', transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={e => { if(!oferta.destacada) e.currentTarget.style.background = 'rgba(255,176,32,0.05)'; }}
+                                    onMouseOut={e => { if(!oferta.destacada) e.currentTarget.style.background = 'white'; }}
+                                >
+                                    <Zap size={18} fill={oferta.destacada ? "white" : "none"} /> 
+                                    {oferta.destacada ? 'Oferta Destacada' : 'Destacar Oferta'}
+                                </button>
+                            )}
+
+                            {userRole !== 'solo_lectura' && (
+                                <>
+                                    <button 
+                                        onClick={() => navigate(`/editar-oferta/${id}`)}
+                                        style={{ 
+                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                            padding: '10px 18px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)',
+                                            background: 'white', color: 'var(--primary)', fontWeight: 'bold',
+                                            cursor: 'pointer', transition: 'all 0.2s'
+                                        }}
+                                        onMouseOver={e => { e.currentTarget.style.background = 'rgba(0,214,107,0.05)'; }}
+                                        onMouseOut={e => { e.currentTarget.style.background = 'white'; }}
+                                    >
+                                        <Edit size={18} /> Editar
+                                    </button>
+                                    
+                                    <button 
+                                        onClick={() => setShowPauseModal(true)}
+                                        style={{ 
+                                            display: 'flex', alignItems: 'center', gap: '8px',
+                                            padding: '10px 18px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)',
+                                            background: 'white', color: 'var(--text-gray)', fontWeight: 'bold',
+                                            cursor: 'pointer', transition: 'all 0.2s'
+                                        }}
+                                        onMouseOver={e => { e.currentTarget.style.background = '#f5f5f5'; }}
+                                        onMouseOut={e => { e.currentTarget.style.background = 'white'; }}
+                                    >
+                                        {oferta.estado === 'Publicada' ? 
+                                            <><PauseCircle size={18} /> Pausar</> : 
+                                            <><PlayCircle size={18} color="var(--primary)" /> {oferta.estado === 'Borrador' ? 'Publicar' : 'Reanudar'}</>
+                                        }
+                                    </button>
+                                </>
+                            )}
+                            
+                            {userRole === 'administrador' && (
+                                <button 
+                                    onClick={() => setShowDeleteModal(true)}
+                                    style={{ 
+                                        display: 'flex', alignItems: 'center', gap: '8px',
+                                        padding: '10px 18px', borderRadius: '12px', border: 'none',
+                                        background: 'rgba(211, 47, 47, 0.1)', color: '#d32f2f', fontWeight: 'bold',
+                                        cursor: 'pointer', transition: 'background 0.2s'
+                                    }}
+                                    onMouseOver={e => { e.currentTarget.style.background = 'rgba(211, 47, 47, 0.15)'; }}
+                                    onMouseOut={e => { e.currentTarget.style.background = 'rgba(211, 47, 47, 0.1)'; }}
+                                >
+                                    <Trash2 size={18} /> Eliminar
+                                </button>
+                            )}
+                        </div>
                     )}
                 </div>
 

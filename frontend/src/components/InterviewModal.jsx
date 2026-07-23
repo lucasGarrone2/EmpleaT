@@ -31,7 +31,7 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) throw new Error("No hay sesión activa");
 
-                const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
+                const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
                 const response = await fetch(`${backendUrl}/api/premium/simular-entrevista`, {
                     method: 'POST',
                     headers: {
@@ -113,7 +113,7 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
                 respuesta: finalRespuestas[idx]
             }));
 
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
+            const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
             const response = await fetch(`${backendUrl}/api/premium/evaluar-respuesta`, {
                 method: 'POST',
                 headers: {

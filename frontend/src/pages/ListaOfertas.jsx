@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
@@ -193,6 +193,8 @@ export default function ListaOfertas() {
     const [boostQuizModalFor, setBoostQuizModalFor] = useState(null);
     const [adaptarCvModalFor, setAdaptarCvModalFor] = useState(null);
     const [marketAvgSalary, setMarketAvgSalary] = useState(0);
+    const viewedOffersRef = useRef(new Set());
+
 
     const locationRouter = useLocation();
     const queryParams = new URLSearchParams(locationRouter.search);
@@ -254,8 +256,8 @@ export default function ListaOfertas() {
                         const confirmData = await confirmRes.json();
                         if (confirmData.success) {
                             esPremiumLocal = true;
-                            // Limpiar URL para no volver a ejecutar
-                            window.history.replaceState({}, document.title, window.location.pathname);
+                            // Limpiar URL reactivamente en React Router para no volver a ejecutar
+                            navigate('/ofertas', { replace: true });
                             showAlert("¡Listo! Tu pago ya se acreditó. ¡Ya eres Premium!", "¡Éxito!", "success");
                         }
                     } catch (e) {
@@ -294,7 +296,7 @@ export default function ListaOfertas() {
                 const { data: ofertasData, error: ofError } = await supabase
                     .from('ofertas')
                     .select(`
-                        id, titulo, modalidad, descripcion, salario_min_usd, salario_max_usd, creada_en, porcentaje_match_minimo, ciudad, nombre_empresa_custom, oculta_admin, seniority,
+                        id, titulo, modalidad, descripcion, salario_min_usd, salario_max_usd, creada_en, porcentaje_match_minimo, ciudad, nombre_empresa_custom, oculta_admin, seniority, destacada, destacada_hasta,
                         empresas (nombre, ubicacion, logo_url, baneada),
                         oferta_skills (
                             skill_id,
@@ -509,8 +511,14 @@ export default function ListaOfertas() {
         return true;
     });
 
-    // Paginación y Ordenamiento seguros
+    // Paginación y Ordenamiento seguros (ofertas destacadas primero)
     const ofertasOrdenadas = [...ofertasZ].sort((a, b) => {
+        // Boost: ofertas destacadas activas van primero
+        const now = new Date();
+        const aIsBoosted = a.destacada && a.destacada_hasta && new Date(a.destacada_hasta) > now ? 1 : 0;
+        const bIsBoosted = b.destacada && b.destacada_hasta && new Date(b.destacada_hasta) > now ? 1 : 0;
+        if (bIsBoosted !== aIsBoosted) return bIsBoosted - aIsBoosted;
+
         if (ordenamiento === 'Mejor Match') return b.porcentajeMatch - a.porcentajeMatch;
         if (ordenamiento === 'Más recientes') return new Date(b.creada_en) - new Date(a.creada_en);
         if (ordenamiento === 'Más antiguas') return new Date(a.creada_en) - new Date(b.creada_en);
@@ -713,23 +721,38 @@ export default function ListaOfertas() {
                              const yaPostulado = !!postulacionesMap[oferta.id];
                              const boostEstado = postulacionesMap[oferta.id]?.match_boost_estado || 'pendiente';
                              const finalMatch = boostEstado === 'aprobado' ? Math.min(100, oferta.porcentajeMatch + 5) : oferta.porcentajeMatch;
+                             const isOfertaDestacada = oferta.destacada && oferta.destacada_hasta && new Date(oferta.destacada_hasta) > new Date();
                              
                              // Extrae la primera letra de la empresa
                              const empLetra = (oferta.empresas?.nombre || 'E').charAt(0).toUpperCase();
 
                             return (
                                 <div key={oferta.id} 
-                                    onClick={() => setExpandedOferta(isExpanded ? null : oferta.id)}
+                                    onClick={() => {
+                                        const wasExpanded = expandedOferta === oferta.id;
+                                        setExpandedOferta(wasExpanded ? null : oferta.id);
+                                        // Incrementar vista solo una vez por sesión al expandir
+                                        if (!wasExpanded && !viewedOffersRef.current.has(oferta.id)) {
+                                            viewedOffersRef.current.add(oferta.id);
+                                            supabase.rpc('increment_vista_oferta', { p_oferta_id: oferta.id }).catch(() => {});
+                                        }
+                                    }}
                                     style={{ 
-                                        background: 'white', 
+                                        background: isOfertaDestacada ? 'linear-gradient(135deg, #FFFDF5 0%, #FFFFFF 100%)' : 'white', 
                                         borderRadius: '12px', 
-                                        border: `1px solid ${isExpanded ? 'var(--primary)' : '#EAEAEA'}`,
+                                        border: `1px solid ${isOfertaDestacada ? 'rgba(255,176,32,0.4)' : (isExpanded ? 'var(--primary)' : '#EAEAEA')}`,
                                         padding: '1.5rem',
-                                        boxShadow: isExpanded ? '0 8px 30px rgba(0,214,107,0.08)' : '0 2px 10px rgba(0,0,0,0.02)',
+                                        boxShadow: isOfertaDestacada ? '0 4px 20px rgba(255,176,32,0.08)' : (isExpanded ? '0 8px 30px rgba(0,214,107,0.08)' : '0 2px 10px rgba(0,0,0,0.02)'),
                                         cursor: 'pointer',
                                         transition: 'all 0.2s',
                                         position: 'relative'
                                     }}>
+                                    {/* Boost Badge */}
+                                    {isOfertaDestacada && (
+                                        <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'linear-gradient(90deg, #FFB020, #FF9800)', color: 'white', padding: '3px 10px', borderRadius: '8px', fontSize: '0.72rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 2px 8px rgba(255,176,32,0.3)' }}>
+                                            <Zap size={12} fill="white" /> Destacada
+                                        </div>
+                                    )}
                                     
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem', flex: 1 }}>

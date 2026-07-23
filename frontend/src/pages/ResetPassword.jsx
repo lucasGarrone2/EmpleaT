@@ -1,4 +1,4 @@
- import { useState } from "react";
+ import { useState, useEffect } from "react";
 import { supabase } from '../supabase';
 import { useNavigate } from 'react-router-dom';
 import { Lock, CheckCircle } from 'lucide-react';
@@ -13,6 +13,15 @@ export default function ResetPassword() {
 
     const navigate = useNavigate();
 
+    // SEC-18: Verificar que la sesión activa es realmente de recovery
+    useEffect(() => {
+        const isRecovering = sessionStorage.getItem('is_recovering_password') === 'true';
+        if (!isRecovering) {
+            // Si no hay flag de recovery, no hay nada que hacer aquí
+            navigate('/login', { replace: true });
+        }
+    }, [navigate]);
+
     const handleUpdatePassword = async (e) => {
         e.preventDefault();
         
@@ -21,8 +30,9 @@ export default function ResetPassword() {
             return;
         }
 
-        if (password.length < 6) {
-            setError("La contraseña debe tener al menos 6 caracteres");
+        // SEC-22: Mínimo 8 caracteres
+        if (password.length < 8) {
+            setError("La contraseña debe tener al menos 8 caracteres");
             return;
         }
 

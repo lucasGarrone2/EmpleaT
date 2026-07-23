@@ -3,8 +3,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
-import { User, Briefcase, Clock, FileText, ArrowLeft, BrainCircuit, MapPin, CheckCircle, XCircle, Rocket, PartyPopper } from 'lucide-react';
-import './Register.css'; // Mantenemos los estilos consistentes
+import { User, Briefcase, Clock, FileText, ArrowLeft, BrainCircuit, MapPin, CheckCircle, XCircle, Rocket, PartyPopper, MessageSquare, Send, CalendarCheck } from 'lucide-react';
+import ChatPostulacion from '../components/ChatPostulacion';
+import './Register.css';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function PerfilCandidatoParaEmpresa() {
     const { ofertaId, candidatoId } = useParams();
@@ -21,12 +24,17 @@ export default function PerfilCandidatoParaEmpresa() {
     // ATS Pipeline states
     const [estadoPostulacion, setEstadoPostulacion] = useState('postulado');
     const [postulacionId, setPostulacionId] = useState(null);
+    const [candidatoNombre, setCandidatoNombre] = useState('');
 
-    // Estados para el Modal de Motivo de Rechazo (ATS)
+    // Chat
+    const [mostrarChat, setMostrarChat] = useState(false);
+
+    // ActionModal: modal unificado para todas las acciones ATS
+    const [actionModal, setActionModal] = useState(null); // null | { tipo, titulo, mensajePre, mostrarMotivo }
+    const [actionMensaje, setActionMensaje] = useState('');
+    const [actionMotivoId, setActionMotivoId] = useState('');
+    const [isSubmittingAction, setIsSubmittingAction] = useState(false);
     const [rejectionReasons, setRejectionReasons] = useState([]);
-    const [showRejectionModal, setShowRejectionModal] = useState(false);
-    const [selectedReasonId, setSelectedReasonId] = useState('');
-    const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
 
     useEffect(() => {
         const fetchRejectionReasons = async () => {
@@ -122,6 +130,7 @@ export default function PerfilCandidatoParaEmpresa() {
 
                 if (candError || !candData) throw new Error("Candidato no encontrado");
                 setCandidato(candData);
+                setCandidatoNombre(candData.nombre_completo || 'el candidato');
 
                 // 3. Obtener las skills del candidato
                 const { data: skillsData, error: skillsError } = await supabase
@@ -151,58 +160,85 @@ export default function PerfilCandidatoParaEmpresa() {
         fetchDetalle();
     }, [ofertaId, candidatoId, user, navigate]);
 
-    // Función para cambiar de fase del pipeline ATS
-    const updateEstado = async (nuevoEstado) => {
-        if (nuevoEstado === 'Rechazado') {
-            setSelectedReasonId('');
-            setShowRejectionModal(true);
+
+    // Abre el ActionModal con la config correcta según el tipo de acción
+    const abrirActionModal = (tipo) => {
+        const nombre = candidatoNombre || 'el candidato';
+        const configs = {
+            invitar_entrevista: {
+                tipo: 'invitar_entrevista',
+                titulo: '📅 Invitar a entrevista',
+                mensajePre: `Hola ${nombre}, tu perfil nos interesó y queremos coordinar una entrevista. ¿Qué disponibilidad tenés esta semana?`,
+                mostrarMotivo: false
+            },
+            rechazar: {
+                tipo: 'rechazar',
+                titulo: '❌ Descartar candidato',
+                mensajePre: `Hola ${nombre}, gracias por tu interés en la posición. En esta oportunidad decidimos avanzar con otro perfil.`,
+                mostrarMotivo: true
+            },
+            mensaje: {
+                tipo: 'mensaje',
+                titulo: '💬 Enviar mensaje',
+                mensajePre: '',
+                mostrarMotivo: false
+            }
+        };
+        setActionModal(configs[tipo]);
+        setActionMensaje(configs[tipo].mensajePre);
+        setActionMotivoId('');
+    };
+
+    // Ejecuta la acción contra el backend (atómica: estado + mensaje)
+    const handleConfirmAction = async () => {
+        if (!actionModal || !postulacionId) return;
+        if (!actionMensaje.trim()) {
+            showAlert('El mensaje no puede estar vacío.', 'Atención', 'warning');
+            return;
+        }
+        if (actionModal.mostrarMotivo && !actionMotivoId) {
+            showAlert('Por favor seleccioná el motivo de rechazo.', 'Atención', 'warning');
             return;
         }
 
+        setIsSubmittingAction(true);
         try {
-            const { error: updateErr } = await supabase
-                .from('postulaciones')
-                .update({ estado: nuevoEstado })
-                .eq('id', postulacionId);
-
-            if (updateErr) throw updateErr;
-            setEstadoPostulacion(nuevoEstado);
-        } catch (err) {
-            console.error("Error al actualizar estado:", err);
-            showAlert("No se pudo actualizar el estado de la postulación.", "Error", "error");
-        }
-    };
-
-    const handleConfirmRejection = async () => {
-        if (!selectedReasonId || !postulacionId) return;
-        setIsSubmittingRejection(true);
-
-        try {
-            const { error: updateErr } = await supabase
-                .from('postulaciones')
-                .update({ 
-                    estado: 'Rechazado',
-                    motivo_rechazo_id: parseInt(selectedReasonId)
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(`${API_URL}/api/postulaciones/${postulacionId}/accion`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({
+                    tipo_accion: actionModal.tipo,
+                    mensaje: actionMensaje.trim(),
+                    ...(actionMotivoId && { motivo_rechazo_id: actionMotivoId })
                 })
-                .eq('id', postulacionId);
+            });
 
-            if (updateErr) throw updateErr;
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Error al ejecutar la acción.');
 
-            setEstadoPostulacion('Rechazado');
-            setShowRejectionModal(false);
-            setSelectedReasonId('');
+            setEstadoPostulacion(data.nuevo_estado);
+            setActionModal(null);
+            setActionMensaje('');
+            setActionMotivoId('');
+            // Mostrar chat automáticamente tras la primera acción
+            setMostrarChat(true);
+            showAlert('Acción realizada con éxito.', '¡Listo!', 'success');
         } catch (err) {
-            console.error("Error al rechazar candidato:", err);
-            showAlert("No se pudo rechazar al postulante: " + err.message, "Error", "error");
-            setShowRejectionModal(false);
+            console.error('Error en acción ATS:', err);
+            showAlert(err.message, 'Error', 'error');
         } finally {
-            setIsSubmittingRejection(false);
+            setIsSubmittingAction(false);
         }
     };
 
-    const handleCancelRejection = () => {
-        setShowRejectionModal(false);
-        setSelectedReasonId('');
+    const handleCancelAction = () => {
+        setActionModal(null);
+        setActionMensaje('');
+        setActionMotivoId('');
     };
 
 
@@ -431,6 +467,7 @@ export default function PerfilCandidatoParaEmpresa() {
                         gap: '12px',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.01)'
                     }}>
+                        {/* Header con estado */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0,214,107,0.08)', paddingBottom: '10px' }}>
                             <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--text-gray)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                                 Proceso de Selección
@@ -446,135 +483,109 @@ export default function PerfilCandidatoParaEmpresa() {
                             })()}
                         </div>
 
-                        {estadoPostulacion?.toLowerCase() === 'postulado' ? (
-                            // Candidato "Postulado": Email Oculto/Enmascarado + Botón de Iniciar Proceso
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    gap: '8px', 
-                                    background: '#f8fafc', 
-                                    padding: '10px 14px', 
-                                    borderRadius: '10px', 
-                                    border: '1px solid #e2e8f0',
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.9rem',
-                                    color: '#94a3b8',
-                                    userSelect: 'none'
-                                }}>
-                                    📧 {candidato.email ? (() => {
-                                        const [local, domain] = candidato.email.split('@');
-                                        if (!local || !domain) return "••••@••••.com";
-                                        return `${local.charAt(0)}•••••@${domain}`;
-                                    })() : "••••@••••.com"}
-                                </div>
-                                <button
-                                    onClick={() => updateEstado('En revisión')}
-                                    style={{
-                                        background: 'var(--primary)',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '12px',
-                                        padding: '12px',
-                                        fontSize: '0.95rem',
-                                        fontWeight: 'bold',
-                                        cursor: 'pointer',
-                                        boxShadow: '0 4px 15px rgba(0,214,107,0.2)',
-                                        transition: 'all 0.2s',
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        alignItems: 'center',
-                                        gap: '6px'
-                                    }}
-                                    onMouseOver={e => {
-                                        e.currentTarget.style.transform = 'translateY(-1px)';
-                                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,214,107,0.3)';
-                                    }}
-                                    onMouseOut={e => {
-                                        e.currentTarget.style.transform = 'translateY(0)';
-                                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,214,107,0.2)';
-                                    }}
-                                >
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
-                                        <Rocket size={16} /> Iniciar Proceso (Revelar Email)
-                                    </span>
-                                </button>
+                        {/* Email: visible SOLO desde Entrevista en adelante */}
+                        {(() => {
+                            const normalized = estadoPostulacion?.toLowerCase();
+                            const emailVisible = ['entrevista', 'seleccionado', 'contratado'].includes(normalized);
+                            if (emailVisible && candidato.email) {
+                                return (
+                                    <div style={{
+                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                        background: 'rgba(0,214,107,0.04)', padding: '10px 14px',
+                                        borderRadius: '10px', border: '1px solid rgba(0,214,107,0.15)'
+                                    }}>
+                                        <a href={`mailto:${candidato.email}`}
+                                            style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: '700', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '180px' }}
+                                            title="Enviar correo electrónico directo">
+                                            📧 {candidato.email}
+                                        </a>
+                                        <button onClick={() => { navigator.clipboard.writeText(candidato.email); showAlert('¡Email copiado!', 'Copiado', 'success'); }}
+                                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', textDecoration: 'underline' }}>
+                                            Copiar
+                                        </button>
+                                    </div>
+                                );
+                            }
+                            if (!emailVisible) {
+                                return (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#f8fafc', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', color: '#94a3b8', fontSize: '0.85rem' }}>
+                                        🔒 Email disponible al invitar a entrevista
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
+
+                        {/* Botones de acción ATS */}
+                        {['rechazado', 'seleccionado', 'contratado'].includes(estadoPostulacion?.toLowerCase()) ? (
+                            <div style={{ fontSize: '0.88rem', color: 'var(--text-gray)', textAlign: 'center', padding: '8px', fontStyle: 'italic' }}>
+                                El proceso de selección ha concluido.
                             </div>
                         ) : (
-                            // Proceso iniciado: Email Real Revelado + Selector ATS de fase
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <div style={{ 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'space-between', 
-                                    background: 'rgba(0,214,107,0.04)', 
-                                    padding: '10px 14px', 
-                                    borderRadius: '10px', 
-                                    border: '1px solid rgba(0,214,107,0.15)' 
-                                }}>
-                                    <a 
-                                        href={`mailto:${candidato.email}`} 
-                                        style={{ 
-                                            fontSize: '0.9rem', 
-                                            color: 'var(--primary)', 
-                                            fontWeight: '700', 
-                                            textDecoration: 'none',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                            maxWidth: '200px'
-                                        }}
-                                        title="Enviar correo electrónico directo"
-                                    >
-                                        📧 {candidato.email}
-                                    </a>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {estadoPostulacion?.toLowerCase() !== 'entrevista' && (
                                     <button
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(candidato.email);
-                                            showAlert("¡Email copiado al portapapeles con éxito!", "Copiado", "success");
-                                        }}
-                                        style={{ 
-                                            background: 'none', 
-                                            border: 'none', 
-                                            color: '#64748b', 
-                                            cursor: 'pointer', 
-                                            fontSize: '0.75rem',
-                                            fontWeight: 'bold',
-                                            textDecoration: 'underline'
-                                        }}
-                                    >
-                                        Copiar
-                                    </button>
-                                </div>
-                                
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                    <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>
-                                        Mover candidato a:
-                                    </label>
-                                    <select
-                                        value={estadoPostulacion}
-                                        onChange={(e) => updateEstado(e.target.value)}
+                                        id="btn-invitar-entrevista"
+                                        onClick={() => abrirActionModal('invitar_entrevista')}
                                         style={{
-                                            padding: '10px',
-                                            borderRadius: '10px',
-                                            border: '1px solid #cbd5e1',
-                                            fontSize: '0.9rem',
-                                            fontWeight: 'bold',
-                                            color: 'var(--text-dark)',
-                                            background: 'white',
-                                            cursor: 'pointer',
-                                            outline: 'none',
-                                            boxShadow: '0 2px 5px rgba(0,0,0,0.02)'
+                                            background: 'var(--primary)', color: 'white', border: 'none',
+                                            borderRadius: '12px', padding: '11px 14px', fontSize: '0.9rem',
+                                            fontWeight: 'bold', cursor: 'pointer', display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center', gap: '7px',
+                                            transition: 'all 0.2s', boxShadow: '0 4px 12px rgba(0,214,107,0.2)'
                                         }}
+                                        onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 18px rgba(0,214,107,0.3)'; }}
+                                        onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,214,107,0.2)'; }}
                                     >
-                                        <option value="En revisión">CV Visto / En Revisión</option>
-                                        <option value="Entrevista">En Entrevista</option>
-                                        <option value="Seleccionado">¡Contratado!</option>
-                                        <option value="Rechazado">Rechazado</option>
-                                    </select>
-                                </div>
+                                        <CalendarCheck size={16} /> Invitar a entrevista
+                                    </button>
+                                )}
+                                <button
+                                    id="btn-enviar-mensaje"
+                                    onClick={() => { abrirActionModal('mensaje'); }}
+                                    style={{
+                                        background: 'rgba(0,214,107,0.08)', color: 'var(--primary)', border: '1px solid rgba(0,214,107,0.25)',
+                                        borderRadius: '12px', padding: '11px 14px', fontSize: '0.9rem',
+                                        fontWeight: 'bold', cursor: 'pointer', display: 'flex',
+                                        alignItems: 'center', justifyContent: 'center', gap: '7px', transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.background = 'rgba(0,214,107,0.14)'}
+                                    onMouseOut={e => e.currentTarget.style.background = 'rgba(0,214,107,0.08)'}
+                                >
+                                    <MessageSquare size={16} /> Enviar mensaje
+                                </button>
+                                <button
+                                    id="btn-rechazar-candidato"
+                                    onClick={() => abrirActionModal('rechazar')}
+                                    style={{
+                                        background: 'rgba(220,38,38,0.06)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)',
+                                        borderRadius: '12px', padding: '11px 14px', fontSize: '0.9rem',
+                                        fontWeight: 'bold', cursor: 'pointer', display: 'flex',
+                                        alignItems: 'center', justifyContent: 'center', gap: '7px', transition: 'all 0.2s'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.background = 'rgba(220,38,38,0.1)'}
+                                    onMouseOut={e => e.currentTarget.style.background = 'rgba(220,38,38,0.06)'}
+                                >
+                                    <XCircle size={16} /> Descartar candidato
+                                </button>
                             </div>
                         )}
+
+                        {/* Toggle del chat */}
+                        <button
+                            onClick={() => setMostrarChat(v => !v)}
+                            style={{
+                                background: 'none', border: '1px dashed rgba(0,0,0,0.15)', borderRadius: '10px',
+                                padding: '8px 12px', fontSize: '0.82rem', color: 'var(--text-gray)',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+                                justifyContent: 'center', transition: 'all 0.2s', marginTop: '4px'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+                            onMouseOut={e => e.currentTarget.style.borderColor = 'rgba(0,0,0,0.15)'}
+                        >
+                            <MessageSquare size={14} />
+                            {mostrarChat ? 'Ocultar conversación' : 'Ver conversación'}
+                        </button>
                     </div>
                 </div>
 
@@ -638,69 +649,114 @@ export default function PerfilCandidatoParaEmpresa() {
                     )}
                 </div>
 
+                {/* Conversación (Chat) */}
+                {postulacionId && mostrarChat && (
+                    <div style={{ background: 'var(--bg-white)', padding: '2rem', borderRadius: '24px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
+                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', margin: '0 0 1.2rem 0', fontSize: '1.2rem' }}>
+                            <MessageSquare size={22} /> Conversación
+                        </h3>
+                        <ChatPostulacion
+                            postulacionId={postulacionId}
+                            miTipo="empresa"
+                            nombreOtro={candidatoNombre}
+                        />
+                    </div>
+                )}
+
             </div>
 
-            {/* MODAL DE MOTIVO DE RECHAZO (ATS) */}
-            {showRejectionModal && (
-                <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', boxSizing: 'border-box' }}>
-                    <div style={{ background: 'white', borderRadius: '24px', padding: '2.5rem', width: '100%', maxWidth: '450px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)' }}>
-                        <h3 style={{ fontSize: '1.4rem', margin: '0 0 1rem 0', color: 'var(--text-dark)', fontWeight: 'bold' }}>
-                            Motivo de Rechazo Requerido
+            {/* ACTION MODAL UNIFICADO */}
+            {actionModal && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                    background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', zIndex: 1000, padding: '20px', boxSizing: 'border-box'
+                }}>
+                    <div style={{
+                        background: 'white', borderRadius: '24px', padding: '2.5rem',
+                        width: '100%', maxWidth: '500px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)'
+                    }}>
+                        <h3 style={{ fontSize: '1.4rem', margin: '0 0 0.5rem 0', color: 'var(--text-dark)', fontWeight: 'bold' }}>
+                            {actionModal.titulo}
                         </h3>
-                        <p style={{ color: 'var(--text-gray)', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: '1.5' }}>
-                            Para descartar a este candidato, por favor selecciona el motivo principal de rechazo.
+                        <p style={{ color: 'var(--text-gray)', marginBottom: '1.5rem', fontSize: '0.92rem', lineHeight: '1.5' }}>
+                            {actionModal.tipo === 'rechazar'
+                                ? 'Descartá al candidato con un mensaje personalizado. El candidato recibirá una notificación.'
+                                : actionModal.tipo === 'invitar_entrevista'
+                                    ? 'Al confirmar, el candidato será invitado a una entrevista y recibirá este mensaje.'
+                                    : 'Enviá un mensaje al candidato. Podrá responderte desde su panel.'}
                         </p>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '2rem' }}>
-                            {rejectionReasons.map(reason => (
-                                <label key={reason.id} style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    padding: '12px 16px',
-                                    borderRadius: '12px',
-                                    border: `1px solid ${selectedReasonId === String(reason.id) ? 'var(--primary)' : '#e2e8f0'}`,
-                                    background: selectedReasonId === String(reason.id) ? 'rgba(0,214,107,0.03)' : 'white',
-                                    cursor: 'pointer',
-                                    fontWeight: selectedReasonId === String(reason.id) ? 'bold' : 'normal',
-                                    transition: 'all 0.2s'
-                                }}>
-                                    <input 
-                                        type="radio" 
-                                        name="rejectionReason" 
-                                        value={reason.id} 
-                                        checked={selectedReasonId === String(reason.id)}
-                                        onChange={(e) => setSelectedReasonId(e.target.value)}
-                                        style={{ accentColor: 'var(--primary)', width: '18px', height: '18px' }}
-                                    />
-                                    <span style={{ fontSize: '0.95rem', color: 'var(--text-dark)' }}>{reason.descripcion}</span>
+
+                        {/* Motivo de rechazo (solo si tipo === rechazar) */}
+                        {actionModal.mostrarMotivo && (
+                            <div style={{ marginBottom: '1.2rem' }}>
+                                <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                                    Motivo de rechazo *
                                 </label>
-                            ))}
+                                <select
+                                    value={actionMotivoId}
+                                    onChange={e => setActionMotivoId(e.target.value)}
+                                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.9rem', color: 'var(--text-dark)', outline: 'none', boxSizing: 'border-box' }}
+                                >
+                                    <option value="">Seleccioná un motivo...</option>
+                                    {rejectionReasons.map(r => (
+                                        <option key={r.id} value={r.id}>{r.descripcion}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Mensaje personalizable */}
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <label style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                                {actionModal.tipo === 'mensaje' ? 'Mensaje *' : 'Mensaje para el candidato *'}
+                            </label>
+                            <textarea
+                                value={actionMensaje}
+                                onChange={e => setActionMensaje(e.target.value)}
+                                maxLength={2000}
+                                rows={5}
+                                placeholder="Escribí tu mensaje aquí..."
+                                style={{
+                                    width: '100%', padding: '12px 14px', borderRadius: '12px',
+                                    border: '1px solid #cbd5e1', fontSize: '0.9rem', resize: 'vertical',
+                                    outline: 'none', fontFamily: 'inherit', lineHeight: '1.5',
+                                    color: 'var(--text-dark)', boxSizing: 'border-box'
+                                }}
+                                onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+                                onBlur={e => e.target.style.borderColor = '#cbd5e1'}
+                            />
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8', float: 'right' }}>
+                                {actionMensaje.length}/2000
+                            </span>
                         </div>
 
                         <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button 
-                                onClick={handleCancelRejection}
+                            <button
+                                onClick={handleCancelAction}
+                                disabled={isSubmittingAction}
                                 style={{ flex: 1, padding: '12px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.1)', background: 'white', color: 'var(--text-gray)', fontWeight: 'bold', cursor: 'pointer' }}
                             >
                                 Cancelar
                             </button>
-                            <button 
-                                onClick={handleConfirmRejection}
-                                disabled={!selectedReasonId || isSubmittingRejection}
-                                style={{ 
-                                    flex: 1, 
-                                    padding: '12px', 
-                                    borderRadius: '12px', 
-                                    border: 'none', 
-                                    background: selectedReasonId ? '#dc2626' : '#94a3b8', 
-                                    color: 'white', 
-                                    fontWeight: 'bold', 
-                                    cursor: selectedReasonId ? 'pointer' : 'not-allowed',
-                                    opacity: isSubmittingRejection ? 0.7 : 1
+                            <button
+                                onClick={handleConfirmAction}
+                                disabled={isSubmittingAction || !actionMensaje.trim() || (actionModal.mostrarMotivo && !actionMotivoId)}
+                                style={{
+                                    flex: 1, padding: '12px', borderRadius: '12px', border: 'none',
+                                    background: isSubmittingAction || !actionMensaje.trim() || (actionModal.mostrarMotivo && !actionMotivoId)
+                                        ? '#94a3b8'
+                                        : actionModal.tipo === 'rechazar' ? '#dc2626' : 'var(--primary)',
+                                    color: 'white', fontWeight: 'bold',
+                                    cursor: isSubmittingAction ? 'not-allowed' : 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                                 }}
                             >
-                                {isSubmittingRejection ? 'Guardando...' : 'Descartar Candidato'}
+                                {isSubmittingAction
+                                    ? 'Enviando...'
+                                    : actionModal.tipo === 'rechazar' ? 'Descartar y notificar'
+                                    : actionModal.tipo === 'invitar_entrevista' ? 'Invitar y notificar'
+                                    : 'Enviar mensaje'}
                             </button>
                         </div>
                     </div>

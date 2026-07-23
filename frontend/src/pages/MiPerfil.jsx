@@ -3,46 +3,47 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
-import { User, Briefcase, Clock, FileText, Edit2, Save, X, BrainCircuit, Trash2, PlusCircle, Award, Calendar, ExternalLink, Lock, Sparkles, PartyPopper, Check } from 'lucide-react';
+import { User, Briefcase, Clock, FileText, Edit2, Save, X, BrainCircuit, Trash2, PlusCircle, Award, Calendar, ExternalLink, Lock, Sparkles, PartyPopper, Check, Crown } from 'lucide-react';
 import './Register.css'; // Reusing established styles
 
 export default function MiPerfil() {
     const { user } = useAuth();
     const navigate = useNavigate();
     const showAlert = useAlert();
-    
+
     const [loading, setLoading] = useState(true);
     const [candidato, setCandidato] = useState(null);
     const [skills, setSkills] = useState([]);
     const [insignias, setInsignias] = useState([]);
     const [postulaciones, setPostulaciones] = useState([]);
     const [quizIntentos, setQuizIntentos] = useState([]);
-    
+
     const getSkillCooldown = (skillName) => {
         if (!quizIntentos || quizIntentos.length === 0) return null;
         const skillAttempts = quizIntentos.filter(i => i.skill_nombre && i.skill_nombre.toLowerCase() === skillName.toLowerCase());
         if (skillAttempts.length === 0) return null;
-        
+
         // Get the latest attempt
         const latestAttempt = skillAttempts[0];
         const msSinceAttempt = Date.now() - new Date(latestAttempt.fecha_intento).getTime();
         const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
-        
+
         if (msSinceAttempt < COOLDOWN_MS) {
             const remainingHours = Math.ceil((COOLDOWN_MS - msSinceAttempt) / (1000 * 60 * 60));
             return remainingHours;
         }
         return null;
     };
-    
+
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({
         nombre_completo: '',
         titulo_profesional: '',
         anios_experiencia: 0,
-        sobre_mi: ''
+        sobre_mi: '',
+        disponible_busqueda: false
     });
-    
+
     const [guardando, setGuardando] = useState(false);
     const [generatingBio, setGeneratingBio] = useState(false);
     const [error, setError] = useState(null);
@@ -50,7 +51,6 @@ export default function MiPerfil() {
     const [fotoFile, setFotoFile] = useState(null);
     const [fotoPreview, setFotoPreview] = useState(null);
 
-    // Agregar skill manualmente
     const [newSkillInput, setNewSkillInput] = useState('');
     const [newSkillNivel, setNewSkillNivel] = useState(3);
     const [addingSkill, setAddingSkill] = useState(false);
@@ -73,7 +73,7 @@ export default function MiPerfil() {
             navigate('/login');
             return;
         }
-        
+
         const fetchPerfil = async () => {
             try {
                 // Fetch basic info
@@ -82,18 +82,19 @@ export default function MiPerfil() {
                     .select('*')
                     .eq('auth_id', user.id)
                     .maybeSingle();
-                
+
                 if (candError) throw candError;
-                
+
                 if (candData) {
                     setCandidato(candData);
                     setFormData({
                         nombre_completo: candData.nombre_completo || '',
                         titulo_profesional: candData.titulo_profesional || '',
                         anios_experiencia: candData.anios_experiencia || 0,
-                        sobre_mi: candData.sobre_mi || ''
+                        sobre_mi: candData.sobre_mi || '',
+                        disponible_busqueda: candData.disponible_busqueda || false
                     });
-                    
+
                     // Fetch skills
                     // Try to fetch from candidato_skills with inner join on diccionario_skills
                     const { data: skillsData, error: skillsError } = await supabase
@@ -105,7 +106,7 @@ export default function MiPerfil() {
                             diccionario_skills ( concept_uri, nombre_skill )
                         `)
                         .eq('candidato_id', candData.id);
-                        
+
                     if (!skillsError && skillsData) {
                         setSkills(skillsData);
                     } else {
@@ -128,7 +129,10 @@ export default function MiPerfil() {
                         .select('insignias(nombre)')
                         .eq('candidato_id', candData.id);
                     if (insigniasData) {
-                        setInsignias(insigniasData.map(i => i.insignias.nombre));
+                        const validInsignias = insigniasData
+                            .map(i => i.insignias?.nombre)
+                            .filter(Boolean);
+                        setInsignias(validInsignias);
                     }
 
                     // Fetch applications (postulaciones) with ATS stages in real time
@@ -162,7 +166,7 @@ export default function MiPerfil() {
                         .select('skill_nombre, fecha_intento, finalizado, aprobado')
                         .eq('candidato_id', candData.id)
                         .order('fecha_intento', { ascending: false });
-                    
+
                     if (intentosData) {
                         setQuizIntentos(intentosData);
                     }
@@ -186,9 +190,9 @@ export default function MiPerfil() {
                 .delete()
                 .eq('candidato_id', candidato.id)
                 .eq('skill_id', skillId);
-            
+
             if (error) throw error;
-            
+
             setSkills(skills.filter(s => s.skill_id !== skillId));
             setSuccessMessage("Habilidad eliminada correctamente");
             setTimeout(() => setSuccessMessage(''), 3000);
@@ -244,9 +248,9 @@ export default function MiPerfil() {
                 }], { onConflict: 'candidato_id, skill_id' })
                 .select()
                 .single();
-                
+
             if (error) throw error;
-            
+
             // Reemplazar o agregar la skill en el estado local de React
             const updatedSkills = skills.filter(s => s.skill_id !== skillId);
             setSkills([...updatedSkills, data]);
@@ -264,12 +268,12 @@ export default function MiPerfil() {
     const handleDeleteAccount = async () => {
         const confirmar = window.confirm("¿Estás seguro/a de que quieres borrar tu perfil permanentemente? Perderás todos tus datos, postulaciones y habilidades al instante. Esta acción NO se puede deshacer.");
         if (!confirmar) return;
-        
+
         try {
             setGuardando(true);
             const { error } = await supabase.rpc('delete_user_account');
             if (error) throw error;
-            
+
             await supabase.auth.signOut();
             window.location.href = '/';
         } catch (err) {
@@ -299,7 +303,7 @@ export default function MiPerfil() {
 
             const skillsText = skills.map(s => s.nombre_original || s.diccionario_skills?.nombre_skill || '').filter(Boolean).join(', ');
 
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/generate-bio`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/generate-bio`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -334,7 +338,7 @@ export default function MiPerfil() {
         setGuardando(true);
         setError(null);
         setSuccessMessage('');
-        
+
         try {
             let finalFotoUrl = candidato?.foto_url;
 
@@ -345,15 +349,15 @@ export default function MiPerfil() {
                 formData.append('role', 'candidato');
 
                 const { data: { session } } = await supabase.auth.getSession();
-                
-                const upRes = await fetch(`${import.meta.env.VITE_BACKEND_URL || "http://localhost:3000"}/api/upload-image`, {
+
+                const upRes = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/upload-image`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${session.access_token}` },
                     body: formData
                 });
-                
+
                 if (!upRes.ok) {
-                    const err = await upRes.json().catch(()=>({}));
+                    const err = await upRes.json().catch(() => ({}));
                     throw new Error(err.error || "Error al subir foto de perfil");
                 }
                 const upData = await upRes.json();
@@ -367,12 +371,13 @@ export default function MiPerfil() {
                     titulo_profesional: formData.titulo_profesional,
                     anios_experiencia: formData.anios_experiencia,
                     sobre_mi: formData.sobre_mi,
-                    foto_url: finalFotoUrl
+                    foto_url: finalFotoUrl,
+                    disponible_busqueda: formData.disponible_busqueda
                 })
                 .eq('auth_id', user.id);
-                
+
             if (updateError) throw updateError;
-            
+
             setCandidato({
                 ...candidato,
                 ...formData,
@@ -386,6 +391,27 @@ export default function MiPerfil() {
             setError(err.message || "Error al guardar los cambios.");
         } finally {
             setGuardando(false);
+        }
+    };
+
+    const handleToggleBusqueda = async () => {
+        if (!candidato) return;
+        const nuevoValor = !candidato.disponible_busqueda;
+        // Optimistic update
+        setCandidato(prev => ({ ...prev, disponible_busqueda: nuevoValor }));
+        setFormData(prev => ({ ...prev, disponible_busqueda: nuevoValor }));
+        try {
+            const { error: updateError } = await supabase
+                .from('candidatos')
+                .update({ disponible_busqueda: nuevoValor })
+                .eq('auth_id', user.id);
+            if (updateError) throw updateError;
+        } catch (err) {
+            // Revert on error
+            setCandidato(prev => ({ ...prev, disponible_busqueda: !nuevoValor }));
+            setFormData(prev => ({ ...prev, disponible_busqueda: !nuevoValor }));
+            console.error('Error al cambiar visibilidad:', err);
+            showAlert('No se pudo actualizar tu visibilidad. Intentá de nuevo.', 'Error', 'error');
         }
     };
 
@@ -405,13 +431,13 @@ export default function MiPerfil() {
 
             <div className="bg-shape shape-1"></div>
             <div className="bg-shape shape-2"></div>
-            
-            <div className="profile-card-container" style={{ 
-                position: 'relative', 
-                width: '100%', 
-                maxWidth: '1000px', 
-                backgroundColor: 'var(--bg-white)', 
-                borderRadius: '24px', 
+
+            <div className="profile-card-container" style={{
+                position: 'relative',
+                width: '100%',
+                maxWidth: '1000px',
+                backgroundColor: 'var(--bg-white)',
+                borderRadius: '24px',
                 boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
                 padding: '4rem',
                 border: '1px solid rgba(0,214,107,0.1)',
@@ -423,7 +449,7 @@ export default function MiPerfil() {
                     <h2 className="brand-title" style={{ fontSize: '2.5rem', margin: 0 }}>Mi Perfil</h2>
                     {candidato && (
                         !editMode ? (
-                            <button 
+                            <button
                                 onClick={() => setEditMode(true)}
                                 className="submit-btn"
                                 style={{ padding: '10px 20px', width: 'auto', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem', boxShadow: 'none' }}
@@ -432,13 +458,13 @@ export default function MiPerfil() {
                             </button>
                         ) : (
                             <div style={{ display: 'flex', gap: '10px' }}>
-                                <button 
+                                <button
                                     onClick={() => setEditMode(false)}
                                     style={{ padding: '10px 20px', background: 'transparent', border: '1px solid var(--text-gray)', color: 'var(--text-gray)', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.1rem' }}
                                 >
                                     <X size={18} /> Cancelar
                                 </button>
-                                <button 
+                                <button
                                     onClick={handleSave}
                                     disabled={guardando}
                                     className="submit-btn"
@@ -456,7 +482,7 @@ export default function MiPerfil() {
                         {successMessage}
                     </div>
                 )}
-                
+
                 {error && (
                     <div className="message error" style={{ borderRadius: '12px', marginBottom: '2rem' }}>
                         {error}
@@ -467,7 +493,7 @@ export default function MiPerfil() {
                     <div style={{ textAlign: 'center', padding: '3rem' }}>
                         <h3 style={{ color: 'var(--text-dark)', marginBottom: '1rem' }}>¡Aún no has completado tu perfil mágico!</h3>
                         <p style={{ color: 'var(--text-gray)', marginBottom: '2rem', fontSize: '1.1rem' }}>Sube tu CV para que nuestra IA extraiga todos tus datos y te conecte con las mejores empresas.</p>
-                        <button 
+                        <button
                             onClick={() => navigate('/perfil')}
                             className="submit-btn"
                             style={{ display: 'inline-flex', width: 'auto', padding: '15px 30px', fontSize: '1.2rem', boxShadow: '0 8px 25px rgba(0,214,107,0.25)' }}
@@ -477,7 +503,7 @@ export default function MiPerfil() {
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
-                        
+
                         <div style={{ background: 'rgba(255, 193, 7, 0.1)', color: '#b28900', padding: '15px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', border: '1px solid rgba(255, 193, 7, 0.3)' }}>
                             <BrainCircuit size={20} />
                             <strong>Aviso Importante:</strong> Tu perfil fue completado y estructurado con asistencia de Inteligencia Artificial. Por favor, verifica tus datos regularmente para evitar errores técnicos de interpretación o inferencia.
@@ -491,9 +517,9 @@ export default function MiPerfil() {
                                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', margin: 0, fontSize: '1.3rem' }}>
                                         <User size={24} /> Datos Personales
                                     </h3>
-                                    
+
                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                        <div style={{ 
+                                        <div style={{
                                             width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden', background: '#f0f0f0', border: '3px solid var(--primary)', display: 'flex', justifyContent: 'center', alignItems: 'center'
                                         }}>
                                             {fotoPreview ? (
@@ -514,15 +540,15 @@ export default function MiPerfil() {
                                         )}
                                     </div>
                                 </div>
-                                
+
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                                     <div>
                                         <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.9rem', marginBottom: '0.3rem' }}>Nombre Completo</label>
                                         {editMode ? (
-                                            <input 
+                                            <input
                                                 type="text" maxLength={200}
-                                                name="nombre_completo" 
-                                                value={formData.nombre_completo} 
+                                                name="nombre_completo"
+                                                value={formData.nombre_completo}
                                                 onChange={handleInputChange}
                                                 style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }}
                                             />
@@ -530,14 +556,14 @@ export default function MiPerfil() {
                                             <div style={{ fontWeight: '600', color: 'var(--text-dark)', fontSize: '1.1rem' }}>{candidato.nombre_completo || 'No especificado'}</div>
                                         )}
                                     </div>
-                                    
+
                                     <div>
                                         <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.9rem', marginBottom: '0.3rem' }}>Profesión</label>
                                         {editMode ? (
-                                            <input 
+                                            <input
                                                 type="text" maxLength={200}
-                                                name="titulo_profesional" 
-                                                value={formData.titulo_profesional} 
+                                                name="titulo_profesional"
+                                                value={formData.titulo_profesional}
                                                 onChange={handleInputChange}
                                                 style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }}
                                             />
@@ -547,6 +573,54 @@ export default function MiPerfil() {
                                             </div>
                                         )}
                                     </div>
+
+                                    <div>
+                                        <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.9rem', marginBottom: '0.6rem' }}>Búsqueda de Talento (Opt-in)</label>
+                                        <button
+                                            onClick={handleToggleBusqueda}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '12px',
+                                                background: 'none', border: 'none', cursor: 'pointer',
+                                                padding: 0
+                                            }}
+                                            title={candidato.disponible_busqueda ? 'Haz clic para desactivar la visibilidad' : 'Haz clic para activar la visibilidad'}
+                                        >
+                                            {/* Toggle track */}
+                                            <span style={{
+                                                position: 'relative',
+                                                display: 'inline-flex',
+                                                width: '46px', height: '26px',
+                                                borderRadius: '13px',
+                                                background: candidato.disponible_busqueda ? 'var(--primary)' : '#cbd5e1',
+                                                transition: 'background 0.2s',
+                                                flexShrink: 0
+                                            }}>
+                                                <span style={{
+                                                    position: 'absolute',
+                                                    top: '3px',
+                                                    left: candidato.disponible_busqueda ? '23px' : '3px',
+                                                    width: '20px', height: '20px',
+                                                    borderRadius: '50%',
+                                                    background: 'white',
+                                                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                                                    transition: 'left 0.2s'
+                                                }} />
+                                            </span>
+                                            <span style={{
+                                                fontWeight: '600',
+                                                color: candidato.disponible_busqueda ? 'var(--primary)' : '#94a3b8',
+                                                fontSize: '0.95rem',
+                                                transition: 'color 0.2s'
+                                            }}>
+                                                {candidato.disponible_busqueda
+                                                    ? 'Visible para empresas'
+                                                    : 'No visible en búsquedas'}
+                                            </span>
+                                        </button>
+                                        <p style={{ margin: '6px 0 0', color: '#94a3b8', fontSize: '0.8rem' }}>
+                                            Permití que empresas premium te encuentren en búsquedas avanzadas.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -555,15 +629,15 @@ export default function MiPerfil() {
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', marginBottom: '1.5rem', fontSize: '1.3rem' }}>
                                     <Clock size={24} /> Experiencia y CV
                                 </h3>
-                                
+
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
                                     <div>
                                         <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.9rem', marginBottom: '0.3rem' }}>Años de Experiencia</label>
                                         {editMode ? (
-                                            <input 
-                                                type="number" 
-                                                name="anios_experiencia" 
-                                                value={formData.anios_experiencia} 
+                                            <input
+                                                type="number"
+                                                name="anios_experiencia"
+                                                value={formData.anios_experiencia}
                                                 onChange={handleInputChange}
                                                 style={{ width: '100%', padding: '12px', borderRadius: '10px', border: '1px solid rgba(0,214,107,0.3)', fontSize: '1rem', outline: 'none', boxSizing: 'border-box' }}
                                             />
@@ -571,11 +645,11 @@ export default function MiPerfil() {
                                             <div style={{ fontWeight: '600', color: 'var(--text-dark)', fontSize: '1.1rem' }}>{candidato.anios_experiencia} años</div>
                                         )}
                                     </div>
-                                    
+
                                     <div>
                                         <label style={{ display: 'block', color: 'var(--text-gray)', fontSize: '0.9rem', marginBottom: '0.3rem' }}>Currículum Vitae</label>
                                         {candidato.cv_url ? (
-                                            <div 
+                                            <div
                                                 onClick={async () => {
                                                     try {
                                                         const { data, error } = await supabase.storage.from('cv_files').download(candidato.cv_url);
@@ -627,7 +701,7 @@ export default function MiPerfil() {
                                 </h3>
                                 {editMode && (
                                     candidato?.es_premium ? (
-                                        <button 
+                                        <button
                                             type="button"
                                             onClick={handleGenerateBio}
                                             disabled={generatingBio}
@@ -656,7 +730,7 @@ export default function MiPerfil() {
                                             )}
                                         </button>
                                     ) : (
-                                        <Link 
+                                        <Link
                                             to="/pricing"
                                             style={{
                                                 background: '#f1f5f9',
@@ -677,11 +751,11 @@ export default function MiPerfil() {
                                     )
                                 )}
                             </div>
-                            
+
                             {editMode ? (
-                                <textarea 
+                                <textarea
                                     name="sobre_mi" maxLength={3000}
-                                    value={formData.sobre_mi} 
+                                    value={formData.sobre_mi}
                                     onChange={handleInputChange}
                                     placeholder="Cuenta un poco más sobre ti, tu historia y lo que buscas..."
                                     style={{ width: '100%', padding: '1.5rem', borderRadius: '15px', border: '1px solid rgba(0,214,107,0.3)', resize: 'vertical', fontFamily: 'inherit', fontSize: '1.05rem', boxSizing: 'border-box', minHeight: '120px', outline: 'none' }}
@@ -703,14 +777,14 @@ export default function MiPerfil() {
                                     Extraídas o Agregadas Manualmente
                                 </span>
                             </div>
-                            
+
 
                             {skills.length > 0 ? (
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: editMode ? '1.5rem' : 0 }}>
                                     {skills.map((skillItem, index) => {
-                                        const skillName = skillItem.nombre_original 
-                                                         || skillItem.diccionario_skills?.nombre_skill 
-                                                         || 'Habilidad Desconocida';
+                                        const skillName = skillItem.nombre_original
+                                            || skillItem.diccionario_skills?.nombre_skill
+                                            || 'Habilidad Desconocida';
                                         return (
                                             <span key={index} style={{
                                                 backgroundColor: 'white',
@@ -727,30 +801,34 @@ export default function MiPerfil() {
                                                 transition: 'transform 0.2s',
                                                 cursor: 'default'
                                             }}
-                                            onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                                            onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+                                                onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                                onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
                                             >
                                                 {skillName}
                                                 <span style={{
-                                                    backgroundColor: 'var(--primary)', 
-                                                    color: 'white', 
-                                                    padding: '4px 10px', 
-                                                    borderRadius: '12px', 
+                                                    backgroundColor: 'var(--primary)',
+                                                    color: 'white',
+                                                    padding: '4px 10px',
+                                                    borderRadius: '12px',
                                                     fontSize: '0.85rem',
                                                     fontWeight: 'bold'
                                                 }}>
                                                     Lvl {skillItem.nivel_estimado}
                                                 </span>
-                                                {insignias.includes(skillName) ? (
+                                                {insignias.some(ins => 
+                                                    ins.toLowerCase() === skillName.toLowerCase() ||
+                                                    ins.toLowerCase() === (skillItem.nombre_original || '').toLowerCase() ||
+                                                    ins.toLowerCase() === (skillItem.diccionario_skills?.nombre_skill || '').toLowerCase()
+                                                ) ? (
                                                     <Award size={18} color="#FFD700" title="Habilidad Validada" style={{ filter: 'drop-shadow(0 0 2px rgba(255, 215, 0, 0.5))' }} />
                                                 ) : (
                                                     !editMode && (() => {
                                                         const cooldownHours = getSkillCooldown(skillName);
                                                         if (cooldownHours !== null) {
                                                             return (
-                                                                <span style={{ 
-                                                                    fontSize: '0.85rem', 
-                                                                    color: '#d32f2f', 
+                                                                <span style={{
+                                                                    fontSize: '0.85rem',
+                                                                    color: '#d32f2f',
                                                                     marginLeft: '4px',
                                                                     fontWeight: 'bold',
                                                                     cursor: 'not-allowed',
@@ -766,7 +844,7 @@ export default function MiPerfil() {
                                                     })()
                                                 )}
                                                 {editMode && (
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleDeleteSkill(skillItem.skill_id)}
                                                         title="Eliminar habilidad"
                                                         style={{ background: 'rgba(255,0,0,0.08)', color: '#d32f2f', border: 'none', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}
@@ -841,10 +919,10 @@ export default function MiPerfil() {
                                         const oferta = post.ofertas;
                                         const empresa = oferta?.empresas;
                                         const normalized = post.estado?.toLowerCase() || 'postulado';
-                                        
+
                                         const isEnRevisionOrHigher = ['en_revision', 'en revisión', 'en revision', 'entrevista', 'seleccionado', 'contratado'].includes(normalized);
                                         const isEntrevistaOrHigher = ['entrevista', 'seleccionado', 'contratado'].includes(normalized);
-                                        
+
                                         return (
                                             <div key={post.id} style={{
                                                 background: 'rgba(0,214,107,0.01)',
@@ -869,7 +947,7 @@ export default function MiPerfil() {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    
+
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
                                                         {(() => {
                                                             if (normalized === 'en_revision' || normalized === 'en revisión' || normalized === 'en revision') return <span style={{ padding: '4px 12px', background: '#fef3c7', color: '#b45309', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold' }}>CV Visto / En Revisión</span>;
@@ -906,7 +984,7 @@ export default function MiPerfil() {
                                                         zIndex: 0,
                                                         transition: 'width 0.4s ease'
                                                     }}></div>
-                                                    
+
                                                     {/* Step 1: Postulado */}
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, flex: 1 }}>
                                                         <div style={{
@@ -985,7 +1063,7 @@ export default function MiPerfil() {
                             <p style={{ color: '#5f2120', fontSize: '1.05rem', marginBottom: '1.5rem', lineHeight: '1.6' }}>
                                 Tienes derecho a eliminar permanentemente tus datos de nuestros sistemas en cualquier momento. Al hacer click en el botón inferior perderás inmediatamente tu cuenta, y todo el progreso y postulaciones que hayas conseguido.
                             </p>
-                            <button 
+                            <button
                                 onClick={handleDeleteAccount}
                                 disabled={guardando}
                                 style={{ background: '#d32f2f', color: 'white', border: 'none', padding: '15px 25px', borderRadius: '12px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 15px rgba(211,47,47,0.3)', display: 'flex', alignItems: 'center', gap: '8px' }}

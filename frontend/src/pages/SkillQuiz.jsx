@@ -54,7 +54,7 @@ export default function SkillQuiz() {
                 
                 if (!isMounted) return;
 
-                const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+                const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
                 
                 const res = await fetch(`${backendUrl}/api/generate-quiz`, {
                     method: 'POST',
@@ -151,7 +151,7 @@ export default function SkillQuiz() {
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+            const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
             
             // Reemplazar nulls con -1 para que cuente como incorrecta si no respondió
             const respuestasLimpias = respuestasParaEnviar.map(r => r === null ? -1 : r);

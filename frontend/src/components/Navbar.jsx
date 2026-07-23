@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { LogOut, Menu, User, Briefcase, PlusCircle, Search, Home, Sparkles } from 'lucide-react';
+import { LogOut, Menu, User, Briefcase, PlusCircle, Search, Home, Sparkles, MessageSquare } from 'lucide-react';
 import NotificationBell from './NotificationBell';
+import ChatBadge from './ChatBadge';
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -60,13 +61,15 @@ const Navbar = () => {
             } else if (rol === 'empresa') {
                 const { data } = await supabase
                     .from('empresa_miembros')
-                    .select('empresas (nombre, logo_url)')
+                    .select('empresas (nombre, logo_url, plan, premium_hasta)')
                     .eq('auth_id', user.id)
                     .maybeSingle();
  
                 if (data && data.empresas) {
                     setUserName(data.empresas.nombre.split(' ')[0]);
                     setUserAvatar(data.empresas.logo_url);
+                    const hasPremium = data.empresas.plan === 'premium' && data.empresas.premium_hasta && new Date(data.empresas.premium_hasta) > new Date();
+                    setIsPremium(hasPremium);
                 } else {
                     const emailName = user.email.split('@')[0];
                     setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
@@ -209,6 +212,9 @@ const Navbar = () => {
                             {user.user_metadata?.rol !== 'empresa' && user.user_metadata?.rol !== 'admin' && (
                                 <NotificationBell />
                             )}
+                            {user.user_metadata?.rol !== 'admin' && (
+                                <ChatBadge />
+                            )}
                             <div style={{ position: 'relative' }}>
                             <div 
                                 onClick={() => setMenuOpen(!menuOpen)} 
@@ -291,6 +297,22 @@ const Navbar = () => {
                                             >
                                                 <PlusCircle size={18} color="var(--primary)"/> Crear Oferta
                                             </div>
+                                            <div 
+                                                onClick={() => { navigate('/mis-chats'); setMenuOpen(false); }}
+                                                style={dropdownItemStyle}
+                                                onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <MessageSquare size={18} color="var(--primary)"/> Mis Chats
+                                            </div>
+                                            <div 
+                                                onClick={() => { navigate('/pricing-empresa'); setMenuOpen(false); }}
+                                                style={dropdownItemStyle}
+                                                onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <Sparkles size={18} color="var(--primary)"/> {isPremium ? 'Mi Suscripción' : 'Hazte Premium'}
+                                            </div>
                                         </>
                                     ) : (
                                         <>
@@ -309,6 +331,14 @@ const Navbar = () => {
                                                 onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                                             >
                                                 <Briefcase size={18} color="var(--primary)"/> Mis Postulaciones
+                                            </div>
+                                            <div 
+                                                onClick={() => { navigate('/mis-chats'); setMenuOpen(false); }}
+                                                style={dropdownItemStyle}
+                                                onMouseOver={e => e.currentTarget.style.background = '#f5f5f5'}
+                                                onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                                            >
+                                                <MessageSquare size={18} color="var(--primary)"/> Mis Chats
                                             </div>
                                             <div 
                                                 onClick={() => { navigate('/ofertas'); setMenuOpen(false); }}

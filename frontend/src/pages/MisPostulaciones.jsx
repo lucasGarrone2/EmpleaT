@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
-import { Briefcase, Calendar, ExternalLink, Search, Filter, ArrowUpDown, ChevronRight, Check, X, Award, PartyPopper } from 'lucide-react';
+import { Briefcase, Calendar, ExternalLink, Search, Filter, ArrowUpDown, ChevronRight, Check, X, Award, PartyPopper, MessageSquare } from 'lucide-react';
+import ChatPostulacion from '../components/ChatPostulacion';
 import './Register.css'; // Reusing established styling tokens
 
 export default function MisPostulaciones() {
@@ -17,6 +18,11 @@ export default function MisPostulaciones() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('todos');
     const [sortBy, setSortBy] = useState('newest'); // newest, oldest
+
+    // Chat: guardar qué postulación tiene el chat abierto
+    const [chatAbiertoId, setChatAbiertoId] = useState(null);
+    const [candidatoId, setCandidatoId] = useState(null); // auth_id del candidato
+    const [miAuthId, setMiAuthId] = useState(null);
     
     // Estadísticas
     const [stats, setStats] = useState({
@@ -34,6 +40,9 @@ export default function MisPostulaciones() {
 
         const fetchPostulaciones = async () => {
             try {
+                // Guardar auth_id propio para pasarlo al chat
+                setMiAuthId(user.id);
+
                 // 1. Obtener ID del candidato logueado
                 const { data: candData, error: candError } = await supabase
                     .from('candidatos')
@@ -398,6 +407,36 @@ export default function MisPostulaciones() {
                                             <p style={{ margin: 0, fontSize: '0.92rem', color: '#b91c1c', fontWeight: '500' }}>
                                                 Motivo de descarte: <span style={{ fontWeight: 'normal', color: '#7f1d1d' }}>{post.motivos_rechazo.descripcion}</span>
                                             </p>
+                                        </div>
+                                    )}
+
+                                    {/* Botón para abrir el chat (solo si hay conversación iniciada por la empresa) */}
+                                    <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+                                        <button
+                                            onClick={() => setChatAbiertoId(chatAbiertoId === post.id ? null : post.id)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '6px',
+                                                background: chatAbiertoId === post.id ? 'rgba(0,214,107,0.1)' : 'rgba(0,0,0,0.04)',
+                                                border: chatAbiertoId === post.id ? '1px solid rgba(0,214,107,0.3)' : '1px solid rgba(0,0,0,0.1)',
+                                                borderRadius: '10px', padding: '8px 14px',
+                                                fontSize: '0.85rem', fontWeight: '600',
+                                                color: chatAbiertoId === post.id ? 'var(--primary)' : 'var(--text-gray)',
+                                                cursor: 'pointer', transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <MessageSquare size={15} />
+                                            {chatAbiertoId === post.id ? 'Cerrar chat' : 'Ver chat'}
+                                        </button>
+                                    </div>
+
+                                    {/* Chat expandible */}
+                                    {chatAbiertoId === post.id && (
+                                        <div style={{ marginTop: '1rem' }}>
+                                            <ChatPostulacion
+                                                postulacionId={post.id}
+                                                miTipo="candidato"
+                                                nombreOtro={oferta?.empresas?.razon_social || 'el reclutador'}
+                                            />
                                         </div>
                                     )}
                                 </div>
