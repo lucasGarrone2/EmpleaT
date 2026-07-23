@@ -671,7 +671,7 @@ export default function Pricing() {
                             ¿Confirmas ejercer el arrepentimiento?
                         </h3>
                         <p style={{ color: '#4B5563', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '2rem' }}>
-                            Esta acción cancelará tu membresía Premium de forma inmediata y solicitará el reembolso automático de tu dinero en Mercado Pago. **Esta acción es irreversible.**
+                            Esta acción cancelará tu membresía Premium y solicitará el reembolso de tu dinero en Mercado Pago. **Si pagaste con tarjeta de débito o crédito, el reintegro puede tardar unos días hábiles en verse reflejado en tu cuenta según los plazos de tu banco.** Esta acción es irreversible.
                         </p>
                         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
                             <button
