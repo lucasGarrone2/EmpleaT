@@ -228,7 +228,21 @@ ${safeCVText}
     console.log(`[Job ${jobId}] Respuesta de Gemini recibida.`);
 
     const cleanJson = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const finalData = JSON.parse(cleanJson);
+    const parsedData = JSON.parse(cleanJson);
+
+    // Sanitizar y validar tipos/rangos para evitar corrupción de datos
+    const validatedData = {
+        nombre: String(parsedData.nombre || '').trim().substring(0, 200),
+        profesion: String(parsedData.profesion || '').trim().substring(0, 200),
+        sobre_mi: String(parsedData.sobre_mi || '').trim().substring(0, 3000),
+        experiencia_anios: Math.max(0, Math.min(60, parseInt(parsedData.experiencia_anios) || 0)),
+        skills: Array.isArray(parsedData.skills)
+            ? parsedData.skills.slice(0, 50).map(s => ({
+                nombre: String(s.nombre || '').trim().substring(0, 100),
+                nivel: Math.max(1, Math.min(5, parseInt(s.nivel) || 3))
+            }))
+            : []
+    };
 
     // 2. Mover el archivo de la cuarentena a la carpeta aprobada
     const approvedPath = `approved/${authId}/cv_${Date.now()}_${safeOriginalName}`;
@@ -250,7 +264,7 @@ ${safeCVText}
       .from('cv_processing_jobs')
       .update({
         status: 'completado',
-        resultado: finalData,
+        resultado: validatedData,
         cv_url: approvedPath
       })
       .eq('id', jobId);
@@ -416,6 +430,12 @@ const bioLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 15, // 15 biografías por hora
   message: { error: "Límite de generación de biografías alcanzado (15/hora)." }
+});
+
+const mensajesPollingLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120, // 120 peticiones por minuto
+  message: { error: "Límite de solicitudes de mensajes alcanzado (120/min)." }
 });
 
 const uploadImageStorage = multer({ 
@@ -622,12 +642,15 @@ app.post('/api/generate-quiz', quizLimiter, async (req, res) => {
     const { skill, candidato_id } = req.body;
     if (!skill || !candidato_id) return res.status(400).json({ error: "Faltan datos (skill, candidato_id)." });
 
-    // Sanitizar entrada de skill para mitigar prompt injections
+    // Sanitizar entrada de skill para mitigar prompt injections y normalizar Unicode (diacríticos)
     const cleanSkill = String(skill || '')
+        .normalize('NFD') // Descomponer caracteres
+        .replace(/[\u0300-\u036f]/g, '') // Eliminar diacríticos (acentos/diéresis)
         .replace(/[\r\n]/g, ' ')
         .replace(/[\\'"<>]/g, '')
         .trim()
-        .substring(0, 50);
+        .substring(0, 50)
+        .toLowerCase(); // Convertir a minúsculas para coincidencia exacta
 
     if (cleanSkill.length < 2) {
         return res.status(400).json({ error: "Nombre de habilidad inválido o demasiado corto." });
@@ -2426,7 +2449,7 @@ app.post('/api/postulaciones/:id/mensaje-candidato', accionLimiter, async (req, 
 // Polling: obtener mensajes de una postulación (candidato o empresa)
 // ?since=<iso_timestamp> para polling incremental
 // -------------------------------------------------------------
-app.get('/api/postulaciones/:id/mensajes', async (req, res) => {
+app.get('/api/postulaciones/:id/mensajes', mensajesPollingLimiter, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ error: 'No autorizado.' });
@@ -2438,6 +2461,12 @@ app.get('/api/postulaciones/:id/mensajes', async (req, res) => {
 
     const { id: postulacionId } = req.params;
     const { since } = req.query;
+
+    // Validar formato UUID para evitar errores sintácticos de Postgres
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(postulacionId)) {
+        return res.status(400).json({ error: 'Formato de ID de postulación inválido.' });
+    }
 
     // Determinar si el usuario es candidato o empresa de esta postulación
     const { data: postulacion, error: postErr } = await supabaseAdmin
@@ -3585,6 +3614,74 @@ app.post('/api/empresa/confirm-payment', paymentLimiter, async (req, res) => {
         console.error("Error en /api/empresa/confirm-payment:", error);
         res.status(500).json({ error: "Error confirmando el pago." });
     }
+});
+
+// -------------------------------------------------------------
+// DELETE /api/account/delete
+// GDPR: Eliminar cuenta de usuario y borrar todos sus archivos en Storage
+// -------------------------------------------------------------
+app.delete('/api/account/delete', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No autorizado. Se requiere token JWT.' });
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Token malformado.' });
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Token inválido o expirado.' });
+
+    const authId = user.id;
+    console.log(`[GDPR] Iniciando proceso de eliminación de cuenta para usuario: ${authId}`);
+
+    // 1. Eliminar archivos en cv_files (la carpeta del usuario)
+    try {
+      const { data: cvFiles, error: cvErr } = await supabaseAdmin.storage.from('cv_files').list(authId);
+      if (!cvErr && cvFiles && cvFiles.length > 0) {
+        const filesToDelete = cvFiles.map(f => `${authId}/${f.name}`);
+        const { error: delErr } = await supabaseAdmin.storage.from('cv_files').remove(filesToDelete);
+        if (delErr) {
+          console.error(`[GDPR] Error eliminando archivos cv_files para ${authId}:`, delErr.message);
+        } else {
+          console.log(`[GDPR] Eliminados ${filesToDelete.length} archivos de cv_files para ${authId}`);
+        }
+      }
+    } catch (errcv) {
+      console.error(`[GDPR] Excepción al procesar cv_files para ${authId}:`, errcv.message);
+    }
+
+    // 2. Eliminar archivos en profile_pics (la carpeta del usuario)
+    try {
+      const { data: picFiles, error: picErr } = await supabaseAdmin.storage.from('profile_pics').list(authId);
+      if (!picErr && picFiles && picFiles.length > 0) {
+        const filesToDelete = picFiles.map(f => `${authId}/${f.name}`);
+        const { error: delErr } = await supabaseAdmin.storage.from('profile_pics').remove(filesToDelete);
+        if (delErr) {
+          console.error(`[GDPR] Error eliminando archivos profile_pics para ${authId}:`, delErr.message);
+        } else {
+          console.log(`[GDPR] Eliminados ${filesToDelete.length} archivos de profile_pics para ${authId}`);
+        }
+      }
+    } catch (errpic) {
+      console.error(`[GDPR] Excepción al procesar profile_pics para ${authId}:`, errpic.message);
+    }
+
+    // 3. Ejecutar la RPC para borrar la cuenta de auth.users en cascada
+    const { error: rpcError } = await supabaseAdmin.rpc('delete_user_account_by_admin', {
+      p_auth_id: authId
+    });
+
+    if (rpcError) {
+      console.error(`[GDPR] Error al ejecutar delete_user_account_by_admin para ${authId}:`, rpcError);
+      return res.status(500).json({ error: 'Error al eliminar la cuenta de la base de datos.' });
+    }
+
+    console.log(`[GDPR] Cuenta del usuario ${authId} eliminada correctamente de forma física y lógica.`);
+    return res.json({ success: true, message: 'Cuenta eliminada correctamente.' });
+
+  } catch (err) {
+    console.error('[GDPR] Error inesperado en delete account:', err.message);
+    return res.status(500).json({ error: 'Error interno del servidor.' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;

@@ -265,20 +265,36 @@ export default function MiPerfil() {
         }
     };
 
-    const handleDeleteAccount = async () => {
-        const confirmar = window.confirm("¿Estás seguro/a de que quieres borrar tu perfil permanentemente? Perderás todos tus datos, postulaciones y habilidades al instante. Esta acción NO se puede deshacer.");
-        if (!confirmar) return;
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+    const handleDeleteAccount = () => {
+        setShowDeleteModal(true);
+    };
+
+    const ejecutarEliminacionCuenta = async () => {
+        setShowDeleteModal(false);
         try {
             setGuardando(true);
-            const { error } = await supabase.rpc('delete_user_account');
-            if (error) throw error;
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("No hay sesión activa");
+
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/account/delete`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`
+                }
+            });
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || "No se pudo borrar la cuenta.");
+            }
 
             await supabase.auth.signOut();
             window.location.href = '/';
         } catch (err) {
             console.error("Error borrando cuenta", err);
-            setError("No se pudo borrar la cuenta. Asegúrate de haber ejecutado el script SQL en Supabase.");
+            setError(err.message || "No se pudo borrar la cuenta.");
             setGuardando(false);
         }
     };
@@ -1074,6 +1090,91 @@ export default function MiPerfil() {
                     </div>
                 )}
             </div>
+
+            {/* Modal de Confirmación de Eliminación de Cuenta */}
+            {showDeleteModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                    animation: 'fadeIn 0.2s ease-out'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '24px',
+                        padding: '2.5rem',
+                        maxWidth: '500px',
+                        width: '90%',
+                        boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+                        border: '1px solid rgba(0,0,0,0.08)',
+                        textAlign: 'center',
+                        animation: 'scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                    }}>
+                        <div style={{
+                            background: '#FEE2E2',
+                            color: '#EF4444',
+                            width: '60px',
+                            height: '60px',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 1.5rem auto'
+                        }}>
+                            <Trash2 size={32} />
+                        </div>
+                        <h3 style={{ fontSize: '1.5rem', color: '#111827', fontWeight: '800', marginBottom: '1rem' }}>
+                            ¿Confirmas eliminar tu cuenta?
+                        </h3>
+                        <p style={{ color: '#4B5563', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '2rem' }}>
+                            Esta acción eliminará de forma permanente tu perfil, postulaciones, exámenes y **todos tus archivos físicos (CV y fotos)**. Esta operación es irreversible y no se puede deshacer.
+                        </p>
+                        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                            <button
+                                onClick={() => setShowDeleteModal(false)}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px',
+                                    borderRadius: '10px',
+                                    border: '1px solid #D1D5DB',
+                                    background: 'white',
+                                    color: '#374151',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    transition: 'background 0.2s'
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={ejecutarEliminacionCuenta}
+                                style={{
+                                    flex: 1,
+                                    padding: '12px',
+                                    borderRadius: '10px',
+                                    border: 'none',
+                                    background: 'linear-gradient(90deg, #EF4444 0%, #DC2626 100%)',
+                                    color: 'white',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 10px rgba(239,68,68,0.25)',
+                                    transition: 'opacity 0.2s'
+                                }}
+                            >
+                                Borrar Todo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
