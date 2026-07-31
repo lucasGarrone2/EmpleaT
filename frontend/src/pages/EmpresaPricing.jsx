@@ -35,7 +35,7 @@ const FEATURES = [
     { icon: <BarChart3 size={20} />, title: 'Analytics de Embudo', desc: 'Vistas, conversiones y tiempo de respuesta por oferta.' },
     { icon: <Zap size={20} />, title: 'Ofertas Destacadas', desc: 'Tus ofertas aparecen primero durante 7 días.' },
     { icon: <Search size={20} />, title: 'Búsqueda Avanzada', desc: 'Encontrá candidatos por skills y experiencia.' },
-    { icon: <Users size={20} />, title: 'Equipo Ilimitado', desc: 'Sin límite de miembros (free: máx 2).' },
+    { icon: <Users size={20} />, title: 'Equipo Ilimitado', desc: 'Sin límite de miembros (free: máx 3).' },
     { icon: <Shield size={20} />, title: 'Roles Granulares', desc: 'Admin, reclutador y solo lectura.' },
     { icon: <Star size={20} />, title: 'Soporte Prioritario', desc: 'Atención preferencial vía mail.' }
 ];

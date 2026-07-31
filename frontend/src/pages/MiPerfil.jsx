@@ -787,7 +787,7 @@ export default function MiPerfil() {
                         <div style={{ background: 'var(--bg-white)', padding: '2rem', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 5px 15px rgba(0,0,0,0.02)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--secondary)', margin: 0, fontSize: '1.3rem' }}>
-                                    <BrainCircuit size={24} /> Mis Habilidades (ESCO)
+                                    <BrainCircuit size={24} /> Mis Habilidades
                                 </h3>
                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-gray)', background: 'rgba(0,0,0,0.05)', padding: '4px 10px', borderRadius: '12px' }}>
                                     Extraídas o Agregadas Manualmente
@@ -831,7 +831,7 @@ export default function MiPerfil() {
                                                 }}>
                                                     Lvl {skillItem.nivel_estimado}
                                                 </span>
-                                                {insignias.some(ins => 
+                                                {insignias.some(ins =>
                                                     ins.toLowerCase() === skillName.toLowerCase() ||
                                                     ins.toLowerCase() === (skillItem.nombre_original || '').toLowerCase() ||
                                                     ins.toLowerCase() === (skillItem.diccionario_skills?.nombre_skill || '').toLowerCase()

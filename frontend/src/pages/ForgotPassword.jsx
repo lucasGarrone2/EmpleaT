@@ -21,7 +21,14 @@ export default function ForgotPassword() {
         });
 
         if (error) {
-            setError(error.message);
+            const lower = String(error.message).toLowerCase();
+            if (lower.includes('rate limit') || lower.includes('too many requests')) {
+                setError("Demasiados intentos. Por favor aguarda unos minutos antes de solicitar otro enlace.");
+            } else if (lower.includes('user not found')) {
+                setError("No existe una cuenta registrada con este correo electrónico.");
+            } else {
+                setError("Ocurrió un error al enviar el enlace. Por favor, intenta de nuevo.");
+            }
         } else {
             setMessage("¡Enlace enviado! Revisa tu bandeja de entrada.");
         }

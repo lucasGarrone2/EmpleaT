@@ -4,7 +4,7 @@ import { X, CheckCircle2, XCircle, AlertTriangle, Info } from 'lucide-react';
 const AlertContext = createContext(null);
 
 export function AlertProvider({ children }) {
-    const [alert, setAlert] = useState(null); // { message, title, type, onClose }
+    const [alert, setAlert] = useState(null); // { message, title, type, isConfirm, confirmText, cancelText, onConfirm, onCancel, onClose }
 
     const showAlert = useCallback((message, title = 'Atención', type = 'info') => {
         return new Promise((resolve) => {
@@ -12,6 +12,7 @@ export function AlertProvider({ children }) {
                 message,
                 title,
                 type,
+                isConfirm: false,
                 onClose: () => {
                     setAlert(null);
                     resolve(true);
@@ -20,8 +21,29 @@ export function AlertProvider({ children }) {
         });
     }, []);
 
+    const showConfirm = useCallback((message, title = 'Confirmar Acción', confirmText = 'Aceptar', cancelText = 'Cancelar') => {
+        return new Promise((resolve) => {
+            setAlert({
+                message,
+                title,
+                type: 'warning',
+                isConfirm: true,
+                confirmText,
+                cancelText,
+                onConfirm: () => {
+                    setAlert(null);
+                    resolve(true);
+                },
+                onCancel: () => {
+                    setAlert(null);
+                    resolve(false);
+                }
+            });
+        });
+    }, []);
+
     return (
-        <AlertContext.Provider value={showAlert}>
+        <AlertContext.Provider value={{ showAlert, showConfirm }}>
             {children}
             {alert && (
                 <div style={{
@@ -36,12 +58,12 @@ export function AlertProvider({ children }) {
                     padding: '1rem',
                 }}>
                     <div style={{
-                        background: 'rgba(255, 255, 255, 0.95)',
+                        background: 'rgba(255, 255, 255, 0.98)',
                         backdropFilter: 'blur(20px)',
                         borderRadius: '24px',
                         width: '100%',
                         maxWidth: '440px',
-                        boxShadow: '0 20px 40px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05)',
+                        boxShadow: '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
                         overflow: 'hidden',
                         display: 'flex',
                         flexDirection: 'column',
@@ -51,7 +73,7 @@ export function AlertProvider({ children }) {
                     }}>
                         {/* Botón cerrar */}
                         <button 
-                            onClick={alert.onClose}
+                            onClick={alert.isConfirm ? alert.onCancel : alert.onClose}
                             style={{
                                 position: 'absolute',
                                 top: '16px', right: '16px',
@@ -113,35 +135,84 @@ export function AlertProvider({ children }) {
                             </p>
                         </div>
 
-                        {/* Botón de Acción */}
+                        {/* Botones de Acción */}
                         <div style={{
-                            display: 'flex', justifyContent: 'center',
-                            marginTop: '24px'
+                            display: 'flex',
+                            justifyContent: 'center',
+                            gap: '12px',
+                            marginTop: '24px',
+                            width: '100%'
                         }}>
-                            <button
-                                onClick={alert.onClose}
-                                style={{
-                                    background: 
-                                        alert.type === 'success' ? 'var(--primary)' :
-                                        alert.type === 'error' ? '#F44336' :
-                                        alert.type === 'warning' ? '#FF9800' :
-                                        'var(--primary)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '12px',
-                                    padding: '10px 32px',
-                                    fontWeight: '700',
-                                    fontSize: '0.95rem',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                                    transition: 'all 0.15s',
-                                    outline: 'none'
-                                }}
-                                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-                                onMouseLeave={e => e.currentTarget.style.transform = 'none'}
-                            >
-                                Aceptar
-                            </button>
+                            {alert.isConfirm ? (
+                                <>
+                                    <button
+                                        onClick={alert.onCancel}
+                                        style={{
+                                            flex: 1,
+                                            background: '#F0F0F0',
+                                            color: '#444',
+                                            border: 'none',
+                                            borderRadius: '12px',
+                                            padding: '12px 18px',
+                                            fontWeight: '700',
+                                            fontSize: '0.95rem',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s',
+                                            outline: 'none'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#E5E5E5'}
+                                        onMouseLeave={e => e.currentTarget.style.background = '#F0F0F0'}
+                                    >
+                                        {alert.cancelText || 'Cancelar'}
+                                    </button>
+                                    <button
+                                        onClick={alert.onConfirm}
+                                        style={{
+                                            flex: 1,
+                                            background: '#F44336',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '12px',
+                                            padding: '12px 18px',
+                                            fontWeight: '700',
+                                            fontSize: '0.95rem',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 4px 12px rgba(244,67,54,0.25)',
+                                            transition: 'all 0.15s',
+                                            outline: 'none'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                                        onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+                                    >
+                                        {alert.confirmText || 'Aceptar'}
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={alert.onClose}
+                                    style={{
+                                        background: 
+                                            alert.type === 'success' ? 'var(--primary)' :
+                                            alert.type === 'error' ? '#F44336' :
+                                            alert.type === 'warning' ? '#FF9800' :
+                                            'var(--primary)',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        padding: '10px 32px',
+                                        fontWeight: '700',
+                                        fontSize: '0.95rem',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                                        transition: 'all 0.15s',
+                                        outline: 'none'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+                                    onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+                                >
+                                    Aceptar
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -155,5 +226,16 @@ export function useAlert() {
     if (!context) {
         throw new Error('useAlert debe usarse dentro de un AlertProvider');
     }
-    return context;
+    if (typeof context === 'function') {
+        return context;
+    }
+    return context.showAlert;
+}
+
+export function useConfirm() {
+    const context = useContext(AlertContext);
+    if (!context) {
+        throw new Error('useConfirm debe usarse dentro de un AlertProvider');
+    }
+    return context.showConfirm;
 }

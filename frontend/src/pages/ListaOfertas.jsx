@@ -10,6 +10,7 @@ import InterviewModal from '../components/InterviewModal';
 import BoostQuizModal from '../components/BoostQuizModal';
 import OfertaCardSkeleton from '../components/OfertaCardSkeleton';
 import AdaptarCvModal from '../components/AdaptarCvModal';
+import { hayOverlapCategorias, getCategoriaSkill } from '../utils/categories';
 
 function PremiumStats({ offerId, candidatoId, currentCandidateMatch, currentOfferSalary, esPremium, marketAvgSalary }) {
     const [stats, setStats] = useState({ totalPostulantes: 0, candidateRank: 0, avgMatch: 0 });
@@ -205,7 +206,8 @@ export default function ListaOfertas() {
         ubicacionTexto: queryParams.get('loc') || '',
         ubicacion: 'Todas',
         modalidad: { Remoto: false, Híbrido: false, Presencial: false },
-        rubro: 'Todos'
+        rubro: 'Todos',
+        minMatch: 50
     });
 
     const [ordenamiento, setOrdenamiento] = useState('Mejor Match');
@@ -226,7 +228,7 @@ export default function ListaOfertas() {
             try {
                 const { data: candData, error: candError } = await supabase
                     .from('candidatos')
-                    .select('id, es_premium')
+                    .select('id, es_premium, titulo_profesional, nombre_completo')
                     .eq('auth_id', user.id)
                     .maybeSingle();
                 
@@ -307,6 +309,7 @@ export default function ListaOfertas() {
                     `)
                     .eq('estado', 'Publicada');
                 
+
                 if (ofError) throw ofError;
 
                 const ofertasValidas = (ofertasData || []).filter(o => !o.oculta_admin && (!o.empresas || !o.empresas.baneada));
@@ -325,77 +328,257 @@ export default function ListaOfertas() {
                 setMarketAvgSalary(avgSal);
 
                 const ofertasConMatch = ofertasValidas.map(oferta => {
+                    const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
+                    
+                    const isJuniorOffer = (oferta.seniority || '').toLowerCase().includes('junior') || 
+                                          (oferta.seniority || '').toLowerCase().includes('trainee') || 
+                                          (oferta.titulo || '').toLowerCase().includes('junior') || 
+                                          (oferta.titulo || '').toLowerCase().includes('trainee');
+
                     const skillsRequeridas = oferta.oferta_skills || [];
                     const totalRequeridas = skillsRequeridas.length;
                     let confidenciasReales = 0;
 
-                    if (totalRequeridas > 0) {
-                        const synonymMap = {
-                            'sql': ['mysql', 'postgresql', 'sql server', 'oracle', 'pl/sql'],
-                            'mysql': ['sql', 'base de datos', 'mariadb'],
-                            'postgresql': ['sql', 'base de datos'],
-                            'cloud': ['aws', 'azure', 'gcp', 'google cloud', 'nube'],
-                            'aws': ['cloud', 'nube', 'amazon web services'],
-                            'azure': ['cloud', 'nube', 'microsoft azure'],
-                            'gcp': ['cloud', 'nube', 'google cloud'],
-                            'frontend': ['react', 'vue', 'angular', 'html', 'css', 'javascript', 'js'],
-                            'backend': ['node', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'express', 'desarrollo web'],
-                            'javascript': ['js', 'typescript', 'react', 'node', 'vue', 'angular', 'frontend'],
-                            'js': ['javascript', 'typescript', 'frontend'],
-                            'react': ['javascript', 'frontend', 'reactjs', 'react.js'],
-                            'java': ['spring', 'backend', 'java ee', 'springboot'],
-                            'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi'],
-                            'desarrollo web': ['html', 'css', 'javascript', 'frontend', 'backend', 'web', 'php', 'diseño web'],
-                            'html': ['html5', 'frontend', 'desarrollo web', 'css', 'diseño web'],
-                            'css': ['css3', 'frontend', 'desarrollo web', 'html', 'diseño web']
-                        };
+                    const synonymMap = {
+                        // === JAVASCRIPT / TYPESCRIPT ===
+                        'javascript': ['js', 'ecmascript', 'typescript', 'ts'],
+                        'js': ['javascript', 'ecmascript', 'typescript'],
+                        'typescript': ['ts', 'javascript', 'js'],
+                        'ts': ['typescript', 'javascript'],
+                        'react': ['reactjs', 'react.js', 'jsx', 'redux'],
+                        'reactjs': ['react', 'react.js'],
+                        'react.js': ['react', 'reactjs'],
+                        'next.js': ['nextjs', 'react'],
+                        'nextjs': ['next.js', 'react'],
+                        'vue': ['vuejs', 'vue.js'],
+                        'vuejs': ['vue', 'vue.js'],
+                        'angular': ['angularjs', 'angular.js'],
+                        'node': ['nodejs', 'node.js', 'express'],
+                        'nodejs': ['node', 'node.js', 'express'],
+                        'node.js': ['node', 'nodejs', 'express'],
+                        'express': ['expressjs', 'node', 'nodejs'],
 
-                        skillsRequeridas.forEach(req => {
-                            const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
-                            const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
-                            const nivelReq = req.nivel_requerido ?? null;
+                        // === HTML / CSS ===
+                        'html': ['html5'],
+                        'html5': ['html'],
+                        'css': ['css3', 'sass', 'scss', 'less', 'tailwind', 'bootstrap'],
+                        'css3': ['css'],
+                        'tailwind': ['tailwindcss', 'css'],
+                        'bootstrap': ['css'],
+                        'sass': ['scss', 'css'],
+                        'scss': ['sass', 'css'],
 
-                            const matchTarget = arraySkillsCandidato.find(cs => {
-                                if (cs.skill_id && cs.skill_id === req.skill_id) return true;
-                                const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
-                                if (!csStr || !reqStr) return false;
-                                if (csStr === reqStr) return true;
-                                const minLen = Math.min(csStr.length, reqStr.length);
-                                if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
-                                const reqSynonyms = synonymMap[reqStr] || [];
-                                const csSynonyms = synonymMap[csStr] || [];
-                                if (reqSynonyms.some(syn => csStr.includes(syn) || syn.includes(csStr))) return true;
-                                if (csSynonyms.some(syn => reqStr.includes(syn) || syn.includes(reqStr))) return true;
-                                return false;
-                            });
+                        // === PYTHON ===
+                        'python': ['py', 'django', 'flask', 'fastapi'],
+                        'django': ['python'],
+                        'flask': ['python'],
+                        'fastapi': ['python'],
 
-                            req.isMatch = !!matchTarget;
-                            if (matchTarget) {
-                                if (!nivelReq) {
-                                    confidenciasReales += 1.0;
-                                } else {
-                                    const nivelCand = matchTarget.nivel_estimado || 3;
-                                    const diff = nivelReq - nivelCand;
-                                    if (diff <= 0) confidenciasReales += 1.0;
-                                    else if (diff === 1) confidenciasReales += 0.75;
-                                    else if (diff === 2) confidenciasReales += 0.50;
-                                    else confidenciasReales += 0.10;
-                                }
-                            }
+                        // === JAVA ===
+                        'java': ['spring', 'spring boot', 'springboot', 'java ee', 'jee', 'j2ee', 'maven', 'gradle', 'hibernate', 'jpa'],
+                        'spring': ['spring boot', 'springboot', 'java'],
+                        'spring boot': ['springboot', 'spring', 'java'],
+                        'springboot': ['spring boot', 'spring', 'java'],
+
+                        // === .NET / C# ===
+                        'c#': ['csharp', '.net', 'dotnet', 'asp.net'],
+                        'csharp': ['c#', '.net', 'dotnet'],
+                        '.net': ['dotnet', 'c#', 'csharp', 'asp.net'],
+                        'dotnet': ['.net', 'c#', 'csharp'],
+                        'asp.net': ['.net', 'c#'],
+
+                        // === PHP ===
+                        'php': ['laravel', 'symfony', 'wordpress'],
+                        'laravel': ['php'],
+                        'wordpress': ['php'],
+
+                        // === MOBILE ===
+                        'mobile': ['movil', 'android', 'ios', 'react native', 'flutter'],
+                        'movil': ['mobile', 'android', 'ios'],
+                        'android': ['kotlin', 'java', 'mobile'],
+                        'ios': ['swift', 'objective-c', 'mobile', 'apple'],
+                        'react native': ['mobile', 'react', 'javascript'],
+                        'flutter': ['dart', 'mobile'],
+                        'swift': ['ios'],
+                        'kotlin': ['android', 'java'],
+
+                        // === DATABASES ===
+                        'sql': ['mysql', 'postgresql', 'postgres', 'sql server', 'oracle', 'pl/sql', 'sqlite', 'base de datos', 'database'],
+                        'mysql': ['sql', 'base de datos', 'mariadb'],
+                        'postgresql': ['postgres', 'sql', 'base de datos'],
+                        'postgres': ['postgresql', 'sql', 'base de datos'],
+                        'sql server': ['sql', 'base de datos', 'tsql'],
+                        'oracle': ['sql', 'pl/sql', 'base de datos'],
+                        'mongodb': ['nosql', 'base de datos', 'mongoose'],
+                        'nosql': ['mongodb', 'redis', 'cassandra', 'dynamodb', 'firebase', 'base de datos'],
+                        'redis': ['cache', 'nosql', 'base de datos'],
+
+                        // === CLOUD / DEVOPS ===
+                        'cloud': ['aws', 'azure', 'gcp', 'google cloud', 'nube'],
+                        'aws': ['amazon web services', 'cloud', 's3', 'ec2', 'lambda'],
+                        'amazon web services': ['aws', 'cloud'],
+                        'azure': ['microsoft azure', 'cloud'],
+                        'gcp': ['google cloud', 'cloud'],
+                        'devops': ['ci/cd', 'docker', 'kubernetes', 'jenkins', 'github actions', 'gitlab', 'terraform'],
+                        'docker': ['contenedores', 'devops', 'kubernetes'],
+                        'kubernetes': ['k8s', 'docker', 'devops'],
+                        'k8s': ['kubernetes', 'docker'],
+                        'ci/cd': ['devops', 'jenkins', 'github actions', 'gitlab ci'],
+                        'git': ['github', 'gitlab', 'bitbucket'],
+                        'github': ['git'],
+                        'gitlab': ['git'],
+
+                        // === SOPORTE TECNICO / HELPDESK ===
+                        'soporte tecnico': ['helpdesk', 'atencion al usuario', 'mantenimiento de pc', 'hardware', 'redes', 'soporte informatico', 'soporte'],
+                        'soporte': ['soporte tecnico', 'helpdesk', 'mantenimiento de pc', 'hardware', 'redes'],
+                        'helpdesk': ['soporte tecnico', 'atencion al usuario', 'soporte informatico', 'soporte'],
+
+                        // === SALUD / MEDICINA ===
+                        'medicina': ['medico', 'medica', 'salud', 'clinica', 'medicina general', 'diagnostico clinico', 'atencion al paciente'],
+                        'medico': ['medicina', 'medica', 'salud', 'clinica', 'doctor'],
+                        'diagnostico por imagenes': ['tomografia', 'resonancia', 'mamografia', 'radiologia', 'ecografia'],
+
+                        // === DERECHO ===
+                        'derecho': ['abogado', 'abogada', 'juridico', 'legal', 'leyes'],
+                        'abogado': ['derecho', 'juridico', 'legal', 'leyes'],
+
+                        // === FINANZAS / MARKETING ===
+                        'contabilidad': ['finanzas', 'impuestos', 'balance', 'auditoria', 'facturacion', 'excel', 'contador'],
+                        'ventas': ['comercial', 'atencion al cliente', 'telemarketing', 'cierre de ventas'],
+                        'marketing': ['marketing digital', 'seo', 'sem', 'redes sociales', 'social media', 'google ads']
+                    };
+
+                    // Función para obtener sinónimos expandidos (2 niveles de profundidad)
+                    const getExpandedSynonyms = (skillStr) => {
+                        const direct = synonymMap[skillStr] || [];
+                        const expanded = new Set(direct);
+                        direct.forEach(syn => {
+                            (synonymMap[syn] || []).forEach(syn2 => expanded.add(syn2));
                         });
+                        expanded.add(skillStr);
+                        return expanded;
+                    };
+
+                    // --- CAPA 1: GATE DE RUBRO ---
+                    const coreSkillsOferta = skillsRequeridas.filter(s => s.es_core !== false);
+                    const targetCoreSkills = coreSkillsOferta.length > 0 ? coreSkillsOferta : skillsRequeridas;
+                    const hasMacroOverlap = hayOverlapCategorias(arraySkillsCandidato, targetCoreSkills);
+
+                    if (!hasMacroOverlap) {
+                        return { ...oferta, porcentajeMatch: Math.min(15, totalRequeridas > 0 ? 10 : 0) };
                     }
 
-                    const porcentajeMatch = totalRequeridas > 0 ? Math.round((confidenciasReales / totalRequeridas) * 100) : 0;
-                    return { ...oferta, porcentajeMatch };
+                    // --- CAPA 2: MATCH TÉCNICO PONDERADO (75% CORE + 25% SECUNDARIAS) ---
+                    const candSkillSet = new Set(arraySkillsCandidato.map(cs => normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill)));
+                    const hasFrontend = ['react', 'reactjs', 'react.js', 'vue', 'angular', 'javascript', 'js', 'typescript', 'ts', 'html', 'css', 'frontend', 'front-end'].some(s => candSkillSet.has(s));
+                    const hasBackend = ['node', 'nodejs', 'node.js', 'express', 'java', 'spring', 'spring boot', 'springboot', 'python', 'django', 'flask', 'fastapi', 'c#', '.net', 'php', 'backend', 'back-end', 'sql', 'mysql', 'postgresql', 'mongodb'].some(s => candSkillSet.has(s));
+                    const hasDb = ['sql', 'mysql', 'postgresql', 'postgres', 'oracle', 'sql server', 'mongodb', 'nosql', 'redis', 'base de datos', 'bases de datos'].some(s => candSkillSet.has(s));
+
+                    const evaluateSkillScore = (req) => {
+                        const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
+                        const nivelReq = req.nivel_requerido ?? null;
+
+                        const matchTarget = arraySkillsCandidato.find(cs => {
+                            if (cs.skill_id && cs.skill_id === req.skill_id) return true;
+                            const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
+                            if (!csStr || !reqStr) return false;
+                            if (csStr === reqStr) return true;
+                            const minLen = Math.min(csStr.length, reqStr.length);
+                            if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
+                            const reqSyns = synonymMap[reqStr] || [];
+                            if (reqSyns.includes(csStr)) return true;
+                            return false;
+                        });
+
+                        let isRoleInferred = false;
+                        if (!matchTarget) {
+                            if (['full stack', 'fullstack', 'full-stack', 'desarrollo web', 'web development'].includes(reqStr)) {
+                                if ((hasFrontend && hasBackend) || candSkillSet.has('full stack') || candSkillSet.has('fullstack')) {
+                                    isRoleInferred = true;
+                                }
+                            } else if (['backend', 'back-end'].includes(reqStr)) {
+                                if (hasBackend) isRoleInferred = true;
+                            } else if (['frontend', 'front-end'].includes(reqStr)) {
+                                if (hasFrontend) isRoleInferred = true;
+                            } else if (['base de datos', 'bases de datos', 'database'].includes(reqStr)) {
+                                if (hasDb) isRoleInferred = true;
+                            }
+                        }
+
+                        req.isMatch = !!matchTarget || isRoleInferred;
+
+                        if (matchTarget || isRoleInferred) {
+                            if (!nivelReq || isJuniorOffer) return 1.0;
+                            const nivelCand = matchTarget ? (matchTarget.nivel_estimado || 3) : 3;
+                            const diff = nivelReq - nivelCand;
+                            if (diff <= 0) return 1.0;
+                            if (diff === 1) return 0.85;
+                            if (diff === 2) return 0.60;
+                            return 0.30;
+                        }
+
+                        const reqExpanded = getExpandedSynonyms(reqStr);
+                        const indirectMatch = arraySkillsCandidato.find(cs => {
+                            const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
+                            return csStr && reqExpanded.has(csStr);
+                        });
+                        if (indirectMatch) {
+                            req.isMatch = true;
+                            return 0.50;
+                        }
+
+                        return req.es_core !== false ? 0.10 : 0.30;
+                    };
+
+                    let matchTecnico = 1.0;
+                    if (totalRequeridas > 0) {
+                        const coreSkills = skillsRequeridas.filter(s => s.es_core !== false);
+                        const secSkills = skillsRequeridas.filter(s => s.es_core === false);
+
+                        const coreScores = coreSkills.length > 0
+                            ? coreSkills.map(evaluateSkillScore)
+                            : skillsRequeridas.map(evaluateSkillScore);
+                        const coreAvg = coreScores.reduce((acc, v) => acc + v, 0) / coreScores.length;
+
+                        if (secSkills.length > 0) {
+                            const secScores = secSkills.map(evaluateSkillScore);
+                            const secAvg = secScores.reduce((acc, v) => acc + v, 0) / secScores.length;
+                            matchTecnico = 0.75 * coreAvg + 0.25 * secAvg;
+                        } else {
+                            matchTecnico = coreAvg;
+                        }
+                    }
+
+                    // --- CAPA 3: FIT POR SENIORITY (85% TÉCNICO + 15% SENIORITY FIT) ---
+                    const seniorityBucketOfferMap = {
+                        'trainee': 1, 'inicial': 1, 'junior': 2, 'semi-senior': 3, 'ssr': 3, 'semi senior': 3, 'senior': 4, 'sr': 4, 'experto': 5, 'lead': 5
+                    };
+                    const offerSeniorityStr = (oferta.seniority || '').toLowerCase();
+                    let offerBucket = 3;
+                    for (const [key, val] of Object.entries(seniorityBucketOfferMap)) {
+                        if (offerSeniorityStr.includes(key)) {
+                            offerBucket = val;
+                            break;
+                        }
+                    }
+
+                    const candMaxLvl = arraySkillsCandidato.reduce((max, s) => Math.max(max, s.nivel_estimado || 3), 3);
+                    const candBucket = candMaxLvl;
+                    const senDiff = offerBucket - candBucket;
+
+                    let seniorityFit = 1.0;
+                    if (senDiff <= 0) seniorityFit = 1.0;
+                    else if (senDiff === 1) seniorityFit = 0.70;
+                    else if (senDiff === 2) seniorityFit = 0.35;
+                    else seniorityFit = 0.10;
+
+                    let score = Math.round((0.85 * matchTecnico + 0.15 * seniorityFit) * 100);
+
+                    return { ...oferta, porcentajeMatch: score };
                 });
 
-                const ofertasConMatchFiltradas = ofertasConMatch.filter(oferta => {
-                    if (!oferta.porcentaje_match_minimo || oferta.porcentaje_match_minimo === 0) return true;
-                    return oferta.porcentajeMatch >= oferta.porcentaje_match_minimo;
-                });
-
-                ofertasConMatchFiltradas.sort((a, b) => b.porcentajeMatch - a.porcentajeMatch);
-                setOfertas(ofertasConMatchFiltradas);
+                ofertasConMatch.sort((a, b) => b.porcentajeMatch - a.porcentajeMatch);
+                setOfertas(ofertasConMatch);
 
             } catch (err) {
                 console.error("Error obteniendo ofertas", err);
@@ -508,6 +691,15 @@ export default function ListaOfertas() {
             if (!filtros.modalidad[o.modalidad]) return false;
         }
 
+        if (filtros.minMatch > 0 && o.porcentajeMatch < filtros.minMatch) {
+            return false;
+        }
+
+        // Ocultar automáticamente si no se alcanza el porcentaje_match_minimo de la oferta
+        if (o.porcentaje_match_minimo > 0 && o.porcentajeMatch < o.porcentaje_match_minimo) {
+            return false;
+        }
+
         return true;
     });
 
@@ -553,30 +745,30 @@ export default function ListaOfertas() {
                         padding: '12px',
                         borderRadius: '12px',
                         background: 'white',
-                        border: '1px solid rgba(0, 214, 107, 0.3)',
-                        color: 'var(--text-dark)',
+                        border: '1px solid #ddd',
                         fontWeight: 'bold',
+                        color: 'var(--text-dark)',
                         cursor: 'pointer',
                         marginBottom: '1rem',
-                        fontSize: '1rem',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
                     }}
                 >
-                    <Filter size={18} color="var(--primary)" /> 
-                    {showMobileFilters ? 'Ocultar Filtros' : 'Filtrar Ofertas ☰'}
+                    <Filter size={18} /> {showMobileFilters ? 'Ocultar Filtros' : 'Mostrar Filtros'}
                 </button>
 
-                {/* SIDEBAR FILTROS */}
-                <aside className={`ofertas-sidebar ${showMobileFilters ? 'show' : ''}`} style={{ flex: '0 0 280px', width: '280px', background: 'white', borderRadius: '12px', padding: '1.5rem', border: '1px solid #EAEAEA' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '1.5rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
-                        <Filter size={20} color="#555" />
-                        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#333' }}>Filtros</h3>
-                    </div>
+                {/* FILTROS LATERALES */}
+                <aside 
+                    className={`ofertas-sidebar ${showMobileFilters ? 'mobile-visible' : ''}`}
+                    style={{ flex: '1 1 260px', maxWidth: '300px', background: 'white', padding: '1.8rem', borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.05)' }}
+                >
+                    <h3 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Filter size={20} color="var(--primary)" /> Filtros
+                    </h3>
 
                     {(filtros.palabraClave || filtros.ubicacionTexto) && (
-                        <div style={{ marginBottom: '1.5rem', background: '#F0F9F4', padding: '10px', borderRadius: '8px', border: '1px solid #c2e8d4' }}>
-                            <div style={{ fontSize: '0.85rem', color: '#00B159', fontWeight: 'bold', marginBottom: '5px' }}>Búsqueda Activa:</div>
-                            {filtros.palabraClave && <div style={{ fontSize: '0.9rem', color: '#333' }}>Puesto: <strong>{filtros.palabraClave}</strong></div>}
+                        <div style={{ marginBottom: '1.5rem', padding: '10px 12px', background: '#eef2ff', borderRadius: '10px', border: '1px solid #c7d2fe' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#4338ca', uppercase: 'true' }}>Filtro Activo:</span>
+                            {filtros.palabraClave && <div style={{ fontSize: '0.9rem', color: '#333' }}>Buscar: <strong>"{filtros.palabraClave}"</strong></div>}
                             {filtros.ubicacionTexto && <div style={{ fontSize: '0.9rem', color: '#333' }}>Lugar: <strong>{filtros.ubicacionTexto}</strong></div>}
                             <button 
                                 onClick={() => setFiltros({...filtros, palabraClave: '', ubicacionTexto: ''})} 
@@ -585,6 +777,23 @@ export default function ListaOfertas() {
                             </button>
                         </div>
                     )}
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', color: '#444', fontWeight: 'bold', marginBottom: '10px' }}>
+                            <Sparkles size={16} color="var(--primary)" /> Match Mínimo deseado
+                        </label>
+                        <select 
+                            value={filtros.minMatch} 
+                            onChange={e => setFiltros({...filtros, minMatch: Number(e.target.value)})}
+                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', background: 'white', fontWeight: '600', color: 'var(--primary)' }}
+                        >
+                            <option value={0}>Todas las Ofertas (0%+)</option>
+                            <option value={30}>Básico (Match ≥ 30%)</option>
+                            <option value={50}>Medio (Match ≥ 50%)</option>
+                            <option value={70}>Alto (Match ≥ 70%)</option>
+                            <option value={85}>Excelente (Match ≥ 85%)</option>
+                        </select>
+                    </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', fontSize: '0.9rem', color: '#666', fontWeight: 'bold', marginBottom: '10px' }}>Ubicación</label>
@@ -759,7 +968,7 @@ export default function ListaOfertas() {
                                             {/* Circulo Inicial de Empresa */}
                                             <div style={{ width: '56px', height: '56px', background: '#F0F9F4', color: '#00B159', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', fontWeight: 'bold', flexShrink: 0, overflow: 'hidden' }}>
                                                 {oferta.empresas?.logo_url ? (
-                                                    <img src={oferta.empresas.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                    <img src={oferta.empresas.logo_url} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#ffffff', padding: '4px', boxSizing: 'border-box' }} />
                                                 ) : (
                                                     empLetra
                                                 )}
@@ -848,32 +1057,35 @@ export default function ListaOfertas() {
                                             <p style={{ color: '#555', lineHeight: '1.6', fontSize: '1rem', whiteSpace: 'pre-line' }}>{oferta.descripcion}</p>
                                             
                                             <div style={{ marginTop: '1.5rem' }}>
-                                                <h4 style={{ fontSize: '0.85rem', color: '#333', letterSpacing: '1px', marginBottom: '12px' }}>SKILLS REQUERIDAS:</h4>
+                                                <h4 style={{ fontSize: '0.85rem', color: '#333', letterSpacing: '1px', marginBottom: '12px' }}>SKILLS COINCIDENTES:</h4>
                                                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                                    {oferta.oferta_skills?.map(sk => {
-                                                        const label = sk.nombre_original || sk.diccionario_skills?.nombre_skill || 'Skill';
-                                                        const matched = sk.isMatch;
-                                                        
-                                                        return (
-                                                            <span key={sk.skill_id} style={{ 
-                                                                padding: '6px 14px', 
-                                                                background: matched ? 'rgba(0,214,107,0.1)' : '#F8F9FA', 
-                                                                borderRadius: '8px', 
-                                                                fontSize: '0.9rem', 
-                                                                color: matched ? 'var(--primary)' : '#888', 
-                                                                border: `1px solid ${matched ? 'rgba(0,214,107,0.2)' : '#EAEAEA'}`,
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                gap: '6px',
-                                                                fontWeight: matched ? 'bold' : 'normal'
-                                                            }}>
-                                                                <span style={{ fontSize: '1.1rem' }}>{matched ? '✓' : '✗'}</span> {label}
-                                                            </span>
-                                                        );
-                                                    })}
-                                                    {(!oferta.oferta_skills || oferta.oferta_skills.length === 0) && (
-                                                        <span style={{ color: '#999', fontSize: '0.9rem', fontStyle: 'italic' }}>Sin requerimientos</span>
-                                                    )}
+                                                    {(() => {
+                                                        const matchingSkills = (oferta.oferta_skills || []).filter(sk => sk.isMatch);
+                                                        if (matchingSkills.length === 0) {
+                                                            return (
+                                                                <span style={{ color: '#999', fontSize: '0.9rem', fontStyle: 'italic' }}>Sin coincidencias registradas aún con las skills de la oferta</span>
+                                                            );
+                                                        }
+                                                        return matchingSkills.map(sk => {
+                                                            const label = sk.nombre_original || sk.diccionario_skills?.nombre_skill || 'Skill';
+                                                            return (
+                                                                <span key={sk.skill_id} style={{ 
+                                                                    padding: '6px 14px', 
+                                                                    background: 'rgba(0,214,107,0.1)', 
+                                                                    borderRadius: '8px', 
+                                                                    fontSize: '0.9rem', 
+                                                                    color: 'var(--primary)', 
+                                                                    border: '1px solid rgba(0,214,107,0.25)',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '6px',
+                                                                    fontWeight: 'bold'
+                                                                }}>
+                                                                    <span style={{ fontSize: '1.1rem' }}>✓</span> {label}
+                                                                </span>
+                                                            );
+                                                        });
+                                                    })()}
                                                 </div>
                                             </div>
 

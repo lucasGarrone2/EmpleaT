@@ -28,6 +28,7 @@ export default function PerfilCandidatoParaEmpresa() {
 
     // Chat
     const [mostrarChat, setMostrarChat] = useState(false);
+    const [ofertaInfo, setOfertaInfo] = useState(null);
 
     // ActionModal: modal unificado para todas las acciones ATS
     const [actionModal, setActionModal] = useState(null); // null | { tipo, titulo, mensajePre, mostrarMotivo }
@@ -80,7 +81,7 @@ export default function PerfilCandidatoParaEmpresa() {
                 const { data: ofData, error: ofError } = await supabase
                     .from('ofertas')
                     .select(`
-                        id, empresa_id,
+                        id, empresa_id, titulo, seniority,
                         oferta_skills (
                             skill_id,
                             nombre_original,
@@ -92,6 +93,7 @@ export default function PerfilCandidatoParaEmpresa() {
                     .single();
 
                 if (ofError || !ofData) throw new Error("Oferta no encontrada");
+                setOfertaInfo(ofData);
 
                 // Verificar que el usuario pertenece a la empresa de esta oferta
                 const { data: miembroData } = await supabase
@@ -269,12 +271,28 @@ export default function PerfilCandidatoParaEmpresa() {
         'azure': ['cloud', 'nube', 'microsoft azure'],
         'gcp': ['cloud', 'nube', 'google cloud'],
         'frontend': ['react', 'vue', 'angular', 'html', 'css', 'javascript', 'js'],
-        'backend': ['node', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'express'],
+        'backend': ['node', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'express', 'spring boot'],
         'javascript': ['js', 'typescript', 'react', 'node', 'vue', 'angular', 'frontend'],
         'js': ['javascript', 'typescript', 'frontend'],
         'react': ['javascript', 'frontend', 'reactjs', 'react.js'],
-        'java': ['spring', 'backend', 'java ee', 'springboot'],
-        'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi']
+        'java': ['spring', 'backend', 'java ee', 'springboot', 'spring boot'],
+        'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi'],
+        'arquitectura': ['backend', 'microservicios', 'cloud', 'aws', 'java', 'spring boot', 'spring', 'node', 'nodejs', 'express', 'c#', '.net', 'python', 'docker', 'system design', 'desarrollo de software'],
+        'software': ['desarrollo de software', 'programacion', 'aplicaciones', 'coding', 'backend', 'frontend', 'full stack', 'java', 'python', 'c#', 'javascript', 'js', 'node'],
+        'microservicios': ['microservices', 'backend', 'spring boot', 'springboot', 'spring', 'node', 'nodejs', 'express', 'docker', 'kubernetes', 'api', 'rest', 'java', 'c#'],
+        'ci/cd': ['devops', 'docker', 'kubernetes', 'github', 'gitlab', 'jenkins', 'aws', 'cloud', 'git', 'github actions', 'terraform', 'ansible'],
+        'clean code': ['buenas practicas', 'testing', 'refactoring', 'solid', 'patrones de diseño', 'code review', 'backend', 'frontend', 'desarrollo de software'],
+        'buenas practicas': ['clean code', 'solid', 'patrones de diseño', 'testing', 'code review'],
+        'patrones de diseño': ['clean code', 'solid', 'design patterns', 'java', 'c#', 'typescript', 'backend', 'arquitectura'],
+        'design patterns': ['patrones de diseño', 'clean code', 'solid', 'arquitectura'],
+        'solid': ['clean code', 'patrones de diseño', 'java', 'c#', 'typescript', 'backend'],
+        'rest api': ['api', 'api rest', 'restful', 'express', 'spring boot', 'fastapi', 'node', 'backend', 'endpoints', 'web services'],
+        'api rest': ['rest api', 'api', 'express', 'spring boot', 'fastapi', 'node', 'backend'],
+        'liderazgo tecnico': ['tech lead', 'scrum', 'agile', 'senior', 'arquitectura', 'code review'],
+        'tech lead': ['liderazgo tecnico', 'scrum', 'agile', 'senior', 'arquitectura'],
+        'base de datos relacional': ['sql', 'mysql', 'postgresql', 'postgres', 'oracle', 'sql server', 'base de datos'],
+        'base de datos no relacional': ['nosql', 'mongodb', 'redis', 'cassandra', 'dynamodb', 'firebase', 'base de datos'],
+        'infraestructura': ['devops', 'cloud', 'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'linux', 'sysadmin', 'terraform']
     };
 
     const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
@@ -312,15 +330,19 @@ export default function PerfilCandidatoParaEmpresa() {
 
                 if (found) {
                     const nivelReq = req.nivel_requerido || null;
+                    const isJuniorOffer = (ofertaInfo?.seniority || '').toLowerCase().includes('junior') || 
+                                          (ofertaInfo?.seniority || '').toLowerCase().includes('trainee') || 
+                                          (ofertaInfo?.titulo || '').toLowerCase().includes('junior') || 
+                                          (ofertaInfo?.titulo || '').toLowerCase().includes('trainee');
                     let pct;
-                    if (!nivelReq) {
+                    if (!nivelReq || isJuniorOffer) {
                         pct = 100;
                     } else {
                         const diff = nivelReq - nivelCand;
                         if (diff <= 0) pct = 100;
-                        else if (diff === 1) pct = 75;
-                        else if (diff === 2) pct = 50;
-                        else pct = 10;
+                        else if (diff === 1) pct = 85;
+                        else if (diff === 2) pct = 60;
+                        else pct = 30;
                     }
                     contribution = pct;
                     isMatch = true;

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/AlertContext';
 import { supabase } from '../supabase';
-import { Building2, PlusCircle, Briefcase, MapPin, Users, Settings, ArrowUpDown, CalendarDays, TrendingUp, TrendingDown, Trash2, AlertCircle, Sparkles, Crown, Zap, Lock } from 'lucide-react';
+import { Building2, PlusCircle, Briefcase, MapPin, Users, Settings, ArrowUpDown, CalendarDays, TrendingUp, TrendingDown, Trash2, AlertCircle, Sparkles, Crown, Zap, Lock, RefreshCw, Clock, Mail } from 'lucide-react';
 import './Register.css'; // Reusing established styles for consistency
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -10,6 +11,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 export default function EmpresaDashboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const showConfirm = useConfirm();
 
     const [loading, setLoading] = useState(true);
     const [empresa, setEmpresa] = useState(null);
@@ -60,6 +62,7 @@ export default function EmpresaDashboard() {
                     .from('empresa_miembros')
                     .select('*, empresas(*)')
                     .eq('auth_id', user.id)
+                    .eq('estado', 'aceptado')
                     .maybeSingle();
 
                 if (miembroError) throw miembroError;
@@ -177,14 +180,12 @@ export default function EmpresaDashboard() {
         }
 
         try {
-            // Obtener token JWT de Supabase
             const { data: { session } } = await supabase.auth.getSession();
             if (!session?.access_token) {
                 throw new Error("No se pudo obtener la sesión activa.");
             }
 
-            // Realizar llamada segura al backend
-            const res = await fetch(`${API_URL}/api/empresa/miembros/invitar`, {
+            const res = await fetch(`${API_URL}/api/empresas/${empresa.id}/miembros/invitar`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -195,16 +196,15 @@ export default function EmpresaDashboard() {
 
             const data = await res.json();
             if (!res.ok) {
-                throw new Error(data.error || "Ocurrió un error al agregar al miembro.");
+                throw new Error(data.error || "Ocurrió un error al enviar la invitación.");
             }
 
-            setInviteSuccess(`¡Usuario ${emailClean} agregado correctamente como ${inviteRole === 'administrador' ? 'Administrador' : (inviteRole === 'reclutador' ? 'Reclutador' : 'Solo Lectura')}!`);
+            setInviteSuccess(`¡Invitación enviada a ${emailClean} como ${inviteRole === 'administrador' ? 'Administrador' : (inviteRole === 'reclutador' ? 'Reclutador' : 'Solo Lectura')}!`);
             setInviteEmail('');
-            // Refresh member list
             await fetchMiembros(empresa.id);
         } catch (err) {
             console.error("Error al invitar miembro:", err);
-            setInviteError(err.message || "No se pudo agregar al miembro.");
+            setInviteError(err.message || "No se pudo enviar la invitación.");
         } finally {
             setInviteLoading(false);
         }
@@ -229,14 +229,14 @@ export default function EmpresaDashboard() {
 
     const handleRemoveMember = async (miembro) => {
         // Prevent deleting oneself
-        if (miembro.auth_id === user.id) {
+        if (miembro.member_auth_id === user.id) {
             setError("No puedes eliminarte a ti mismo del equipo.");
             return;
         }
 
         // Prevent leaving company without admin
-        const adminsCount = miembros.filter(m => m.rol === 'administrador').length;
-        if (miembro.rol === 'administrador' && adminsCount <= 1) {
+        const adminsCount = miembros.filter(m => m.rol === 'administrador' && m.estado === 'aceptado').length;
+        if (miembro.rol === 'administrador' && miembro.estado === 'aceptado' && adminsCount <= 1) {
             setError("No puedes eliminar al único administrador de la empresa. Promueve a otro miembro antes.");
             return;
         }
@@ -258,6 +258,43 @@ export default function EmpresaDashboard() {
         } catch (err) {
             console.error("Error al remover miembro:", err);
             setError("No se pudo remover al miembro: " + err.message);
+        }
+    };
+
+    const handleCancelInvite = async (miembro) => {
+        if (!window.confirm(`¿Cancelar la invitación pendiente de ${miembro.email}?`)) return;
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) throw new Error("Sesión no disponible.");
+
+            const res = await fetch(`${API_URL}/api/empresas/${empresa.id}/miembros/${miembro.miembro_id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${session.access_token}` }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Error al cancelar.");
+            await fetchMiembros(empresa.id);
+        } catch (err) {
+            console.error("Error al cancelar invitación:", err);
+            setError(err.message || "No se pudo cancelar la invitación.");
+        }
+    };
+
+    const handleResendInvite = async (miembro) => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) throw new Error("Sesión no disponible.");
+
+            const res = await fetch(`${API_URL}/api/empresas/${empresa.id}/miembros/${miembro.miembro_id}/reenviar`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${session.access_token}` }
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Error al reenviar.");
+            setInviteSuccess(`Invitación reenviada a ${miembro.email}.`);
+        } catch (err) {
+            console.error("Error al reenviar invitación:", err);
+            setError(err.message || "No se pudo reenviar la invitación.");
         }
     };
 
@@ -337,6 +374,20 @@ export default function EmpresaDashboard() {
                 if (insertError.code === '23505' || insertError.message?.includes('unique_cuit') || insertError.message?.includes('cuit')) {
                     throw new Error("Este CUIT ya se encuentra registrado por otra empresa activa. Por favor, verifique el número.");
                 }
+
+                // Fallback: Si el registro se creó a pesar del error de ON CONFLICT del trigger en la BD
+                const { data: fallbackCompany } = await supabase
+                    .from('empresas')
+                    .select('*')
+                    .eq('auth_id', user.id)
+                    .maybeSingle();
+
+                if (fallbackCompany) {
+                    setEmpresa(fallbackCompany);
+                    setIsOnboarding(false);
+                    return;
+                }
+
                 throw insertError;
             }
             
@@ -382,7 +433,7 @@ export default function EmpresaDashboard() {
                 <div style={{ position: 'relative', width: '100%', maxWidth: '650px', backgroundColor: 'var(--bg-white)', borderRadius: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', padding: '3.5rem', zIndex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '1rem' }}>
                         {logoPreview ? (
-                            <img src={logoPreview} alt="Logo Prev" style={{ width: '64px', height: '64px', borderRadius: '18px', objectFit: 'cover', border: '1px solid rgba(0,214,107,0.3)' }} />
+                            <img src={logoPreview} alt="Logo Prev" style={{ width: '64px', height: '64px', borderRadius: '18px', objectFit: 'contain', background: '#ffffff', padding: '6px', border: '1px solid rgba(0,214,107,0.3)', boxSizing: 'border-box' }} />
                         ) : (
                             <div style={{ background: 'rgba(0,214,107,0.1)', padding: '15px', borderRadius: '18px' }}>
                                 <Building2 size={32} color="var(--primary)" />
@@ -889,7 +940,7 @@ export default function EmpresaDashboard() {
                                     
                                     {!(empresa && empresa.plan === 'premium' && empresa.premium_hasta && new Date(empresa.premium_hasta) > new Date()) && (
                                         <div style={{ fontSize: '0.82rem', color: '#b45309', width: '100%', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                            <AlertCircle size={14} /> Plan gratuito: limitado a 2 miembros máximo. Vinculados actualmente: {miembros.length}/2. <Link to="/pricing-empresa" style={{ color: '#b45309', fontWeight: 'bold', textDecoration: 'underline' }}>Hazte Premium para tener miembros ilimitados.</Link>
+                                            <AlertCircle size={14} /> Plan gratuito: limitado a 3 miembros máximo. Vinculados actualmente: {miembros.length}/3. <Link to="/pricing-empresa" style={{ color: '#b45309', fontWeight: 'bold', textDecoration: 'underline' }}>Hazte Premium para tener miembros ilimitados.</Link>
                                         </div>
                                     )}
                                 </form>
@@ -900,34 +951,45 @@ export default function EmpresaDashboard() {
                             {/* Members list */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 {miembros.map((miembro) => {
-                                    const isMe = miembro.auth_id === user.id;
+                                    const isMe = miembro.member_auth_id === user.id;
+                                    const isPending = miembro.estado === 'pendiente';
                                     return (
                                         <div 
                                             key={miembro.miembro_id}
                                             style={{ 
                                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                                padding: '1.2rem 1.5rem', borderRadius: '14px', border: '1px solid rgba(0,0,0,0.05)',
-                                                background: '#fcfdfd', flexWrap: 'wrap', gap: '1rem'
+                                                padding: '1.2rem 1.5rem', borderRadius: '14px', 
+                                                border: isPending ? '1px dashed rgba(245,158,11,0.4)' : '1px solid rgba(0,0,0,0.05)',
+                                                background: isPending ? '#FFFBEB' : '#fcfdfd', flexWrap: 'wrap', gap: '1rem',
+                                                opacity: isPending ? 0.85 : 1
                                             }}
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(0,214,107,0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                                                    {miembro.nombre_completo.charAt(0).toUpperCase()}
+                                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: isPending ? 'rgba(245,158,11,0.1)' : 'rgba(0,214,107,0.1)', color: isPending ? '#f59e0b' : 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                                                    {isPending ? <Mail size={18} /> : miembro.nombre_completo.charAt(0).toUpperCase()}
                                                 </div>
                                                 <div>
                                                     <div style={{ fontWeight: 'bold', color: 'var(--text-dark)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        {miembro.nombre_completo}
+                                                        {isPending ? miembro.email : miembro.nombre_completo}
                                                         {isMe && <span style={{ fontSize: '0.75rem', background: 'rgba(0,0,0,0.06)', color: 'var(--text-gray)', padding: '2px 6px', borderRadius: '10px' }}>Tú</span>}
+                                                        {isPending && (
+                                                            <span style={{ fontSize: '0.72rem', background: 'rgba(245,158,11,0.15)', color: '#b45309', padding: '2px 8px', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                <Clock size={10} /> Pendiente
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div style={{ fontSize: '0.85rem', color: 'var(--text-gray)', marginTop: '2px' }}>
-                                                        {miembro.email} • Vinculado el {new Date(miembro.created_at).toLocaleDateString()}
+                                                        {isPending 
+                                                            ? `Invitado el ${new Date(miembro.invitado_en).toLocaleDateString()}`
+                                                            : `${miembro.email} • Vinculado el ${new Date(miembro.created_at).toLocaleDateString()}`
+                                                        }
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
                                                 {/* Role Selector/Badge */}
-                                                {userRole === 'administrador' && !isMe ? (
+                                                {userRole === 'administrador' && !isMe && !isPending ? (
                                                     <select
                                                         value={miembro.rol}
                                                         onChange={e => handleUpdateMemberRole(miembro.miembro_id, e.target.value)}
@@ -948,8 +1010,32 @@ export default function EmpresaDashboard() {
                                                     </span>
                                                 )}
 
-                                                {/* Delete Button for Admins */}
-                                                {userRole === 'administrador' && !isMe && (
+                                                {/* Pending member actions: Resend + Cancel */}
+                                                {userRole === 'administrador' && isPending && (
+                                                    <>
+                                                        <button 
+                                                            onClick={() => handleResendInvite(miembro)}
+                                                            style={{ background: 'none', border: '1px solid rgba(0,214,107,0.3)', color: 'var(--primary)', cursor: 'pointer', padding: '5px 10px', borderRadius: '8px', transition: 'background 0.2s', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem', fontWeight: '600' }}
+                                                            onMouseOver={e => e.currentTarget.style.background = 'rgba(0,214,107,0.05)'}
+                                                            onMouseOut={e => e.currentTarget.style.background = 'none'}
+                                                            title="Reenviar invitación"
+                                                        >
+                                                            <RefreshCw size={13} /> Reenviar
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleCancelInvite(miembro)}
+                                                            style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', padding: '6px', borderRadius: '6px', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                            onMouseOver={e => e.currentTarget.style.background = 'rgba(211,47,47,0.05)'}
+                                                            onMouseOut={e => e.currentTarget.style.background = 'none'}
+                                                            title="Cancelar invitación"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </>
+                                                )}
+
+                                                {/* Delete Button for active members (Admins only) */}
+                                                {userRole === 'administrador' && !isMe && !isPending && (
                                                     <button 
                                                         onClick={() => handleRemoveMember(miembro)}
                                                         style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', padding: '6px', borderRadius: '6px', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center' }}

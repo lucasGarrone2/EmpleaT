@@ -47,7 +47,7 @@ export default function TerminosLegales() {
                 <h3 style={{ marginTop: '1.5rem', color: 'var(--secondary)' }}>1.3. Derechos ARCO y Derecho al Olvido</h3>
                 <p style={{ color: 'var(--text-gray)', lineHeight: '1.6', marginBottom: '1.5rem' }}>
                     De conformidad con la Ley N° 25.326 y las normativas internacionales de protección de datos (como el GDPR), usted dispone del derecho de Acceso, Rectificación, Cancelación y Oposición (Derechos ARCO).
-                    Puede actualizar o rectificar sus datos manualmente en cualquier momento desde "Mi Perfil". Asimismo, puede solicitar la eliminación total de sus datos y de todos sus archivos de currículum almacenados en nuestros servidores y buckets (Supabase Storage) haciendo clic en el botón de eliminación de cuenta o enviando un correo a <strong>privacidad@empleat.com</strong>.
+                    Puede actualizar o rectificar sus datos manualmente en cualquier momento desde "Mi Perfil". Asimismo, puede solicitar la eliminación total de sus datos y de todos sus archivos de currículum almacenados en nuestros servidores y buckets (Supabase Storage) haciendo clic en el botón de eliminación de cuenta o enviando un correo a <strong><a href="mailto:support@empleat.com.ar" style={{ color: 'var(--primary)' }}>support@empleat.com.ar</a></strong>.
                 </p>
             </section>
 
@@ -100,6 +100,13 @@ export default function TerminosLegales() {
                 <h3 style={{ marginTop: '1.5rem', color: 'var(--secondary)' }}>4.3. Moderación y Suspensión de Cuentas</h3>
                 <p style={{ color: 'var(--text-gray)', lineHeight: '1.6', marginBottom: '1.5rem' }}>
                     EmpleaT se reserva el derecho de moderar el contenido publicado en la plataforma y suspender, restringir o eliminar de forma definitiva (derecho de admisión) el acceso de cualquier Usuario (candidato o empresa) que incumpla estas normas de uso aceptable, actúe de mala fe, o ponga en riesgo la seguridad de la infraestructura tecnológica o de los datos personales almacenados, sin necesidad de notificación previa y sin lugar a reclamos de indemnización.
+                </p>
+            </section>
+
+            <section style={{ marginBottom: '3rem' }}>
+                <h2 style={{ color: 'var(--primary)', marginBottom: '1.5rem', fontSize: '2rem' }}>5. Contacto y Atención a Usuarios</h2>
+                <p style={{ color: 'var(--text-gray)', lineHeight: '1.6' }}>
+                    Para consultas técnicas, soporte de cuenta, reclamos o ejercicio de derechos de privacidad, podés escribir directamente a nuestro equipo de atención en <strong><a href="mailto:support@empleat.com.ar" style={{ color: 'var(--primary)', fontWeight: 'bold' }}>support@empleat.com.ar</a></strong>.
                 </p>
             </section>
         </div>

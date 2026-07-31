@@ -98,7 +98,6 @@ export default function SkillQuiz() {
 
             } catch (err) {
                 if (err.name === 'AbortError') {
-                    console.log('Examen cancelado (unmounted).');
                     return;
                 }
                 if (isMounted) {

@@ -13,26 +13,42 @@ export default function ResetPassword() {
 
     const navigate = useNavigate();
 
-    // SEC-18: Verificar que la sesión activa es realmente de recovery
+    const translateAuthError = (msg) => {
+        if (!msg) return 'Ocurrió un error inesperado. Por favor, intenta de nuevo.';
+        const lower = String(msg).toLowerCase();
+        if (lower.includes('auth session missing') || lower.includes('session missing') || lower.includes('no session')) {
+            return 'Tu enlace de recuperación no es válido o ha expirado. Por favor, solicita un nuevo enlace.';
+        }
+        if (lower.includes('same password') || lower.includes('should be different')) {
+            return 'La nueva contraseña debe ser diferente a la anterior.';
+        }
+        if (lower.includes('rate limit') || lower.includes('too many requests')) {
+            return 'Demasiados intentos. Por favor aguarda unos minutos e intenta de nuevo.';
+        }
+        return msg;
+    };
+
     useEffect(() => {
         const isRecovering = sessionStorage.getItem('is_recovering_password') === 'true';
         if (!isRecovering) {
-            // Si no hay flag de recovery, no hay nada que hacer aquí
-            navigate('/login', { replace: true });
+            supabase.auth.getSession().then(({ data: { session } }) => {
+                if (!session) {
+                    setError("Tu enlace de recuperación no es válido o ha expirado. Por favor, solicita uno nuevo.");
+                }
+            });
         }
-    }, [navigate]);
+    }, []);
 
     const handleUpdatePassword = async (e) => {
         e.preventDefault();
         
         if (password !== confirmPassword) {
-            setError("Las contraseñas no coinciden");
+            setError("Las contraseñas no coinciden.");
             return;
         }
 
-        // SEC-22: Mínimo 8 caracteres
         if (password.length < 8) {
-            setError("La contraseña debe tener al menos 8 caracteres");
+            setError("La contraseña debe tener al menos 8 caracteres.");
             return;
         }
 
@@ -42,10 +58,10 @@ export default function ResetPassword() {
         const { error } = await supabase.auth.updateUser({ password });
 
         if (error) {
-            setError(error.message);
+            setError(translateAuthError(error.message));
         } else {
             sessionStorage.removeItem('is_recovering_password');
-            await supabase.auth.signOut(); // Sign out to force fresh login with new password
+            await supabase.auth.signOut();
             setSuccess(true);
             setTimeout(() => {
                 navigate('/login');
@@ -83,14 +99,24 @@ export default function ResetPassword() {
 
                         {!success && (
                             <>
-                                {error && <div className="message error">{error}</div>}
+                                {error && (
+                                    <div className="message error" style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+                                        <div>{error}</div>
+                                        <button 
+                                            onClick={() => navigate('/forgot-password')} 
+                                            style={{ marginTop: '10px', background: 'none', border: 'none', color: '#d32f2f', fontWeight: 'bold', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.9rem' }}
+                                        >
+                                            Solicitar nuevo enlace de recuperación →
+                                        </button>
+                                    </div>
+                                )}
 
                                 <form onSubmit={handleUpdatePassword} className="register-form">
                                     <div className="input-group">
                                         <label>Nueva Contraseña</label>
                                         <input 
                                             type="password" 
-                                            placeholder="Mínimo 6 caracteres" 
+                                            placeholder="Mínimo 8 caracteres" 
                                             value={password} 
                                             onChange={(e) => setPassword(e.target.value)} 
                                             required 

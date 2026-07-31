@@ -30,6 +30,7 @@ import MisChats from './pages/MisChats';
 import EmpresaAnalytics from './pages/EmpresaAnalytics';
 import BusquedaCandidatos from './pages/BusquedaCandidatos';
 import EmpresaPricing from './pages/EmpresaPricing';
+import AceptarInvitacion from './pages/AceptarInvitacion';
 
 function RecoveryGuard() {
   const location = useLocation();
@@ -45,6 +46,14 @@ function RecoveryGuard() {
         sessionStorage.removeItem('is_recovering_password');
         await supabase.auth.signOut();
         navigate('/login', { replace: true });
+      }
+
+      const isAcceptingInvite = sessionStorage.getItem('is_accepting_invitation') === 'true';
+      const isInvitePath = location.pathname === '/aceptar-invitacion';
+
+      if (isAcceptingInvite && !isInvitePath) {
+        // Limpiar flag si el usuario navega fuera de la página de invitación
+        sessionStorage.removeItem('is_accepting_invitation');
       }
     };
     checkRecovery();
@@ -67,6 +76,7 @@ function App() {
           <Route path="/terms-of-service" element={<TermsOfService/>} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/pricing-empresa" element={<EmpresaPricing />} />
+          <Route path="/aceptar-invitacion" element={<AceptarInvitacion />} />
 
           {/* Rutas exclusivas para invitados (no logueados) */}
           <Route element={<PublicOnlyRoute />}>

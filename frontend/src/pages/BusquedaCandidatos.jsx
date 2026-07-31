@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, triggerSessionExpired } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
-import { Search, Briefcase, MapPin, Star, ChevronDown, Lock, Sparkles, Users, X, MessageCircle, Loader2, Send, AlertTriangle } from 'lucide-react';
+import { Search, Briefcase, MapPin, Star, ChevronDown, Lock, Sparkles, Users, X, MessageCircle, Loader2, Send, AlertTriangle, Eye, User, Award, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -18,6 +18,9 @@ export default function BusquedaCandidatos() {
     const [searching, setSearching] = useState(false);
     const [results, setResults] = useState([]);
     const [searched, setSearched] = useState(false);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
 
     // Search filters
     const [skillInput, setSkillInput] = useState('');
@@ -25,7 +28,8 @@ export default function BusquedaCandidatos() {
     const [experienciaMin, setExperienciaMin] = useState(0);
     const [suggestions, setSuggestions] = useState([]);
 
-    // Contact modal state
+    // Profile & Contact modal state
+    const [verPerfilModal, setVerPerfilModal] = useState(null);
     const [ofertasActivas, setOfertasActivas] = useState([]);
     const [contactModal, setContactModal] = useState(null); // { candidato_id, titulo_profesional }
     const [selectedOferta, setSelectedOferta] = useState('');
@@ -109,13 +113,19 @@ export default function BusquedaCandidatos() {
         setSelectedSkills(selectedSkills.filter(s => s !== skill));
     };
 
-    const handleSearch = async () => {
+    const handleSearch = async (targetPage = 1) => {
         if (!isPremium) return;
         setSearching(true);
         setSearched(true);
+        const pageToLoad = typeof targetPage === 'number' ? targetPage : 1;
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                triggerSessionExpired();
+                return;
+            }
+
             const res = await fetch(`${API_URL}/api/empresa/buscar-candidatos`, {
                 method: 'POST',
                 headers: {
@@ -125,9 +135,15 @@ export default function BusquedaCandidatos() {
                 body: JSON.stringify({
                     skills: selectedSkills,
                     experiencia_min: experienciaMin,
-                    limit: 30
+                    page: pageToLoad,
+                    limit: 10
                 })
             });
+
+            if (res.status === 401) {
+                triggerSessionExpired();
+                return;
+            }
 
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -136,6 +152,9 @@ export default function BusquedaCandidatos() {
 
             const data = await res.json();
             setResults(data.candidatos || []);
+            setPage(data.page || pageToLoad);
+            setTotalPages(data.totalPages || 1);
+            setTotalCount(data.total || (data.candidatos ? data.candidatos.length : 0));
         } catch (err) {
             console.error("Error searching candidates:", err);
             setResults([]);
@@ -197,7 +216,7 @@ export default function BusquedaCandidatos() {
                 }}>
                     <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(0,214,107,0.1)', filter: 'blur(20px)' }} />
                     <Lock size={48} color="#FFB020" style={{ marginBottom: '1.5rem' }} />
-                    <h2 style={{fontSize: '2rem', margin: '0 0 1rem', fontWeight: '800' }}>
+                    <h2 style={{ color: '#ffffff', fontSize: '2rem', margin: '0 0 1rem', fontWeight: '800' }}>
                         Búsqueda Avanzada de Talento
                     </h2>
                     <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1.1rem', lineHeight: '1.6', maxWidth: '500px', margin: '0 auto 2rem' }}>
@@ -365,16 +384,32 @@ export default function BusquedaCandidatos() {
                                 <div key={candidato.candidato_id} style={{
                                     background: 'white', borderRadius: '16px', padding: '1.5rem',
                                     border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)',
-                                    transition: 'all 0.2s', cursor: 'default'
+                                    transition: 'all 0.2s', cursor: 'default', display: 'flex', flexDirection: 'column', justifyContent: 'space-between'
                                 }}
                                 onMouseOver={e => { e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,214,107,0.1)'; e.currentTarget.style.borderColor = 'rgba(0,214,107,0.3)'; }}
                                 onMouseOut={e => { e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.03)'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.06)'; }}
                                 >
-                                    <div style={{ marginBottom: '12px' }}>
-                                        <h3 style={{ margin: '0 0 4px', fontSize: '1.15rem', color: 'var(--text-dark)' }}>
-                                            {candidato.titulo_profesional || 'Profesional'}
-                                        </h3>
-                                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '0.88rem', color: '#64748b' }}>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                                            <div style={{
+                                                width: '42px', height: '42px', borderRadius: '50%',
+                                                background: 'rgba(0,214,107,0.1)', color: 'var(--primary)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontWeight: 'bold', fontSize: '1.1rem', flexShrink: 0
+                                            }}>
+                                                {(candidato.nombre_completo || 'C').charAt(0).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-dark)', fontWeight: '700' }}>
+                                                    {candidato.nombre_completo || 'Candidato'}
+                                                </h3>
+                                                <div style={{ fontSize: '0.9rem', color: 'var(--primary)', fontWeight: '600', marginTop: '2px' }}>
+                                                    {candidato.titulo_profesional || 'Profesional'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', fontSize: '0.85rem', color: '#64748b', marginBottom: '14px' }}>
                                             {candidato.anios_experiencia !== null && (
                                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                     <Briefcase size={14} /> {candidato.anios_experiencia} año{candidato.anios_experiencia !== 1 ? 's' : ''} exp.
@@ -391,37 +426,52 @@ export default function BusquedaCandidatos() {
                                                 </span>
                                             )}
                                         </div>
+
+                                        {/* Skills */}
+                                        {candidato.skills_match && Array.isArray(candidato.skills_match) && (
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
+                                                {candidato.skills_match.slice(0, 8).map((skill, i) => {
+                                                    const isSearched = selectedSkills.some(s => 
+                                                        skill.nombre?.toLowerCase().includes(s.toLowerCase()) ||
+                                                        s.toLowerCase().includes(skill.nombre?.toLowerCase())
+                                                    );
+                                                    return (
+                                                        <span key={i} style={{
+                                                            padding: '3px 8px', borderRadius: '6px',
+                                                            fontSize: '0.78rem', fontWeight: '600',
+                                                            background: isSearched ? 'rgba(0,214,107,0.12)' : '#f1f5f9',
+                                                            color: isSearched ? 'var(--primary)' : '#64748b',
+                                                            border: isSearched ? '1px solid rgba(0,214,107,0.3)' : '1px solid transparent'
+                                                        }}>
+                                                            {skill.nombre} {skill.nivel ? `(${skill.nivel}/5)` : ''}
+                                                        </span>
+                                                    );
+                                                })}
+                                                {candidato.skills_match.length > 8 && (
+                                                    <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', color: '#94a3b8', background: '#f8fafc' }}>
+                                                        +{candidato.skills_match.length - 8} más
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Skills */}
-                                    {candidato.skills_match && Array.isArray(candidato.skills_match) && (
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
-                                            {candidato.skills_match.slice(0, 8).map((skill, i) => {
-                                                const isSearched = selectedSkills.some(s => 
-                                                    skill.nombre?.toLowerCase().includes(s.toLowerCase()) ||
-                                                    s.toLowerCase().includes(skill.nombre?.toLowerCase())
-                                                );
-                                                return (
-                                                    <span key={i} style={{
-                                                        padding: '3px 8px', borderRadius: '6px',
-                                                        fontSize: '0.78rem', fontWeight: '600',
-                                                        background: isSearched ? 'rgba(0,214,107,0.12)' : '#f1f5f9',
-                                                        color: isSearched ? 'var(--primary)' : '#64748b',
-                                                        border: isSearched ? '1px solid rgba(0,214,107,0.3)' : '1px solid transparent'
-                                                    }}>
-                                                        {skill.nombre} {skill.nivel ? `(${skill.nivel}/5)` : ''}
-                                                    </span>
-                                                );
-                                            })}
-                                            {candidato.skills_match.length > 8 && (
-                                                <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.78rem', color: '#94a3b8', background: '#f8fafc' }}>
-                                                    +{candidato.skills_match.length - 8} más
-                                                </span>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                    {/* Action Buttons */}
+                                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
+                                        <button
+                                            onClick={() => setVerPerfilModal(candidato)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '6px',
+                                                background: 'white', color: 'var(--text-dark)',
+                                                border: '1px solid rgba(0,0,0,0.12)', padding: '8px 14px', borderRadius: '10px',
+                                                fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
+                                            onMouseOut={e => e.currentTarget.style.background = 'white'}
+                                        >
+                                            <Eye size={15} color="#64748b" /> Ver Perfil
+                                        </button>
                                         <button
                                             onClick={() => handleContactar(candidato)}
                                             style={{
@@ -442,6 +492,189 @@ export default function BusquedaCandidatos() {
                             ))}
                         </div>
                     )}
+
+                    {/* Controles de Paginación */}
+                    {results.length > 0 && (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '16px',
+                            marginTop: '2rem',
+                            padding: '1rem',
+                            background: 'white',
+                            borderRadius: '16px',
+                            boxShadow: '0 4px 15px rgba(0,0,0,0.03)'
+                        }}>
+                            <button
+                                onClick={() => handleSearch(page - 1)}
+                                disabled={page <= 1 || searching}
+                                style={{
+                                    padding: '8px 18px',
+                                    borderRadius: '10px',
+                                    border: '1px solid rgba(0,0,0,0.1)',
+                                    background: page <= 1 ? '#f1f5f9' : 'white',
+                                    color: page <= 1 ? '#94a3b8' : '#1e293b',
+                                    fontWeight: '600',
+                                    fontSize: '0.9rem',
+                                    cursor: page <= 1 || searching ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}
+                            >
+                                <ChevronLeft size={16} /> Anterior
+                            </button>
+                            <span style={{ fontSize: '0.92rem', color: '#64748b', fontWeight: '600' }}>
+                                Página {page} de {totalPages} ({totalCount} candidato{totalCount !== 1 ? 's' : ''})
+                            </span>
+                            <button
+                                onClick={() => handleSearch(page + 1)}
+                                disabled={page >= totalPages || searching}
+                                style={{
+                                    padding: '8px 18px',
+                                    borderRadius: '10px',
+                                    border: '1px solid rgba(0,0,0,0.1)',
+                                    background: page >= totalPages ? '#f1f5f9' : 'white',
+                                    color: page >= totalPages ? '#94a3b8' : '#1e293b',
+                                    fontWeight: '600',
+                                    fontSize: '0.9rem',
+                                    cursor: page >= totalPages || searching ? 'not-allowed' : 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}
+                            >
+                                Siguiente <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Modal Ver Perfil */}
+            {verPerfilModal && (
+                <div style={{
+                    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 1000, backdropFilter: 'blur(4px)', padding: '1rem'
+                }} onClick={() => setVerPerfilModal(null)}>
+                    <div style={{
+                        background: 'white', borderRadius: '24px', padding: '2.5rem',
+                        maxWidth: '560px', width: '100%', maxHeight: '85vh', overflowY: 'auto',
+                        boxShadow: '0 25px 60px rgba(0,0,0,0.25)', position: 'relative'
+                    }} onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setVerPerfilModal(null)} style={{
+                            position: 'absolute', top: '20px', right: '20px', background: '#f1f5f9',
+                            border: 'none', cursor: 'pointer', color: '#64748b', borderRadius: '50%',
+                            width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.2s'
+                        }}><X size={20} /></button>
+
+                        {/* Candidate Header Profile */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: '1px solid #f1f5f9' }}>
+                            <div style={{
+                                width: '64px', height: '64px', borderRadius: '50%',
+                                background: 'linear-gradient(135deg, rgba(0,214,107,0.2), rgba(0,214,107,0.05))',
+                                color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontWeight: 'bold', fontSize: '1.75rem', border: '2px solid rgba(0,214,107,0.3)',
+                                flexShrink: 0
+                            }}>
+                                {(verPerfilModal.nombre_completo || 'C').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: '1.4rem', color: 'var(--text-dark)', fontWeight: '800' }}>
+                                    {verPerfilModal.nombre_completo || 'Candidato'}
+                                </h2>
+                                <p style={{ margin: '4px 0 0', fontSize: '1rem', color: 'var(--primary)', fontWeight: '600' }}>
+                                    {verPerfilModal.titulo_profesional || 'Profesional'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Details Badges */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '1.5rem' }}>
+                            {verPerfilModal.anios_experiencia !== null && (
+                                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>Experiencia</div>
+                                    <div style={{ fontWeight: '700', color: 'var(--text-dark)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <Briefcase size={16} color="var(--primary)" /> {verPerfilModal.anios_experiencia} año{verPerfilModal.anios_experiencia !== 1 ? 's' : ''}
+                                    </div>
+                                </div>
+                            )}
+                            {verPerfilModal.ubicacion && (
+                                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>Ubicación</div>
+                                    <div style={{ fontWeight: '700', color: 'var(--text-dark)', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <MapPin size={16} color="var(--primary)" /> {verPerfilModal.ubicacion}
+                                    </div>
+                                </div>
+                            )}
+                            {verPerfilModal.modalidad_preferida && (
+                                <div style={{ background: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #f1f5f9' }}>
+                                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>Modalidad</div>
+                                    <div style={{ fontWeight: '700', color: 'var(--primary)', fontSize: '0.95rem' }}>
+                                        {verPerfilModal.modalidad_preferida}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Skills Section */}
+                        <div style={{ marginBottom: '2rem' }}>
+                            <h4 style={{ margin: '0 0 12px', fontSize: '0.95rem', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                Habilidades y Conocimientos
+                            </h4>
+                            {verPerfilModal.skills_match && Array.isArray(verPerfilModal.skills_match) && verPerfilModal.skills_match.length > 0 ? (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                    {verPerfilModal.skills_match.map((skill, i) => (
+                                        <div key={i} style={{
+                                            padding: '6px 12px', borderRadius: '8px',
+                                            fontSize: '0.85rem', fontWeight: '600',
+                                            background: 'rgba(0,214,107,0.1)', color: 'var(--primary)',
+                                            border: '1px solid rgba(0,214,107,0.2)', display: 'flex', alignItems: 'center', gap: '6px'
+                                        }}>
+                                            <span>{skill.nombre}</span>
+                                            {skill.nivel && (
+                                                <span style={{ fontSize: '0.75rem', background: 'white', color: 'var(--primary)', padding: '1px 6px', borderRadius: '6px', fontWeight: 'bold' }}>
+                                                    {skill.nivel}/5
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p style={{ color: '#94a3b8', fontSize: '0.9rem', fontStyle: 'italic' }}>No hay habilidades detalladas en el perfil.</p>
+                            )}
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+                            <button
+                                onClick={() => setVerPerfilModal(null)}
+                                style={{
+                                    padding: '12px 20px', borderRadius: '12px', background: '#f1f5f9',
+                                    color: '#64748b', border: 'none', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer'
+                                }}
+                            >
+                                Cerrar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const c = verPerfilModal;
+                                    setVerPerfilModal(null);
+                                    handleContactar(c);
+                                }}
+                                style={{
+                                    padding: '12px 24px', borderRadius: '12px', background: 'var(--primary)',
+                                    color: 'white', border: 'none', fontWeight: 'bold', fontSize: '0.95rem', cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 15px rgba(0,214,107,0.3)'
+                                }}
+                            >
+                                <MessageCircle size={18} /> Contactar Candidato
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 

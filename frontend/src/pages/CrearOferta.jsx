@@ -75,13 +75,46 @@ export default function CrearOferta() {
         setSkillsList(skillsList.map(s => s.nombre === nombre ? { ...s, nivel: nuevoNivel } : s));
     };
 
-    const sugerirSkills = () => {
+    const toggleSkillCore = (nombre) => {
+        setSkillsList(skillsList.map(s => s.nombre === nombre ? { ...s, es_core: s.es_core === false ? true : false } : s));
+    };
+
+    const [extractingSkills, setExtractingSkills] = useState(false);
+
+    const sugerirSkills = async () => {
         if (!formData.descripcion.trim()) {
-            setError('Escribe una descripción primero para poder extraer las habilidades.');
+            setError('Escribí una descripción primero para poder extraer las habilidades.');
             setTimeout(() => setError(null), 4000);
             return;
         }
 
+        setExtractingSkills(true);
+        try {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/empresa/extraer-skills-oferta`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ descripcion: formData.descripcion })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                if (data.skills && data.skills.length > 0) {
+                    setSkillsList(prev => {
+                        const existingNames = new Set(prev.map(p => p.nombre.toLowerCase()));
+                        const newSkills = data.skills
+                            .filter(s => !existingNames.has(s.nombre.toLowerCase()))
+                            .map(s => ({ nombre: s.nombre, nivel: skillNivel }));
+                        return [...prev, ...newSkills];
+                    });
+                    setExtractingSkills(false);
+                    return;
+                }
+            }
+        } catch (err) {
+            console.warn("Falling back to local skill extraction:", err);
+        }
+
+        // Fallback local con COMMON_SKILLS si la IA no está disponible
         const extracted = [];
         const descLower = formData.descripcion.toLowerCase();
         
@@ -103,9 +136,10 @@ export default function CrearOferta() {
                 .map(e => ({ nombre: e, nivel: skillNivel }))
             ]);
         } else {
-            setError('No se detectaron habilidades técnicas estándar en tu descripción.');
+            setError('No se detectaron habilidades en la descripción. Podés agregarlas manualmente.');
             setTimeout(() => setError(null), 4000);
         }
+        setExtractingSkills(false);
     };
 
     const handleSubmit = async (e) => {
@@ -366,18 +400,20 @@ export default function CrearOferta() {
                         <button 
                             type="button" 
                             onClick={sugerirSkills}
+                            disabled={extractingSkills}
                             style={{ 
                                 display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', 
                                 background: '#EAF9F1', color: 'var(--primary)', border: '1px solid #c2e8d4', 
-                                borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' 
+                                borderRadius: '8px', cursor: extractingSkills ? 'wait' : 'pointer', fontWeight: 'bold', fontSize: '0.85rem',
+                                opacity: extractingSkills ? 0.7 : 1
                             }}
                         >
-                            <FileSearch size={16} /> Extraer de la Descripción
+                            <FileSearch size={16} /> {extractingSkills ? 'Analizando con IA...' : 'Extraer de la Descripción'}
                         </button>
                     </div>
                     
                     <p style={{ fontSize: '0.85rem', color: '#666', marginTop: 0, marginBottom: '12px' }}>
-                        ¡Escribe tu anuncio arriba y usa el botón para extraer las tecnologías requeridas, o escríbelas y presiona <strong>ENTER</strong>!
+                        ¡Escribí la descripción arriba y usá el botón para extraer automáticamente las habilidades de cualquier rubro (Salud, Medicina, Administración, Ventas, IT, Oficios, etc.), o escríbelas y presioná <strong>ENTER</strong>!
                     </p>
                     
                     <div style={{ 
@@ -395,11 +431,30 @@ export default function CrearOferta() {
                         {skillsList.map((skill, index) => (
                             <div key={index} style={{ 
                                 display: 'flex', alignItems: 'center', gap: '6px',
-                                background: 'rgba(0,214,107,0.08)', color: 'var(--primary)',
+                                background: skill.es_core !== false ? 'rgba(0,214,107,0.08)' : 'rgba(100,100,100,0.08)',
+                                color: skill.es_core !== false ? 'var(--primary)' : '#444',
                                 padding: '5px 8px 5px 14px', borderRadius: '20px', fontSize: '0.95rem', fontWeight: 'bold',
-                                border: '1px solid rgba(0,214,107,0.2)'
+                                border: skill.es_core !== false ? '1px solid rgba(0,214,107,0.2)' : '1px solid rgba(0,0,0,0.1)'
                             }}>
                                 <span>{skill.nombre}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => toggleSkillCore(skill.nombre)}
+                                    title={skill.es_core !== false ? "Habilidad Esencial / Core (75% peso)" : "Herramienta Secundaria (25% peso)"}
+                                    style={{
+                                        border: 'none',
+                                        background: skill.es_core !== false ? '#fff3cd' : '#e9ecef',
+                                        color: skill.es_core !== false ? '#856404' : '#495057',
+                                        borderRadius: '10px',
+                                        padding: '2px 8px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 'bold',
+                                        cursor: 'pointer',
+                                        outline: 'none'
+                                    }}
+                                >
+                                    {skill.es_core !== false ? '⭐ Core' : '🛠️ Secundaria'}
+                                </button>
                                 <select
                                     value={skill.nivel}
                                     onChange={e => updateSkillNivel(skill.nombre, Number(e.target.value))}
@@ -410,11 +465,11 @@ export default function CrearOferta() {
                                         cursor: 'pointer', outline: 'none'
                                     }}
                                 >
-                                    <option value={1}>Lvl 1</option>
-                                    <option value={2}>Lvl 2</option>
-                                    <option value={3}>Lvl 3</option>
-                                    <option value={4}>Lvl 4</option>
-                                    <option value={5}>Lvl 5</option>
+                                    <option value={1}>Lvl 1 - Inicial / Trainee</option>
+                                    <option value={2}>Lvl 2 - Junior</option>
+                                    <option value={3}>Lvl 3 - Semi-Senior</option>
+                                    <option value={4}>Lvl 4 - Senior</option>
+                                    <option value={5}>Lvl 5 - Experto / Lead</option>
                                 </select>
                                 <X 
                                     size={14} 
@@ -424,16 +479,16 @@ export default function CrearOferta() {
                                 />
                             </div>
                         ))}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1', minWidth: '200px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: '1', minWidth: '180px', maxWidth: '100%', flexWrap: 'wrap' }}>
                             <input 
                                 type="text" maxLength={200}
                                 value={skillInput}
                                 onChange={(e) => setSkillInput(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                placeholder={skillsList.length === 0 ? "Ej: React, Node, SQL..." : "Agregar otra..."}
+                                placeholder={skillsList.length === 0 ? "Ej: Diagnóstico Clínico, Excel Avanzado, React..." : "Agregar otra..."}
                                 style={{ 
-                                    flex: '1', border: 'none', outline: 'none', 
-                                    padding: '6px', fontSize: '1.05rem', background: 'transparent'
+                                    flex: '1 1 120px', border: 'none', outline: 'none', 
+                                    padding: '6px', fontSize: '1rem', background: 'transparent', minWidth: '100px'
                                 }}
                             />
                             <select
@@ -441,20 +496,30 @@ export default function CrearOferta() {
                                 onChange={e => setSkillNivel(Number(e.target.value))}
                                 title="Nivel para la próxima skill"
                                 style={{ 
-                                    border: '1px solid rgba(0,0,0,0.1)', background: 'white', color: 'var(--text-gray)',
+                                    border: '1px solid rgba(0,0,0,0.15)', background: '#f8f9fa', color: 'var(--text-gray)',
                                     borderRadius: '8px', padding: '4px 8px', fontSize: '0.85rem',
-                                    cursor: 'pointer', outline: 'none'
+                                    cursor: 'pointer', outline: 'none', maxWidth: '100%'
                                 }}
                             >
-                                <option value={1}>Lvl 1</option>
-                                <option value={2}>Lvl 2</option>
-                                <option value={3}>Lvl 3</option>
-                                <option value={4}>Lvl 4</option>
-                                <option value={5}>Lvl 5</option>
+                                <option value={1}>Lvl 1 - Inicial / Trainee</option>
+                                <option value={2}>Lvl 2 - Junior</option>
+                                <option value={3}>Lvl 3 - Semi-Senior</option>
+                                <option value={4}>Lvl 4 - Senior</option>
+                                <option value={5}>Lvl 5 - Experto / Lead</option>
                             </select>
                         </div>
                     </div>
-                    <p style={{ fontSize: '0.8rem', color: '#888', margin: '6px 0 0 0' }}>Seleccioná el nivel requerido antes de presionar Enter. Podés cambiarlo en cada tag.</p>
+
+                    {/* LEYENDA EXPLICATIVA DE CORE VS SECUNDARIA */}
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', background: '#eef9ff', border: '1px solid #b6e4ff', borderRadius: '10px', padding: '8px 12px', marginTop: '10px', fontSize: '0.83rem', color: '#00568c' }}>
+                        <span style={{ fontSize: '1.1rem' }}>💡</span>
+                        <span>
+                            <strong>Habilidades Core vs Secundarias:</strong> Hacé clic en la etiqueta <span style={{ background: '#fff3cd', color: '#856404', padding: '2px 6px', borderRadius: '6px', fontWeight: 'bold' }}>⭐ Core</span> o <span style={{ background: '#e9ecef', color: '#495057', padding: '2px 6px', borderRadius: '6px', fontWeight: 'bold' }}>🛠️ Secundaria</span> de cualquier skill para cambiar su importancia. Las <strong>Core (75% peso)</strong> son imprescindibles, mientras que las <strong>Secundarias (25% peso)</strong> son deseables.
+                        </span>
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: '#666', margin: '6px 0 0 0' }}>
+                        <strong>Referencia de Niveles:</strong> Lvl 1 (Inicial/Trainee) · Lvl 2 (Junior) · Lvl 3 (Semi-Senior) · Lvl 4 (Senior) · Lvl 5 (Experto/Lead).
+                    </p>
                 </div>
 
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>

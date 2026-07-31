@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
 import { Briefcase, ArrowLeft, Users, Zap, MapPin, Trash2, PauseCircle, PlayCircle, Edit, Kanban, List } from 'lucide-react';
+import { hayOverlapCategorias, getCategoriaSkill } from '../utils/categories';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -163,71 +164,310 @@ export default function OfertaDetalleEmpresa() {
                 if (postError) throw postError;
 
                 // Precalcular afinidades en memoria para poder ordenar por Tiers Premium
+                const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
                 const reqSkills = ofData.oferta_skills || [];
+                const offerTitleNorm = normalize(ofData.titulo || '');
+                const offerDescNorm = normalize(ofData.descripcion || '');
+                const allOfferText = offerTitleNorm + " " + offerDescNorm;
+
                 const synonymMap = {
-                    'sql': ['mysql', 'postgresql', 'sql server', 'oracle', 'pl/sql'],
-                    'mysql': ['sql', 'base de datos', 'mariadb'],
-                    'postgresql': ['sql', 'base de datos'],
-                    'cloud': ['aws', 'azure', 'gcp', 'google cloud', 'nube'],
-                    'aws': ['cloud', 'nube', 'amazon web services'],
-                    'azure': ['cloud', 'nube', 'microsoft azure'],
-                    'gcp': ['cloud', 'nube', 'google cloud'],
-                    'frontend': ['react', 'vue', 'angular', 'html', 'css', 'javascript', 'js'],
-                    'backend': ['node', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'express', 'desarrollo web'],
-                    'javascript': ['js', 'typescript', 'react', 'node', 'vue', 'angular', 'frontend'],
-                    'js': ['javascript', 'typescript', 'frontend'],
-                    'react': ['javascript', 'frontend', 'reactjs', 'react.js'],
-                    'java': ['spring', 'backend', 'java ee', 'springboot'],
-                    'python': ['django', 'flask', 'backend', 'machine learning', 'data science', 'fastapi'],
-                    'desarrollo web': ['html', 'css', 'javascript', 'frontend', 'backend', 'web', 'php'],
-                    'html': ['html5', 'frontend', 'desarrollo web', 'css'],
-                    'css': ['css3', 'frontend', 'desarrollo web', 'html']
+                    // === DESARROLLO WEB / FULL STACK ===
+                    'full stack': ['fullstack', 'full-stack', 'frontend', 'backend', 'desarrollo web', 'web development', 'react', 'node', 'javascript', 'html', 'css'],
+                    'fullstack': ['full stack', 'full-stack', 'frontend', 'backend', 'desarrollo web', 'react', 'node', 'javascript'],
+                    'full-stack': ['full stack', 'fullstack', 'frontend', 'backend', 'desarrollo web', 'react', 'node', 'javascript'],
+                    'frontend': ['front-end', 'front end', 'react', 'vue', 'angular', 'html', 'css', 'javascript', 'js', 'typescript', 'next.js', 'nextjs', 'desarrollo web', 'ui', 'ux', 'full stack', 'svelte', 'tailwind', 'sass', 'scss', 'webpack', 'vite'],
+                    'front-end': ['frontend', 'front end', 'react', 'vue', 'angular', 'html', 'css', 'javascript', 'desarrollo web'],
+                    'backend': ['back-end', 'back end', 'node', 'nodejs', 'express', 'java', 'python', 'c#', 'php', 'ruby', 'go', 'golang', 'spring', 'django', 'flask', 'fastapi', 'desarrollo web', 'api', 'rest', 'graphql', 'full stack', '.net', 'dotnet'],
+                    'back-end': ['backend', 'back end', 'node', 'express', 'java', 'python', 'desarrollo web'],
+                    'desarrollo web': ['html', 'css', 'javascript', 'frontend', 'backend', 'web', 'php', 'diseño web', 'full stack', 'programacion', 'desarrollo de software'],
+                    'web development': ['desarrollo web', 'html', 'css', 'javascript', 'frontend', 'backend', 'full stack'],
+                    'javascript': ['js', 'ecmascript', 'typescript', 'ts', 'react', 'node', 'nodejs', 'vue', 'angular', 'frontend', 'jquery', 'next.js', 'express', 'desarrollo web'],
+                    'js': ['javascript', 'ecmascript', 'typescript', 'react', 'node', 'frontend', 'desarrollo web'],
+                    'typescript': ['ts', 'javascript', 'js', 'frontend', 'react', 'angular', 'node', 'desarrollo web'],
+                    'ts': ['typescript', 'javascript', 'frontend'],
+                    'react': ['reactjs', 'react.js', 'javascript', 'js', 'frontend', 'next.js', 'nextjs', 'jsx', 'redux', 'desarrollo web', 'hooks', 'componentes', 'spa'],
+                    'reactjs': ['react', 'react.js', 'javascript', 'frontend'],
+                    'react.js': ['react', 'reactjs', 'javascript', 'frontend'],
+                    'next.js': ['nextjs', 'react', 'javascript', 'frontend', 'ssr', 'server side rendering'],
+                    'nextjs': ['next.js', 'react', 'javascript', 'frontend'],
+                    'vue': ['vuejs', 'vue.js', 'javascript', 'frontend', 'nuxt', 'desarrollo web'],
+                    'vuejs': ['vue', 'vue.js', 'javascript', 'frontend'],
+                    'angular': ['angularjs', 'angular.js', 'javascript', 'typescript', 'frontend', 'desarrollo web'],
+                    'node': ['nodejs', 'node.js', 'javascript', 'backend', 'express', 'api', 'npm', 'desarrollo web', 'server'],
+                    'nodejs': ['node', 'node.js', 'javascript', 'backend', 'express'],
+                    'node.js': ['node', 'nodejs', 'javascript', 'backend', 'express'],
+                    'express': ['expressjs', 'node', 'nodejs', 'javascript', 'backend', 'api', 'rest'],
+                    'html': ['html5', 'frontend', 'desarrollo web', 'css', 'diseño web', 'maquetado', 'web'],
+                    'html5': ['html', 'frontend', 'desarrollo web', 'css', 'web'],
+                    'css': ['css3', 'frontend', 'desarrollo web', 'html', 'diseño web', 'sass', 'scss', 'less', 'tailwind', 'bootstrap', 'estilos', 'maquetado'],
+                    'css3': ['css', 'frontend', 'desarrollo web', 'html'],
+                    'tailwind': ['tailwindcss', 'css', 'frontend', 'estilos'],
+                    'bootstrap': ['css', 'frontend', 'estilos', 'diseño web'],
+                    'sass': ['scss', 'css', 'frontend', 'estilos'],
+                    'scss': ['sass', 'css', 'frontend', 'estilos'],
+                    'python': ['py', 'django', 'flask', 'fastapi', 'backend', 'machine learning', 'data science', 'pandas', 'numpy', 'scripting', 'automatizacion', 'programacion', 'desarrollo de software'],
+                    'django': ['python', 'backend', 'web framework', 'desarrollo web', 'api'],
+                    'flask': ['python', 'backend', 'microframework', 'api'],
+                    'fastapi': ['python', 'backend', 'api', 'rest'],
+                    'java': ['spring', 'spring boot', 'springboot', 'backend', 'java ee', 'jee', 'j2ee', 'maven', 'gradle', 'hibernate', 'jpa', 'microservicios', 'programacion', 'desarrollo de software'],
+                    'spring': ['spring boot', 'springboot', 'java', 'backend', 'microservicios'],
+                    'spring boot': ['springboot', 'spring', 'java', 'backend', 'microservicios', 'api'],
+                    'springboot': ['spring boot', 'spring', 'java', 'backend'],
+                    'c#': ['csharp', '.net', 'dotnet', 'asp.net', 'backend', 'microsoft', 'programacion', 'unity'],
+                    'csharp': ['c#', '.net', 'dotnet', 'asp.net', 'backend'],
+                    '.net': ['dotnet', 'c#', 'csharp', 'asp.net', 'backend', 'microsoft'],
+                    'dotnet': ['.net', 'c#', 'csharp', 'asp.net', 'backend'],
+                    'asp.net': ['.net', 'c#', 'backend', 'web'],
+                    'php': ['laravel', 'symfony', 'wordpress', 'backend', 'desarrollo web', 'web', 'programacion'],
+                    'laravel': ['php', 'backend', 'web framework', 'desarrollo web'],
+                    'wordpress': ['php', 'cms', 'web', 'diseño web'],
+                    'mobile': ['movil', 'android', 'ios', 'react native', 'flutter', 'swift', 'kotlin', 'aplicaciones moviles', 'app'],
+                    'movil': ['mobile', 'android', 'ios', 'react native', 'flutter', 'aplicaciones moviles'],
+                    'android': ['kotlin', 'java', 'mobile', 'movil', 'aplicaciones moviles', 'app'],
+                    'ios': ['swift', 'objective-c', 'mobile', 'movil', 'apple', 'xcode', 'aplicaciones moviles', 'app'],
+                    'react native': ['mobile', 'movil', 'react', 'javascript', 'aplicaciones moviles', 'app', 'cross-platform'],
+                    'flutter': ['dart', 'mobile', 'movil', 'aplicaciones moviles', 'app', 'cross-platform'],
+                    'swift': ['ios', 'apple', 'mobile', 'xcode'],
+                    'kotlin': ['android', 'java', 'mobile'],
+                    'sql': ['mysql', 'postgresql', 'postgres', 'sql server', 'oracle', 'pl/sql', 'sqlite', 'base de datos', 'bases de datos', 'database', 'db', 'consultas', 'queries'],
+                    'mysql': ['sql', 'base de datos', 'bases de datos', 'mariadb', 'database', 'db'],
+                    'postgresql': ['postgres', 'sql', 'base de datos', 'bases de datos', 'database', 'db'],
+                    'postgres': ['postgresql', 'sql', 'base de datos', 'database'],
+                    'sql server': ['sql', 'microsoft', 'base de datos', 'tsql', 'database'],
+                    'oracle': ['sql', 'pl/sql', 'base de datos', 'database'],
+                    'mongodb': ['nosql', 'base de datos', 'bases de datos', 'database', 'mongoose', 'db'],
+                    'nosql': ['mongodb', 'redis', 'cassandra', 'dynamodb', 'firebase', 'base de datos', 'database'],
+                    'redis': ['cache', 'nosql', 'base de datos', 'database', 'memoria'],
+                    'base de datos': ['bases de datos', 'sql', 'mysql', 'postgresql', 'mongodb', 'database', 'db', 'datos'],
+                    'bases de datos': ['base de datos', 'sql', 'mysql', 'postgresql', 'mongodb', 'database'],
+                    'database': ['base de datos', 'sql', 'mysql', 'postgresql', 'mongodb'],
+                    'cloud': ['cloud computing', 'aws', 'azure', 'gcp', 'google cloud', 'nube', 'infraestructura', 'iaas', 'paas', 'saas'],
+                    'cloud computing': ['cloud', 'aws', 'azure', 'gcp', 'nube', 'infraestructura'],
+                    'aws': ['amazon web services', 'cloud', 'cloud computing', 'nube', 's3', 'ec2', 'lambda', 'infraestructura'],
+                    'amazon web services': ['aws', 'cloud', 'nube'],
+                    'azure': ['microsoft azure', 'cloud', 'cloud computing', 'nube', 'infraestructura'],
+                    'microsoft azure': ['azure', 'cloud', 'nube'],
+                    'gcp': ['google cloud', 'google cloud platform', 'cloud', 'cloud computing', 'nube'],
+                    'google cloud': ['gcp', 'google cloud platform', 'cloud', 'nube'],
+                    'devops': ['ci/cd', 'docker', 'kubernetes', 'jenkins', 'github actions', 'gitlab', 'infraestructura', 'deploy', 'despliegue', 'automatizacion', 'terraform', 'ansible'],
+                    'docker': ['contenedores', 'containers', 'devops', 'kubernetes', 'infraestructura', 'deploy'],
+                    'kubernetes': ['k8s', 'docker', 'devops', 'contenedores', 'orquestacion', 'infraestructura'],
+                    'k8s': ['kubernetes', 'docker', 'devops', 'contenedores'],
+                    'ci/cd': ['devops', 'jenkins', 'github actions', 'gitlab ci', 'integracion continua', 'deploy'],
+                    'terraform': ['infraestructura', 'devops', 'iac', 'cloud', 'infrastructure as code'],
+                    'git': ['github', 'gitlab', 'bitbucket', 'control de versiones', 'version control', 'svn', 'repositorio'],
+                    'github': ['git', 'control de versiones', 'repositorio', 'github actions'],
+                    'gitlab': ['git', 'control de versiones', 'repositorio', 'gitlab ci'],
+                    'api': ['rest', 'restful', 'api rest', 'graphql', 'soap', 'microservicios', 'endpoints', 'web services', 'servicios web'],
+                    'rest': ['api', 'restful', 'api rest', 'http', 'endpoints', 'web services'],
+                    'restful': ['rest', 'api', 'api rest', 'http'],
+                    'api rest': ['rest', 'restful', 'api', 'http', 'endpoints'],
+                    'graphql': ['api', 'consultas', 'apollo', 'endpoints'],
+                    'microservicios': ['microservices', 'api', 'docker', 'kubernetes', 'arquitectura', 'distribuido'],
+                    'microservices': ['microservicios', 'api', 'docker', 'kubernetes'],
+                    'machine learning': ['ml', 'inteligencia artificial', 'ia', 'ai', 'deep learning', 'data science', 'ciencia de datos', 'python', 'tensorflow', 'pytorch'],
+                    'ml': ['machine learning', 'inteligencia artificial', 'ai', 'data science'],
+                    'inteligencia artificial': ['ia', 'ai', 'machine learning', 'ml', 'deep learning', 'data science'],
+                    'ia': ['inteligencia artificial', 'ai', 'machine learning', 'ml'],
+                    'ai': ['inteligencia artificial', 'ia', 'machine learning', 'ml'],
+                    'data science': ['ciencia de datos', 'machine learning', 'python', 'estadistica', 'analytics', 'big data', 'datos'],
+                    'testing': ['qa', 'quality assurance', 'pruebas', 'test', 'automatizacion de pruebas', 'selenium', 'jest', 'cypress', 'junit'],
+                    'qa': ['quality assurance', 'testing', 'pruebas', 'calidad', 'bugs'],
+                    'ux': ['ux/ui', 'ui/ux', 'ui', 'diseño', 'experiencia de usuario', 'usabilidad', 'figma', 'user experience'],
+                    'ui': ['ux/ui', 'ui/ux', 'ux', 'diseño', 'interfaz', 'figma', 'diseño web', 'user interface'],
+                    'ux/ui': ['ui/ux', 'ux', 'ui', 'diseño', 'figma'],
+                    'ui/ux': ['ux/ui', 'ux', 'ui', 'diseño', 'figma'],
+                    'figma': ['diseño', 'ux', 'ui', 'prototipado', 'sketch', 'adobe xd'],
+                    'diseño web': ['html', 'css', 'frontend', 'ui', 'ux', 'web design', 'maquetado'],
+                    'scrum': ['agile', 'metodologias agiles', 'sprint', 'kanban', 'jira'],
+                    'agile': ['scrum', 'metodologias agiles', 'kanban', 'sprint', 'lean'],
+                    'jira': ['scrum', 'agile', 'gestion de proyectos', 'project management', 'tickets'],
+                    'programacion': ['desarrollo', 'coding', 'software', 'desarrollo de software', 'programador', 'developer'],
+                    'desarrollo de software': ['programacion', 'software', 'developer', 'ingeniero de software', 'software engineer', 'backend', 'frontend', 'full stack', 'javascript', 'java', 'python', 'c#'],
+                    'software': ['desarrollo de software', 'programacion', 'aplicaciones', 'coding', 'backend', 'frontend', 'full stack', 'java', 'python', 'c#', 'javascript', 'js', 'node'],
+                    'arquitectura': ['backend', 'microservicios', 'cloud', 'aws', 'java', 'spring boot', 'spring', 'node', 'nodejs', 'express', 'c#', '.net', 'python', 'docker', 'system design', 'desarrollo de software', 'arquitectura de software'],
+                    'arquitectura de software': ['arquitectura', 'backend', 'microservicios', 'cloud', 'aws', 'java', 'spring boot', 'node', 'express'],
+                    'clean code': ['buenas practicas', 'testing', 'refactoring', 'solid', 'patrones de diseño', 'code review', 'backend', 'frontend', 'desarrollo de software'],
+                    'buenas practicas': ['clean code', 'solid', 'patrones de diseño', 'testing', 'code review'],
+                    'patrones de diseño': ['clean code', 'solid', 'design patterns', 'java', 'c#', 'typescript', 'backend', 'arquitectura'],
+                    'design patterns': ['patrones de diseño', 'clean code', 'solid', 'arquitectura'],
+                    'solid': ['clean code', 'patrones de diseño', 'java', 'c#', 'typescript', 'backend'],
+                    'rest api': ['api', 'api rest', 'restful', 'express', 'spring boot', 'fastapi', 'node', 'backend', 'endpoints', 'web services'],
+                    'api rest': ['rest api', 'api', 'express', 'spring boot', 'fastapi', 'node', 'backend'],
+                    'liderazgo tecnico': ['tech lead', 'scrum', 'agile', 'senior', 'arquitectura', 'code review'],
+                    'tech lead': ['liderazgo tecnico', 'scrum', 'agile', 'senior', 'arquitectura'],
+                    'base de datos relacional': ['sql', 'mysql', 'postgresql', 'postgres', 'oracle', 'sql server', 'base de datos'],
+                    'base de datos no relacional': ['nosql', 'mongodb', 'redis', 'cassandra', 'dynamodb', 'firebase', 'base de datos'],
+                    'infraestructura': ['devops', 'cloud', 'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'linux', 'sysadmin', 'terraform'],
+                    'ingles': ['english', 'idioma ingles', 'ingles tecnico', 'ingles avanzado', 'ingles intermedio'],
+                    'english': ['ingles', 'idioma ingles'],
+                    'excel': ['microsoft excel', 'hojas de calculo', 'spreadsheets', 'office', 'google sheets', 'planillas'],
+                    'office': ['microsoft office', 'word', 'excel', 'powerpoint', 'outlook'],
+                    'medicina': ['medico', 'medica', 'salud', 'clinica', 'medicina general', 'diagnostico clinico', 'atencion al paciente', 'guardia medica', 'urgencias', 'hospital', 'sanidad'],
+                    'medico': ['medicina', 'medica', 'salud', 'clinica', 'medicina general', 'atencion al paciente', 'doctor', 'doctora'],
+                    'medica': ['medicina', 'medico', 'salud', 'clinica', 'medicina general', 'atencion al paciente'],
+                    'diagnostico por imagenes': ['tomografia', 'resonancia', 'mamografia', 'radiologia', 'ecografia', 'rayos x', 'imagenologia'],
+                    'tomografia': ['diagnostico por imagenes', 'radiologia', 'resonancia', 'mamografia', 'tomografia computada', 'tc', 'tac'],
+                    'resonancia': ['diagnostico por imagenes', 'radiologia', 'tomografia', 'mamografia', 'resonancia magnetica', 'rmn'],
+                    'mamografia': ['diagnostico por imagenes', 'radiologia', 'tomografia', 'resonancia'],
+                    'atencion al paciente': ['salud', 'medicina', 'enfermeria', 'clinica', 'medico', 'medica', 'cuidado de pacientes'],
+                    'enfermeria': ['salud', 'atencion al paciente', 'cuidados', 'clinica', 'primeros auxilios', 'enfermero', 'enfermera'],
+                    'pediatria': ['medicina', 'medico', 'salud', 'atencion al paciente', 'niños'],
+                    'derecho': ['abogado', 'abogada', 'juridico', 'legal', 'leyes', 'legislacion', 'litigacion', 'letrado'],
+                    'abogado': ['derecho', 'juridico', 'legal', 'leyes', 'litigacion', 'abogada', 'letrado'],
+                    'abogada': ['derecho', 'juridico', 'legal', 'leyes', 'litigacion', 'abogado', 'letrado'],
+                    'legal': ['derecho', 'abogado', 'juridico', 'leyes', 'compliance', 'normativa'],
+                    'contabilidad': ['finanzas', 'impuestos', 'balance', 'auditoria', 'facturacion', 'excel', 'contador', 'contadora', 'contable'],
+                    'administracion': ['gestion', 'secretariado', 'facturacion', 'excel', 'tramites', 'administrativo', 'administrativa'],
+                    'ventas': ['comercial', 'atencion al cliente', 'telemarketing', 'cierre de ventas', 'vendedor', 'vendedora', 'sales', 'comercializacion'],
+                    'marketing': ['marketing digital', 'seo', 'sem', 'redes sociales', 'social media', 'publicidad', 'campañas', 'google ads'],
+                    'marketing digital': ['marketing', 'seo', 'sem', 'redes sociales', 'social media', 'google ads'],
+                    'seguridad informatica': ['ciberseguridad', 'cybersecurity', 'security', 'infosec', 'ethical hacking', 'pentesting'],
+                    'ciberseguridad': ['seguridad informatica', 'cybersecurity', 'security', 'infosec'],
+                    'linux': ['ubuntu', 'debian', 'centos', 'red hat', 'bash', 'shell', 'sysadmin', 'administracion de servidores', 'unix'],
+                    'bash': ['shell', 'linux', 'scripting', 'terminal', 'linea de comandos'],
+                    'sysadmin': ['administracion de servidores', 'linux', 'infraestructura', 'redes', 'windows server']
                 };
+
+                // Función para obtener sinónimos expandidos (2 niveles de profundidad)
+                const getExpandedSynonyms = (skillStr) => {
+                    const direct = synonymMap[skillStr] || [];
+                    const expanded = new Set(direct);
+                    direct.forEach(syn => {
+                        (synonymMap[syn] || []).forEach(syn2 => expanded.add(syn2));
+                    });
+                    expanded.add(skillStr);
+                    return expanded;
+                };
+
+                const isJuniorOffer = (ofData.seniority || '').toLowerCase().includes('junior') || 
+                                      (ofData.seniority || '').toLowerCase().includes('trainee') || 
+                                      (ofData.titulo || '').toLowerCase().includes('junior') || 
+                                      (ofData.titulo || '').toLowerCase().includes('trainee');
 
                 const processedPostulantes = (postData || []).map(post => {
                     const cant = post.candidatos;
-                    let totalScore = 0;
                     const matchTags = [];
                     const candSkills = cant?.candidato_skills || [];
 
-                    if (reqSkills.length > 0) {
-                        reqSkills.forEach(req => {
-                            const normalize = (str) => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
-                            const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
-                            const nivelReq = req.nivel_requerido ?? null;
-                            
-                            const matchTarget = candSkills.find(cs => {
-                                if (cs.skill_id && cs.skill_id === req.skill_id) return true;
-                                const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
-                                if (!csStr || !reqStr) return false;
-                                if (csStr === reqStr) return true;
-                                const minLen = Math.min(csStr.length, reqStr.length);
-                                if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
-                                const reqSynonyms = synonymMap[reqStr] || [];
-                                const csSynonyms = synonymMap[csStr] || [];
-                                if (reqSynonyms.some(syn => csStr.includes(syn) || syn.includes(csStr))) return true;
-                                if (csSynonyms.some(syn => reqStr.includes(syn) || syn.includes(reqStr))) return true;
-                                return false;
-                            });
-                            
-                            if (matchTarget) {
-                                matchTags.push(req.nombre_original || req.diccionario_skills?.nombre_skill || reqStr);
-                                if (!nivelReq) {
-                                    totalScore += 1.0;
-                                } else {
-                                    const nivelCand = matchTarget.nivel_estimado || 3;
-                                    const diff = nivelReq - nivelCand;
-                                    if (diff <= 0) totalScore += 1.0;
-                                    else if (diff === 1) totalScore += 0.75;
-                                    else if (diff === 2) totalScore += 0.50;
-                                    else totalScore += 0.10;
-                                }
-                            }
-                        });
+                    // --- CAPA 1: GATE DE RUBRO ---
+                    const coreSkillsOferta = reqSkills.filter(s => s.es_core !== false);
+                    const targetCoreSkills = coreSkillsOferta.length > 0 ? coreSkillsOferta : reqSkills;
+                    const hasMacroOverlap = hayOverlapCategorias(candSkills, targetCoreSkills);
+
+                    if (!hasMacroOverlap) {
+                        return {
+                            ...post,
+                            recalculatedMatch: Math.min(15, reqSkills.length > 0 ? 10 : 0),
+                            matchTags: []
+                        };
                     }
 
+                    // --- CAPA 2: MATCH TÉCNICO PONDERADO (75% CORE + 25% SECUNDARIAS) ---
+                    const candSkillSet = new Set(candSkills.map(cs => normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill)));
+                    const hasFrontend = ['react', 'reactjs', 'react.js', 'vue', 'angular', 'javascript', 'js', 'typescript', 'ts', 'html', 'css', 'frontend', 'front-end'].some(s => candSkillSet.has(s));
+                    const hasBackend = ['node', 'nodejs', 'node.js', 'express', 'java', 'spring', 'spring boot', 'springboot', 'python', 'django', 'flask', 'fastapi', 'c#', '.net', 'php', 'backend', 'back-end', 'sql', 'mysql', 'postgresql', 'mongodb'].some(s => candSkillSet.has(s));
+                    const hasDb = ['sql', 'mysql', 'postgresql', 'postgres', 'oracle', 'sql server', 'mongodb', 'nosql', 'redis', 'base de datos', 'bases de datos'].some(s => candSkillSet.has(s));
+
+                    const evaluateSkillScore = (req) => {
+                        const reqStr = normalize(req.nombre_original) || normalize(req.diccionario_skills?.nombre_skill);
+                        const nivelReq = req.nivel_requerido ?? null;
+
+                        const matchTarget = candSkills.find(cs => {
+                            if (cs.skill_id && cs.skill_id === req.skill_id) return true;
+                            const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
+                            if (!csStr || !reqStr) return false;
+                            if (csStr === reqStr) return true;
+                            const minLen = Math.min(csStr.length, reqStr.length);
+                            if (minLen >= 3 && (csStr.includes(reqStr) || reqStr.includes(csStr))) return true;
+                            const reqSyns = synonymMap[reqStr] || [];
+                            if (reqSyns.includes(csStr)) return true;
+                            return false;
+                        });
+
+                        let isRoleInferred = false;
+                        if (!matchTarget) {
+                            if (['full stack', 'fullstack', 'full-stack', 'desarrollo web', 'web development'].includes(reqStr)) {
+                                if ((hasFrontend && hasBackend) || candSkillSet.has('full stack') || candSkillSet.has('fullstack')) {
+                                    isRoleInferred = true;
+                                }
+                            } else if (['backend', 'back-end'].includes(reqStr)) {
+                                if (hasBackend) isRoleInferred = true;
+                            } else if (['frontend', 'front-end'].includes(reqStr)) {
+                                if (hasFrontend) isRoleInferred = true;
+                            } else if (['base de datos', 'bases de datos', 'database'].includes(reqStr)) {
+                                if (hasDb) isRoleInferred = true;
+                            }
+                        }
+
+                        if (matchTarget || isRoleInferred) {
+                            matchTags.push(req.nombre_original || req.diccionario_skills?.nombre_skill || reqStr);
+                            if (!nivelReq || isJuniorOffer) return 1.0;
+                            const nivelCand = matchTarget ? (matchTarget.nivel_estimado || 3) : 3;
+                            const diff = nivelReq - nivelCand;
+                            if (diff <= 0) return 1.0;
+                            if (diff === 1) return 0.85;
+                            if (diff === 2) return 0.60;
+                            return 0.30;
+                        }
+
+                        const reqExpanded = getExpandedSynonyms(reqStr);
+                        const indirectMatch = candSkills.find(cs => {
+                            const csStr = normalize(cs.nombre_original) || normalize(cs.diccionario_skills?.nombre_skill);
+                            return csStr && reqExpanded.has(csStr);
+                        });
+                        if (indirectMatch) {
+                            matchTags.push(req.nombre_original || req.diccionario_skills?.nombre_skill || reqStr);
+                            return 0.50;
+                        }
+
+                        return req.es_core !== false ? 0.10 : 0.30;
+                    };
+
+                    let matchTecnico = 1.0;
+                    if (reqSkills.length > 0) {
+                        const coreSkills = reqSkills.filter(s => s.es_core !== false);
+                        const secSkills = reqSkills.filter(s => s.es_core === false);
+
+                        const coreScores = coreSkills.length > 0
+                            ? coreSkills.map(evaluateSkillScore)
+                            : reqSkills.map(evaluateSkillScore);
+                        const coreAvg = coreScores.reduce((acc, v) => acc + v, 0) / coreScores.length;
+
+                        if (secSkills.length > 0) {
+                            const secScores = secSkills.map(evaluateSkillScore);
+                            const secAvg = secScores.reduce((acc, v) => acc + v, 0) / secScores.length;
+                            matchTecnico = 0.75 * coreAvg + 0.25 * secAvg;
+                        } else {
+                            matchTecnico = coreAvg;
+                        }
+                    }
+
+                    // --- CAPA 3: FIT POR SENIORITY (85% TÉCNICO + 15% SENIORITY FIT) ---
+                    const seniorityBucketOfferMap = {
+                        'trainee': 1, 'inicial': 1, 'junior': 2, 'semi-senior': 3, 'ssr': 3, 'semi senior': 3, 'senior': 4, 'sr': 4, 'experto': 5, 'lead': 5
+                    };
+                    const offerSeniorityStr = (ofData?.seniority || '').toLowerCase();
+                    let offerBucket = 3;
+                    for (const [key, val] of Object.entries(seniorityBucketOfferMap)) {
+                        if (offerSeniorityStr.includes(key)) {
+                            offerBucket = val;
+                            break;
+                        }
+                    }
+
+                    const candMaxLvl = candSkills.reduce((max, s) => Math.max(max, s.nivel_estimado || 3), 3);
+                    const candBucket = candMaxLvl;
+                    const senDiff = offerBucket - candBucket;
+
+                    let seniorityFit = 1.0;
+                    if (senDiff <= 0) seniorityFit = 1.0;
+                    else if (senDiff === 1) seniorityFit = 0.70;
+                    else if (senDiff === 2) seniorityFit = 0.35;
+                    else seniorityFit = 0.10;
+
                     let recalculatedMatch = reqSkills.length > 0
-                        ? Math.round((totalScore / reqSkills.length) * 100)
+                        ? Math.round((0.85 * matchTecnico + 0.15 * seniorityFit) * 100)
                         : (post.porcentaje_match_calculado ?? 0);
 
                     if (post.match_boost_estado === 'aprobado') {

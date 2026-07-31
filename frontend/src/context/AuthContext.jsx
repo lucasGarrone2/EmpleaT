@@ -1,5 +1,12 @@
 import {createContext, useContext, useEffect, useState} from 'react'
 import {supabase} from '../supabase'
+import { AlertTriangle } from 'lucide-react'
+
+// Helper global para gatillar el modal de sesión expirada desde cualquier petición API
+export function triggerSessionExpired() {
+    window.dispatchEvent(new Event('empleat-session-expired'));
+}
+
 //creamos el espacio en la memoria(contexto)
 const AuthContext= createContext();
 
@@ -7,8 +14,15 @@ const AuthContext= createContext();
 export function AuthProvider({children}){
     const [user, setUser]= useState(null);
     const [loading, setLoading]= useState(true);
+    const [sessionExpiredModal, setSessionExpiredModal]= useState(false);
 
     useEffect(()=>{
+        const handleSessionExpired = () => {
+            setSessionExpiredModal(true);
+        };
+
+        window.addEventListener('empleat-session-expired', handleSessionExpired);
+
         //Cuando la pagina carga, pregunta a supabase si hay alguien logeado
         supabase.auth.getSession().then(({data: {session}  })=>{
             setUser(session?.user ?? null);
@@ -20,12 +34,27 @@ export function AuthProvider({children}){
             if (event === 'PASSWORD_RECOVERY') {
                 sessionStorage.setItem('is_recovering_password', 'true');
             }
+            // Detectar si el usuario viene de un link de invitación
+            if (event === 'SIGNED_IN' && window.location.pathname === '/aceptar-invitacion') {
+                sessionStorage.setItem('is_accepting_invitation', 'true');
+            }
             // Si el token de sesion expiro o es invalido, limpiar y forzar login
-            if (event === 'TOKEN_REFRESH_FAILED' || event === 'SIGNED_OUT') {
+            if (event === 'TOKEN_REFRESH_FAILED') {
+                setUser(null);
+                setLoading(false);
+                setSessionExpiredModal(true);
+                sessionStorage.removeItem('is_recovering_password');
+                sessionStorage.removeItem('is_accepting_invitation');
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('sb-')) localStorage.removeItem(key);
+                });
+                return;
+            }
+            if (event === 'SIGNED_OUT') {
                 setUser(null);
                 setLoading(false);
                 sessionStorage.removeItem('is_recovering_password');
-                // Limpiar tokens viejos del localStorage
+                sessionStorage.removeItem('is_accepting_invitation');
                 Object.keys(localStorage).forEach(key => {
                     if (key.startsWith('sb-')) localStorage.removeItem(key);
                 });
@@ -36,19 +65,84 @@ export function AuthProvider({children}){
         });
 
         //Limpiamos el escuchador si el componente se destruye
-        return () => subscription.unsubscribe();
+        return () => {
+            window.removeEventListener('empleat-session-expired', handleSessionExpired);
+            subscription.unsubscribe();
+        };
     }, []);
-
-        //Todo lo que pongamos en el value podra ser usado en cualquier pantalla
 
         const value={
             user,
-            loading, // Necesario para que ProtectedRoute muestre spinner durante validación
+            loading,
+            triggerSessionExpired
         };
 
     return (
         <AuthContext.Provider value={value}>
             {!loading && children}
+
+            {/* Modal de Sesión Expirada */}
+            {sessionExpiredModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                    backdropFilter: 'blur(8px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 999999,
+                    padding: '1rem'
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '24px',
+                        maxWidth: '420px',
+                        width: '100%',
+                        padding: '32px 24px 24px',
+                        textAlign: 'center',
+                        boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+                        boxSizing: 'border-box'
+                    }}>
+                        <div style={{
+                            width: '64px', height: '64px', borderRadius: '50%',
+                            background: 'rgba(244, 67, 54, 0.12)', color: '#F44336',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            margin: '0 auto 16px'
+                        }}>
+                            <AlertTriangle size={34} />
+                        </div>
+                        <h3 style={{ margin: '0 0 12px 0', fontSize: '1.35rem', fontWeight: 700, color: '#1a1a1a' }}>
+                            Sesión Expirada
+                        </h3>
+                        <p style={{ margin: '0 0 24px 0', color: '#555', fontSize: '0.96rem', lineHeight: '1.5' }}>
+                            Tu sesión ha expirado por motivos de seguridad o inactividad. Por favor, volvé a iniciar sesión.
+                        </p>
+                        <button
+                            onClick={async () => {
+                                setSessionExpiredModal(false);
+                                await supabase.auth.signOut();
+                                window.location.href = '/login';
+                            }}
+                            style={{
+                                width: '100%',
+                                padding: '12px 24px',
+                                background: '#F44336',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '12px',
+                                fontWeight: 700,
+                                fontSize: '1rem',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 14px rgba(244, 67, 54, 0.3)',
+                                transition: 'all 0.15s'
+                            }}
+                        >
+                            Entendido, Iniciar Sesión
+                        </button>
+                    </div>
+                </div>
+            )}
         </AuthContext.Provider>
     );
 }

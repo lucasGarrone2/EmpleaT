@@ -185,8 +185,7 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
                     {step === 'generating' && (
                         <div style={{ textAlign: 'center', color: '#666' }}>
                             <Loader2 size={48} color="var(--primary)" style={{ animation: 'spin 2s linear infinite', margin: '0 auto 20px auto' }} />
-                            <h3 style={{ margin: '0 0 10px 0', color: '#333' }}>Analizando tu perfil y la oferta...</h3>
-                            <p style={{ margin: 0 }}>Nuestra IA está preparando 3 preguntas desafiantes exclusivas para ti.</p>
+                            <p style={{ margin: 0 }}>Nuestra IA está preparando 3 preguntas para ti (2 técnicas accesibles y 1 de habilidades blandas). <span style={{ fontSize: '0.82rem', color: '#888', fontStyle: 'italic', display: 'block', marginTop: '6px' }}>⏱️ Recuerda que se permite 1 simulación por oferta cada 30 días.</span></p>
                             <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
                         </div>
                     )}
@@ -214,7 +213,7 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
                             
                             <div style={{ background: '#F8F9FA', padding: '20px', borderRadius: '12px', borderLeft: '4px solid var(--primary)', marginBottom: '20px' }}>
                                 <div style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 'bold', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                    Pregunta {currentIndex + 1} de {preguntas.length}
+                                    Pregunta {currentIndex + 1} de {preguntas.length} {currentIndex < 2 ? '• Técnica' : '• Habilidades Blandas'}
                                 </div>
                                 <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#333', lineHeight: '1.5' }}>
                                     {preguntas[currentIndex]}

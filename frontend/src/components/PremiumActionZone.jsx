@@ -91,7 +91,7 @@ export default function PremiumActionZone({ matchScore, isPremium, onSimulateCli
                     <Zap size={18} /> Simulación de Entrevista IA Habilitada
                 </h4>
                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#555' }}>
-                    Aprovecha tu beneficio Premium para prepararte. Te haremos 3 preguntas situacionales sobre esta posición.
+                    Aprovecha tu beneficio Premium para prepararte. Te haremos 3 preguntas personalizadas (2 técnicas accesibles y 1 de habilidades blandas). <span style={{ display: 'block', marginTop: '4px', fontSize: '0.8rem', color: '#666', fontStyle: 'italic' }}>⏱️ Límite: 1 simulación por oferta cada 30 días.</span>
                 </p>
             </div>
             <button 

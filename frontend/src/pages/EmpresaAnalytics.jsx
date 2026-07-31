@@ -125,7 +125,7 @@ export default function EmpresaAnalytics() {
                     <div style={{ position: 'absolute', bottom: '-30px', left: '-30px', width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,176,32,0.1)', filter: 'blur(15px)' }} />
 
                     <Lock size={48} color="#FFB020" style={{ marginBottom: '1.5rem', opacity: 0.9 }} />
-                    <h2 style={{ fontSize: '2rem', margin: '0 0 1rem', fontWeight: '800' }}>
+                    <h2 style={{ color: '#ffffff', fontSize: '2rem', margin: '0 0 1rem', fontWeight: '800' }}>
                         Analytics Premium
                     </h2>
                     <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '1.1rem', lineHeight: '1.6', maxWidth: '500px', margin: '0 auto 2rem' }}>

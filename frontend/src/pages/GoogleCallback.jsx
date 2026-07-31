@@ -11,38 +11,62 @@ import './Register.css';
  */
 export default function GoogleCallback() {
     const navigate = useNavigate();
-    const { user } = useAuth();
-    const [loading, setLoading] = useState(true);
+    const { user, loading: authLoading } = useAuth();
     const [needsRole, setNeedsRole] = useState(false);
     const [selectedRol, setSelectedRol] = useState('candidato');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        // Timeout de seguridad: si en 4 segundos no hay usuario, redirigimos a /login.
-        // Esto previene el cuelgue infinito al navegar directo a /auth/callback sin token.
-        const safetyTimeout = setTimeout(() => {
-            navigate('/login', { replace: true });
-        }, 4000);
+        // Detectar si la URL trae un error de OAuth (ej: User not found por huérfano de auth.identities)
+        const searchParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const oauthError = searchParams.get('error') || hashParams.get('error');
+        const oauthErrorDesc = searchParams.get('error_description') || hashParams.get('error_description');
 
-        if (!user) return; // Esperar al AuthContext
+        if (oauthError || oauthErrorDesc) {
+            setError(oauthErrorDesc || oauthError || 'Error al autenticar con Google. Por favor reintenta.');
+            return;
+        }
 
-        clearTimeout(safetyTimeout); // Sesión detectada, cancelamos el timeout
+        if (authLoading) return; // Esperar a que AuthContext termine de restaurar la sesión
+
+        if (!user) {
+            // Si ya terminó de cargar AuthContext y realmente no hay usuario, redirigir a /login
+            const safetyTimeout = setTimeout(() => {
+                navigate('/login', { replace: true });
+            }, 1500);
+            return () => clearTimeout(safetyTimeout);
+        }
 
         const rol = user.user_metadata?.rol;
 
         if (rol === 'empresa') {
             navigate('/dashboard-empresa', { replace: true });
         } else if (rol === 'candidato') {
-            navigate('/perfil', { replace: true });
+            // Verificar si el candidato ya existe en la base de datos
+            supabase
+                .from('candidatos')
+                .select('id')
+                .eq('auth_id', user.id)
+                .maybeSingle()
+                .then(({ data: candidatoData }) => {
+                    if (candidatoData?.id) {
+                        // Usuario recurrente con perfil cargado -> ir directo a ofertas
+                        navigate('/ofertas', { replace: true });
+                    } else {
+                        // Usuario nuevo -> ir a cargar su perfil
+                        navigate('/perfil', { replace: true });
+                    }
+                })
+                .catch(() => {
+                    navigate('/ofertas', { replace: true });
+                });
         } else {
-            // Usuario nuevo sin rol: mostrar selector
+            // Usuario nuevo que ingresó por Google sin rol previo: mostrar selector
             setNeedsRole(true);
-            setLoading(false);
         }
-
-        return () => clearTimeout(safetyTimeout);
-    }, [user, navigate]);
+    }, [user, authLoading, navigate]);
 
     const handleRolSubmit = async () => {
         setSaving(true);
@@ -68,7 +92,34 @@ export default function GoogleCallback() {
         }
     };
 
-    if (loading && !needsRole) {
+    if (error && !needsRole) {
+        return (
+            <div className="register-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+                <div className="bg-shape shape-1"></div>
+                <div className="bg-shape shape-2"></div>
+                <div style={{
+                    position: 'relative', zIndex: 1, background: 'white',
+                    borderRadius: '24px', padding: '3rem', maxWidth: '480px', width: '100%',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.1)', textAlign: 'center'
+                }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>⚠️</div>
+                    <h2 className="brand-title" style={{ fontSize: '1.5rem', margin: '0 0 1rem 0', color: '#d32f2f' }}>Error de Autenticación</h2>
+                    <p style={{ color: 'var(--text-gray)', marginBottom: '1.5rem', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                        {error}
+                    </p>
+                    <button
+                        onClick={() => navigate('/register', { replace: true })}
+                        className="submit-btn"
+                        style={{ padding: '12px 24px', fontSize: '1rem' }}
+                    >
+                        Volver a Intentar
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (authLoading || (!user && !needsRole)) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
                 <div style={{ color: 'var(--primary)', fontSize: '1.3rem', fontWeight: 'bold' }}>
