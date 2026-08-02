@@ -498,7 +498,14 @@ app.post('/api/upload-cv', uploadLimiter, uploadCVStorage.single('cv'), async (r
        return res.status(400).json({ error: "El archivo no es un PDF válido." });
     }
     
-    // 1. Escaneo antivirus en caliente
+    // ⚠️ TEMPORALMENTE DESACTIVADO — ClamAV no disponible en el hosting actual (RAM insuficiente en Render free tier).
+    // Desactivado a propósito para la ronda de prueba cerrada con usuarios conocidos.
+    // ANTES DE ABRIR AL PÚBLICO GENERAL: reactivar este chequeo. Opciones evaluadas:
+    //   1) Subir a un plan de Render con más RAM y correr clamd como proceso en paralelo.
+    //   2) Usar una API de escaneo antivirus en la nube (ej. Cloudmersive) en vez de self-hosted.
+    // Ver auditoría de seguridad del proyecto para más contexto.
+
+    /* 
     console.log("Iniciando escaneo antivirus del archivo...");
     try {
       await scanBufferForThreats(req.file.buffer);
@@ -506,6 +513,7 @@ app.post('/api/upload-cv', uploadLimiter, uploadCVStorage.single('cv'), async (r
       console.error("Antivirus bloqueó el archivo:", virusErr.message);
       return res.status(400).json({ error: virusErr.message });
     }
+    */
     
     // 2. Subir al bucket 'cv_files' en la ruta de cuarentena
     // SEC-21: UUID garantiza unicidad absoluta del path — elimina colisiones y sobrescritura
