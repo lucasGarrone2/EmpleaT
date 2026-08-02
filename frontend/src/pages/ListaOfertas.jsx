@@ -11,6 +11,7 @@ import BoostQuizModal from '../components/BoostQuizModal';
 import OfertaCardSkeleton from '../components/OfertaCardSkeleton';
 import AdaptarCvModal from '../components/AdaptarCvModal';
 import { hayOverlapCategorias, getCategoriaSkill } from '../utils/categories';
+import { fetchFeatureFlags, isFeatureActive } from '../utils/featureFlags';
 
 function PremiumStats({ offerId, candidatoId, currentCandidateMatch, currentOfferSalary, esPremium, marketAvgSalary }) {
     const [stats, setStats] = useState({ totalPostulantes: 0, candidateRank: 0, avgMatch: 0 });
@@ -194,7 +195,12 @@ export default function ListaOfertas() {
     const [boostQuizModalFor, setBoostQuizModalFor] = useState(null);
     const [adaptarCvModalFor, setAdaptarCvModalFor] = useState(null);
     const [marketAvgSalary, setMarketAvgSalary] = useState(0);
+    const [featureFlags, setFeatureFlags] = useState(null);
     const viewedOffersRef = useRef(new Set());
+
+    useEffect(() => {
+        fetchFeatureFlags().then(({ flags }) => setFeatureFlags(flags));
+    }, []);
 
 
     const locationRouter = useLocation();
@@ -1179,7 +1185,7 @@ export default function ListaOfertas() {
                                                     </div>
                                                 )}
 
-                                                {candidatoData?.es_premium && !yaPostulado && (
+                                                {candidatoData?.es_premium && !yaPostulado && isFeatureActive(featureFlags, 'adaptacion_cv', false) && (
                                                     <div style={{
                                                         padding: '1.2rem',
                                                         background: 'linear-gradient(135deg, rgba(0, 214, 107, 0.08) 0%, rgba(0, 214, 107, 0.02) 100%)',

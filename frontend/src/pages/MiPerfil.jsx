@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
 import { User, Briefcase, Clock, FileText, Edit2, Save, X, BrainCircuit, Trash2, PlusCircle, Award, Calendar, ExternalLink, Lock, Sparkles, PartyPopper, Check, Crown } from 'lucide-react';
+import { fetchFeatureFlags, isFeatureActive } from '../utils/featureFlags';
 import './Register.css'; // Reusing established styles
 
 export default function MiPerfil() {
@@ -17,6 +18,11 @@ export default function MiPerfil() {
     const [insignias, setInsignias] = useState([]);
     const [postulaciones, setPostulaciones] = useState([]);
     const [quizIntentos, setQuizIntentos] = useState([]);
+    const [featureFlags, setFeatureFlags] = useState(null);
+
+    useEffect(() => {
+        fetchFeatureFlags().then(({ flags }) => setFeatureFlags(flags));
+    }, []);
 
     const getSkillCooldown = (skillName) => {
         if (!quizIntentos || quizIntentos.length === 0) return null;
@@ -716,7 +722,7 @@ export default function MiPerfil() {
                                     <User size={24} /> Sobre Mí
                                 </h3>
                                 {editMode && (
-                                    candidato?.es_premium ? (
+                                    (candidato?.es_premium && isFeatureActive(featureFlags, 'generacion_bio', false)) ? (
                                         <button
                                             type="button"
                                             onClick={handleGenerateBio}

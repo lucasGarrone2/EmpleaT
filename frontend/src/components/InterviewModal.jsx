@@ -223,25 +223,29 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
                             <textarea 
                                 value={currentAnswer}
                                 onChange={(e) => setCurrentAnswer(e.target.value)}
-                                placeholder="Escribe tu respuesta aquí. Sé detallado y utiliza ejemplos si es posible..."
+                                maxLength={600}
+                                placeholder="Escribe tu respuesta aquí. Sé conciso (máximo 600 caracteres)..."
                                 style={{
-                                    flex: 1, minHeight: '150px', padding: '15px', borderRadius: '12px',
-                                    border: '1px solid #DDD', fontSize: '1rem', resize: 'none', outline: 'none',
+                                    flex: 1, minHeight: '130px', padding: '15px', borderRadius: '12px',
+                                    border: currentAnswer.length >= 600 ? '1px solid #d32f2f' : '1px solid #DDD', fontSize: '1rem', resize: 'none', outline: 'none',
                                     fontFamily: 'inherit', lineHeight: '1.5'
                                 }}
-                                onFocus={e => e.target.style.borderColor = 'var(--primary)'}
-                                onBlur={e => e.target.style.borderColor = '#DDD'}
+                                onFocus={e => e.target.style.borderColor = currentAnswer.length >= 600 ? '#d32f2f' : 'var(--primary)'}
+                                onBlur={e => e.target.style.borderColor = currentAnswer.length >= 600 ? '#d32f2f' : '#DDD'}
                             ></textarea>
 
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                                <span style={{ fontSize: '0.82rem', color: currentAnswer.length >= 580 ? '#d32f2f' : '#888', fontWeight: currentAnswer.length >= 580 ? 'bold' : 'normal' }}>
+                                    {currentAnswer.length} / 600 caracteres
+                                </span>
                                 <button 
                                     onClick={handleNextQuestion}
-                                    disabled={!currentAnswer.trim() || step === 'evaluating' || submittingRef.current}
+                                    disabled={!currentAnswer.trim() || currentAnswer.length > 600 || step === 'evaluating' || submittingRef.current}
                                     style={{
-                                        background: (currentAnswer.trim() && step !== 'evaluating' && !submittingRef.current) ? 'var(--primary)' : '#EAEAEA',
-                                        color: (currentAnswer.trim() && step !== 'evaluating' && !submittingRef.current) ? 'white' : '#999',
+                                        background: (currentAnswer.trim() && currentAnswer.length <= 600 && step !== 'evaluating' && !submittingRef.current) ? 'var(--primary)' : '#EAEAEA',
+                                        color: (currentAnswer.trim() && currentAnswer.length <= 600 && step !== 'evaluating' && !submittingRef.current) ? 'white' : '#999',
                                         padding: '12px 24px', borderRadius: '8px', border: 'none',
-                                        fontWeight: 'bold', fontSize: '1rem', cursor: (currentAnswer.trim() && step !== 'evaluating' && !submittingRef.current) ? 'pointer' : 'not-allowed',
+                                        fontWeight: 'bold', fontSize: '1rem', cursor: (currentAnswer.trim() && currentAnswer.length <= 600 && step !== 'evaluating' && !submittingRef.current) ? 'pointer' : 'not-allowed',
                                         display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s'
                                     }}
                                 >

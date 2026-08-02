@@ -5,6 +5,7 @@ import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
 import { Briefcase, ArrowLeft, Users, Zap, MapPin, Trash2, PauseCircle, PlayCircle, Edit, Kanban, List } from 'lucide-react';
 import { hayOverlapCategorias, getCategoriaSkill } from '../utils/categories';
+import { fetchFeatureFlags, isFeatureActive } from '../utils/featureFlags';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -23,6 +24,11 @@ export default function OfertaDetalleEmpresa() {
     const [postulantes, setPostulantes] = useState([]);
     const [error, setError] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [featureFlags, setFeatureFlags] = useState(null);
+
+    useEffect(() => {
+        fetchFeatureFlags().then(({ flags }) => setFeatureFlags(flags));
+    }, []);
     const [showPauseModal, setShowPauseModal] = useState(false);
     const [modalActionLoading, setModalActionLoading] = useState(false);
 
@@ -797,7 +803,7 @@ export default function OfertaDetalleEmpresa() {
                                 Ver Métricas
                             </button>
 
-                            {userRole !== 'solo_lectura' && (
+                            {userRole !== 'solo_lectura' && isFeatureActive(featureFlags, 'boost_oferta', false) && (
                                 <button 
                                     onClick={handleToggleBoost}
                                     disabled={boostLoading}
