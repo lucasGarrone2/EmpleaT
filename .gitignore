@@ -42,3 +42,32 @@ coverage/
 .nyc_output/
 backend/scratch/
 
+# Scripts SQL sueltos / temporales
+*.sql
+!backend/ats_pipeline_and_email.sql
+!backend/compliance_db_fixes.sql
+!backend/cuit_verification_and_grants.sql
+!backend/database_rls_reset.sql
+!backend/db_expiration_migration.sql
+!backend/db_notifications_setup.sql
+!backend/ia_resilience_and_errors.sql
+!backend/invitation_migration.sql
+!backend/limites_y_feature_flags.sql
+!backend/mensajes_chat.sql
+!backend/migracion_esco.sql
+!backend/multi_user_company.sql
+!backend/premium_empresa_suite.sql
+!backend/rls_empresas.sql
+!backend/rls_policies.sql
+!backend/security_patch_v8.sql
+!backend/xss_sanitizer_trigger.sql
+!backend/supabase/add_finalizado_to_quiz.sql
+!backend/supabase/admin_setup.sql
+!backend/supabase/create_simulacion_sesiones.sql
+!backend/supabase/empleat_premium.sql
+!backend/supabase/rejection_notification_trigger.sql
+!backend/supabase/seed_motivos_rechazo.sql
+!backend/supabase/skill_validation.sql
+
+
+
