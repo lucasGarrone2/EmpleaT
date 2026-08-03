@@ -338,9 +338,11 @@ export default function SkillQuiz() {
                                     }}
                                 >
                                     <div style={{
-                                        width: '24px', height: '24px', borderRadius: '50%', border: `2px solid ${isSelected ? 'var(--primary)' : '#ccc'}`, display: 'flex', justifyContent: 'center', alignItems: 'center'
+                                        width: '24px', height: '24px', minWidth: '24px', minHeight: '24px', maxWidth: '24px', maxHeight: '24px',
+                                        borderRadius: '50%', border: `2px solid ${isSelected ? 'var(--primary)' : '#ccc'}`,
+                                        display: 'flex', justifyContent: 'center', alignItems: 'center', flexShrink: 0, boxSizing: 'border-box'
                                     }}>
-                                        {isSelected && <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--primary)' }}></div>}
+                                        {isSelected && <div style={{ width: '12px', height: '12px', minWidth: '12px', minHeight: '12px', borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }}></div>}
                                     </div>
                                     <span style={{ fontSize: '1.1rem', color: isSelected ? 'var(--text-dark)' : 'var(--text-gray)', fontWeight: isSelected ? '600' : 'normal' }}>
                                         {opcion}

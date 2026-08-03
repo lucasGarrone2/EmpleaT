@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import './Register.css';
 
 export default function Register() {   
     // Candidate States
     const [candidateEmail, setCandidateEmail] = useState('');
     const [candidatePassword, setCandidatePassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     // Company States
     const [companyEmail, setCompanyEmail] = useState('');
@@ -67,7 +69,7 @@ export default function Register() {
             // Supabase devuelve un usuario sin identidades (array vacío).
             setError("Este correo electrónico ya se encuentra registrado.");
         } else {
-            setMensaje("¡Registro exitoso! Revisa tu correo para confirmar la cuenta.");
+            setMensaje("¡Registro exitoso! Revisa tu correo para confirmar la cuenta (recuerda revisar también tu carpeta de Spam / Correo no deseado).");
             // Clear fields on success
             if (rol === 'candidato') {
                 setCandidateEmail('');
@@ -145,13 +147,27 @@ export default function Register() {
                             
                             <div className="input-group">
                                 <label>Contraseña</label>
-                                <input 
-                                    type="password" 
-                                    placeholder="Mínimo 6 caracteres" 
-                                    value={candidatePassword} 
-                                    onChange={(e) => setCandidatePassword(e.target.value)} 
-                                    required 
-                                />
+                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <input 
+                                        type={showPassword ? "text" : "password"} 
+                                        placeholder="Mínimo 6 caracteres" 
+                                        value={candidatePassword} 
+                                        onChange={(e) => setCandidatePassword(e.target.value)} 
+                                        required 
+                                        style={{ width: '100%', paddingRight: '40px' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        style={{
+                                            position: 'absolute', right: '10px', background: 'none', border: 'none',
+                                            cursor: 'pointer', color: '#888', display: 'flex', alignItems: 'center'
+                                        }}
+                                        title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
                             </div>
 
                             <div style={{ marginBottom: '1.5rem', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
@@ -247,13 +263,27 @@ export default function Register() {
                             
                             <div className="input-group">
                                 <label>Contraseña</label>
-                                <input 
-                                    type="password" 
-                                    placeholder="Mínimo 6 caracteres" 
-                                    value={companyPassword} 
-                                    onChange={(e) => setCompanyPassword(e.target.value)} 
-                                    required 
-                                />
+                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <input 
+                                        type={showPassword ? "text" : "password"} 
+                                        placeholder="Mínimo 6 caracteres" 
+                                        value={companyPassword} 
+                                        onChange={(e) => setCompanyPassword(e.target.value)} 
+                                        required 
+                                        style={{ width: '100%', paddingRight: '40px' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        style={{
+                                            position: 'absolute', right: '10px', background: 'none', border: 'none',
+                                            cursor: 'pointer', color: '#888', display: 'flex', alignItems: 'center'
+                                        }}
+                                        title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
                             </div>
 
                             <div style={{ marginBottom: '1.5rem', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: '10px' }}>

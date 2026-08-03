@@ -225,24 +225,19 @@ const LandingPage = () => {
               </div>
             </div>
 
-            {/* Unified Benefits Grid in Landing */}
-            <div className="pricing-grid-benefits-landing" style={{
-              marginTop: '4rem',
-              maxWidth: '960px',
-              width: '100%',
+            {/* Grid de Beneficios Premium */}
+            <div style={{
               background: 'white',
               borderRadius: '24px',
-              padding: '3rem 2.5rem',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
-              border: '1px solid #E5E7EB',
-              boxSizing: 'border-box'
+              padding: '2.5rem',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.04)',
+              border: '1px solid rgba(0,0,0,0.05)',
+              marginBottom: '2.5rem'
             }}>
               <h3 style={{
-                fontSize: '1.4rem',
-                color: 'var(--secondary)',
-                fontWeight: '800',
-                marginBottom: '2rem',
-                textAlign: 'center',
+                fontSize: '1.2rem',
+                color: 'var(--text-dark)',
+                marginBottom: '1.5rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -261,7 +256,7 @@ const LandingPage = () => {
                   <div style={{ background: '#FFB020', borderRadius: '50%', width: '24px', height: '24px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={14} strokeWidth={3} /></div>
                   <div>
                     <span style={{ fontSize: '0.95rem', color: '#333', lineHeight: '1.5', fontWeight: 'bold' }}>
-                      Adaptador de CV con IA (¡NUEVO!)
+                      Simulador de Entrevistas con IA (¡NUEVO!)
                     </span>
                   </div>
                 </div>
@@ -270,7 +265,7 @@ const LandingPage = () => {
                   <div style={{ background: 'var(--primary)', borderRadius: '50%', width: '24px', height: '24px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Check size={14} strokeWidth={3} /></div>
                   <div>
                     <span style={{ fontSize: '0.95rem', color: '#333', lineHeight: '1.5', fontWeight: '500' }}>
-                      Simulador de Entrevistas con IA
+                      Métricas Avanzadas de Ranking en Postulaciones
                     </span>
                   </div>
                 </div>

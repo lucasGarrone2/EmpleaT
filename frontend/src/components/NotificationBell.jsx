@@ -97,6 +97,7 @@ export default function NotificationBell() {
     // Marcar todas como leídas
     const handleMarkAllAsRead = async () => {
         if (unreadCount === 0) return;
+        setNotifications(prev => prev.map(n => ({ ...n, leido: true })));
         try {
             const { error } = await supabase
                 .from('notificaciones')

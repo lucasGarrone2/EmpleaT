@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './supabase';
 import LandingPage from './pages/LandingPage';
 import Register from './pages/Register';
@@ -66,6 +67,7 @@ function App() {
   return (
     <Router>
       <div className="App">
+        <Analytics />
         <RecoveryGuard />
         <Navbar />
         <Routes>

@@ -173,10 +173,9 @@ export default function Pricing() {
     ];
 
     const beneficios = [
-        "Adaptador de CV inteligente con IA adaptado a cada oferta laboral. (¡NUEVO!)",
+        "Simulador de Entrevistas Técnicas con Inteligencia Artificial. (¡NUEVO!)",
         "Estadísticas competitivas en tiempo real: postulantes totales, tu posición en el ranking de afinidad y comparativa de sueldos. (¡NUEVO!)",
-        "Simulador de Entrevistas Técnicas con Inteligencia Artificial.",
-        "Feedback personalizado y detallado de cada respuesta.",
+        "Feedback personalizado y detallado de cada respuesta en la entrevista simulada.",
         "Posicionamiento destacado en búsquedas de empresas.",
         "Quizzes ilimitados para validar tus habilidades técnicas.",
         "Insignias Premium exclusivas para destacar tu perfil."
@@ -442,11 +441,11 @@ export default function Pricing() {
                                 NUEVO
                             </span>
                             <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#333', fontWeight: 'bold' }}>
-                                Adaptador de CV con IA
+                                Simulador de Entrevistas con IA
                             </h3>
                         </div>
                         <p style={{ color: '#666', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1.5rem' }}>
-                            La IA analiza los requisitos específicos de cada vacante y genera un extracto adaptado a partir de tu perfil para maximizar tus posibilidades de ser contactado.
+                            Simulá entrevistas reales adaptadas a cada vacante laboral con la IA y recibí feedback constructivo inmediato para perfeccionar tus respuestas.
                         </p>
 
                         <div style={{

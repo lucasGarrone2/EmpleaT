@@ -264,12 +264,17 @@ export default function BoostQuizModal({ candidatoId, oferta, onClose, onSuccess
                                             <div style={{
                                                 width: '20px',
                                                 height: '20px',
+                                                minWidth: '20px',
+                                                minHeight: '20px',
+                                                maxWidth: '20px',
+                                                maxHeight: '20px',
                                                 borderRadius: '50%',
                                                 border: `2px solid ${isSelected ? 'var(--primary)' : '#B5B5B5'}`,
                                                 display: 'flex',
                                                 justifyContent: 'center',
                                                 alignItems: 'center',
-                                                flexShrink: 0
+                                                flexShrink: 0,
+                                                boxSizing: 'border-box'
                                             }}>
                                                 {isSelected && (
                                                     <div style={{

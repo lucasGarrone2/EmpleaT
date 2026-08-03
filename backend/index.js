@@ -1388,27 +1388,40 @@ app.post('/api/verify-quiz', async (req, res) => {
         // usaremos el Service Key para insertar en el catálogo y asignar.
         const supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
         
-        let { data: insignia, error: insErr } = await supabaseAdmin
+        let { data: insignia } = await supabaseAdmin
             .from('insignias')
             .select('id')
             .eq('nombre', intento.skill_nombre)
-            .single();
-            
+            .maybeSingle();
+
         if (!insignia) {
             const { data: nuevaIns } = await supabaseAdmin
                 .from('insignias')
                 .insert({ nombre: intento.skill_nombre })
                 .select('id')
-                .single();
+                .maybeSingle();
             insignia = nuevaIns;
         }
 
-        if (insignia) {
-            // Asignar al candidato mediante RPC (Security Definer)
-            await supabaseAdmin.rpc('asignar_insignia_candidato', {
-                p_candidato_id: candidato_id,
-                p_insignia_id: insignia.id
-            });
+        if (insignia?.id) {
+            // Asignación directa garantizada mediante Service Role Key
+            const { error: assignErr } = await supabaseAdmin
+                .from('candidato_insignias')
+                .upsert({
+                    candidato_id: candidato_id,
+                    insignia_id: insignia.id
+                }, { onConflict: 'candidato_id, insignia_id' });
+
+            if (assignErr) {
+                console.error("Error asignando insignia directamente:", assignErr.message);
+            }
+
+            try {
+                await supabaseAdmin.rpc('asignar_insignia_candidato', {
+                    p_candidato_id: candidato_id,
+                    p_insignia_id: insignia.id
+                });
+            } catch (_) {}
         }
     }
 
@@ -3379,6 +3392,79 @@ app.get('/api/chats/no-leidos', async (req, res) => {
   } catch (err) {
     console.error('[ChatsNoLeidos] Error:', err.message);
     return res.json({ total: 0 }); // No fallar: devolver 0
+  }
+});
+
+// -------------------------------------------------------------
+// POST /api/chats/marcar-todos-leidos
+// Marcar todos los mensajes recibidos sin leer como leídos
+// -------------------------------------------------------------
+app.post('/api/chats/marcar-todos-leidos', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No autorizado.' });
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Token malformado.' });
+
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) return res.status(401).json({ error: 'Token inválido.' });
+
+    const { data: candidato } = await supabaseAdmin
+      .from('candidatos')
+      .select('id')
+      .eq('auth_id', user.id)
+      .maybeSingle();
+
+    const { data: miembro } = await supabaseAdmin
+      .from('empresa_miembros')
+      .select('empresa_id')
+      .eq('auth_id', user.id)
+      .eq('estado', 'aceptado')
+      .maybeSingle();
+
+    const nowIso = new Date().toISOString();
+
+    if (candidato) {
+      const { data: postIds } = await supabaseAdmin
+        .from('postulaciones')
+        .select('id')
+        .eq('candidato_id', candidato.id);
+
+      if (postIds?.length > 0) {
+        await supabaseAdmin
+          .from('mensajes')
+          .update({ leido_en: nowIso })
+          .in('postulacion_id', postIds.map(p => p.id))
+          .eq('remitente_tipo', 'empresa')
+          .is('leido_en', null);
+      }
+    } else if (miembro) {
+      const { data: ofertas } = await supabaseAdmin
+        .from('ofertas')
+        .select('id')
+        .eq('empresa_id', miembro.empresa_id);
+
+      if (ofertas?.length > 0) {
+        const { data: postIds } = await supabaseAdmin
+          .from('postulaciones')
+          .select('id')
+          .in('oferta_id', ofertas.map(o => o.id));
+
+        if (postIds?.length > 0) {
+          await supabaseAdmin
+            .from('mensajes')
+            .update({ leido_en: nowIso })
+            .in('postulacion_id', postIds.map(p => p.id))
+            .eq('remitente_tipo', 'candidato')
+            .is('leido_en', null);
+        }
+      }
+    }
+
+    return res.json({ ok: true, message: 'Todas las conversaciones marcadas como leídas.' });
+  } catch (err) {
+    console.error('[MarcarTodosLeidos] Error:', err.message);
+    return res.status(500).json({ error: 'Error interno al marcar mensajes.' });
   }
 });
 

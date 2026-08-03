@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { supabase } from '../supabase';
 import { Link, useNavigate } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import './Register.css'; // Reusing the same styles for visual consistency
 
 export default function Login() {   
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -78,13 +80,27 @@ export default function Login() {
                             
                             <div className="input-group">
                                 <label>Contraseña</label>
-                                <input 
-                                    type="password" 
-                                    placeholder="Tu contraseña" 
-                                    value={password} 
-                                    onChange={(e) => setPassword(e.target.value)} 
-                                    required 
-                                />
+                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <input 
+                                        type={showPassword ? "text" : "password"} 
+                                        placeholder="Tu contraseña" 
+                                        value={password} 
+                                        onChange={(e) => setPassword(e.target.value)} 
+                                        required 
+                                        style={{ width: '100%', paddingRight: '40px' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        style={{
+                                            position: 'absolute', right: '10px', background: 'none', border: 'none',
+                                            cursor: 'pointer', color: '#888', display: 'flex', alignItems: 'center'
+                                        }}
+                                        title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    >
+                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
                             </div>
 
                             <button 
