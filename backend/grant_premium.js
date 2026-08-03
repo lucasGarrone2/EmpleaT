@@ -87,7 +87,44 @@ async function grantPremium() {
   }
 
   if (!updated && !cand && !emp) {
-    console.log(`⚠️  El usuario existe en Auth (${authId}), pero no tiene perfil en 'candidatos' ni 'empresas'.`);
+    const userRole = targetUser.user_metadata?.rol || 'candidato';
+    console.log(`⚠️  El usuario existe en Auth (${authId}) pero no tenía perfil creado. Creando registro como ${userRole}...`);
+
+    if (userRole === 'empresa') {
+      const { error: insEmpErr } = await supabaseAdmin
+        .from('empresas')
+        .insert({
+          auth_id: authId,
+          razon_social: targetUser.user_metadata?.nombre_completo || email.split('@')[0],
+          email: email,
+          plan: 'premium',
+          premium_hasta: expirationDate
+        });
+      if (insEmpErr) {
+        console.error('Error creando perfil de empresa:', insEmpErr.message);
+      } else {
+        console.log(`✅ ¡PREMIUM ACTIVADO para Empresa: ${email}!`);
+        console.log(`   Válido por ${days} días (hasta: ${expirationDate})`);
+        updated = true;
+      }
+    } else {
+      const { error: insCandErr } = await supabaseAdmin
+        .from('candidatos')
+        .insert({
+          auth_id: authId,
+          nombre_completo: targetUser.user_metadata?.nombre_completo || email.split('@')[0],
+          email: email,
+          es_premium: true,
+          premium_hasta: expirationDate
+        });
+      if (insCandErr) {
+        console.error('Error creando perfil de candidato:', insCandErr.message);
+      } else {
+        console.log(`✅ ¡PREMIUM ACTIVADO para Candidato: ${email}!`);
+        console.log(`   Válido por ${days} días (hasta: ${expirationDate})`);
+        updated = true;
+      }
+    }
   }
 
   console.log('\n✨ Operación finalizada con éxito.\n');
