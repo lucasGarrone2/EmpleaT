@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { supabase } from './supabase';
 import LandingPage from './pages/LandingPage';
 import Register from './pages/Register';
@@ -68,6 +69,7 @@ function App() {
     <Router>
       <div className="App">
         <Analytics />
+        <SpeedInsights />
         <RecoveryGuard />
         <Navbar />
         <Routes>
