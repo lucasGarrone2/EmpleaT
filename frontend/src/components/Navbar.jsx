@@ -147,7 +147,8 @@ const Navbar = () => {
 
                 {/* Logo Section */}
                 <div
-                    className="logo"
+                    className="logo notranslate"
+                    translate="no"
                     onClick={() => navigate('/')}
                     style={{
                         cursor: 'pointer',
@@ -160,11 +161,15 @@ const Navbar = () => {
                         letterSpacing: '-0.5px'
                     }}
                 >
-                    <span style={{
-                        background: 'linear-gradient(135deg, var(--primary) 0%, #00994d 100%)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent'
-                    }}>
+                    <span 
+                        className="notranslate" 
+                        translate="no"
+                        style={{
+                            background: 'linear-gradient(135deg, var(--primary) 0%, #00994d 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent'
+                        }}
+                    >
                         EmpleaT
                     </span>
                 </div>
@@ -253,7 +258,7 @@ const Navbar = () => {
                                     <span className="navbar-username" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         {userName && <>Hola, {userName}</>}
                                         {isPremium && (
-                                            <span title="Usuario Premium" className="navbar-premium-badge" style={{ display: 'inline-flex', padding: '2px 6px', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(255,165,0,0.3)' }}>
+                                            <span title="Usuario Premium" className="navbar-premium-badge notranslate" translate="no" style={{ display: 'inline-flex', padding: '2px 6px', background: 'linear-gradient(90deg, #FFD700 0%, #FFA500 100%)', color: 'white', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(255,165,0,0.3)' }}>
                                                 PREMIUM
                                             </span>
                                         )}
