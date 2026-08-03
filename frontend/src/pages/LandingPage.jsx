@@ -67,8 +67,8 @@ const LandingPage = () => {
               </div>
 
               <div className="floating-badge">
-                <h3 className="badge-title">10k+</h3>
-                <p>Profesionales<br />floreciendo hoy mismo</p>
+                <h3 className="badge-title">100%</h3>
+                <p>Acceso Gratuito<br />sin costos ocultos</p>
               </div>
             </div>
 
