@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import HeroSearch from '../components/HeroSearch';
 import FeatureCards from '../components/FeatureCards';
-import { Facebook, Twitter, Instagram, ArrowRight, Sparkles, Zap, Shield, Award, Check, MessageSquare, Mail, Copy, X } from 'lucide-react';
+import { Facebook, Twitter, Instagram, ArrowRight, Sparkles, Zap, Shield, Award, Check, MessageSquare, Mail, Copy, X, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
@@ -47,6 +47,27 @@ const LandingPage = () => {
 
   return (
     <div className="landing-page">
+      {/* Banner de Testeo / Beta */}
+      <div style={{
+        background: 'linear-gradient(90deg, #fff7ed 0%, #ffedd5 100%)',
+        borderBottom: '1px solid #fed7aa',
+        color: '#9a3412',
+        padding: '10px 16px',
+        textAlign: 'center',
+        fontSize: '0.88rem',
+        fontWeight: '600',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px',
+        boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.03)'
+      }} className="notranslate" translate="no">
+        <AlertTriangle size={17} color="#c2410c" style={{ flexShrink: 0 }} />
+        <span>
+          <strong>ENTORNO DE PRUEBAS (BETA):</strong> Esta versión de EmpleaT está en fase de testeo cerrado y no es la versión oficial definitiva.
+        </span>
+      </div>
+
       <main>
         <HeroSearch />
         <FeatureCards />
