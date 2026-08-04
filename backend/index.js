@@ -185,6 +185,7 @@ app.get('/api/feature-flags', async (req, res) => {
 
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 
 // Helper function for Exponential Backoff + Jitter retries with Gemini
 async function callGeminiWithRetry(model, prompt, retries = 4, delay = 1000) {
@@ -336,7 +337,7 @@ REGLAS ESTRICTAS DE EXTRACCIÓN MULTIDISCIPLINARIA:
    - Nivel 5 (Experto): Especialista, referente o más de 5 años de práctica.
 
 4. Regla de Nomenclatura e Inclusión de Skills (Marco ESCO):
-   - Extrae de 5 a 20 habilidades relevantes del CV según el rubro profesional.
+   - Extrae de 10 a 20 habilidades clave del CV (apunta a extraer 15 habilidades en la medida de lo posible según la riqueza del CV).
    - Ejemplos por área:
      * Medicina y Salud: "Medicina General", "Diagnóstico Clínico", "Atención al Paciente", "Pediatría", "Urgencias Médicas", "Historia Clínica Electrónica", "RCP", "Farmacología".
      * Tecnología / IT: "React", "Python", "SQL", "Desarrollo Web", "Git", "Cloud Computing".
@@ -356,7 +357,7 @@ ${safeCVText}
 `;
 
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: GEMINI_MODEL,
         generationConfig: { responseMimeType: "application/json" }
     });
 
@@ -1232,7 +1233,7 @@ REGLA ESTRICTA: Devuelve ÚNICAMENTE un objeto JSON con esta estructura:
 }
 No incluyas introducciones, ni saludos, ni bloques de código markdown.`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", generationConfig: { responseMimeType: "application/json" } });
+    const model = genAI.getGenerativeModel({ model: GEMINI_MODEL, generationConfig: { responseMimeType: "application/json" } });
     
     let textResponse;
     try {
@@ -1555,7 +1556,7 @@ REGLA ESTRICTA: Devuelve ÚNICAMENTE un JSON con esta estructura (sin explicacio
 
     const maxOutputTokens = await getFeatureLimit('simulacion_max_output_tokens', 'global');
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: GEMINI_MODEL,
       generationConfig: {
         responseMimeType: "application/json",
         maxOutputTokens: Number(maxOutputTokens) || 350
@@ -1708,7 +1709,7 @@ REGLA ESTRICTA DE SALIDA: Devuelve ÚNICAMENTE un JSON válido con esta estructu
 
     const maxOutputTokens = await getFeatureLimit('simulacion_max_output_tokens', 'global');
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: GEMINI_MODEL,
       generationConfig: {
         responseMimeType: "application/json",
         maxOutputTokens: Number(maxOutputTokens) || 350
@@ -2428,7 +2429,7 @@ No devuelvas ningún texto introductorio, ni saludos, ni bloques de código mark
 
         console.log("[Adaptar CV] Llamando a Gemini...");
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
+            model: GEMINI_MODEL,
             generationConfig: { responseMimeType: "application/json" }
         });
 
@@ -2515,7 +2516,7 @@ Reglas:
 `;
 
         // SEC-10: Usar callGeminiWithRetry para resiliencia ante 429/503
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
         const result = await callGeminiWithRetry(model, prompt);
         let bio = result.response.text().trim();
 
@@ -2605,7 +2606,7 @@ ${descripcion.substring(0, 4000)}
 `;
 
         const model = genAI.getGenerativeModel({
-            model: "gemini-2.5-flash",
+            model: GEMINI_MODEL,
             generationConfig: { responseMimeType: "application/json" }
         });
 
