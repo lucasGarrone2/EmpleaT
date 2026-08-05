@@ -6,6 +6,7 @@ import { supabase } from '../supabase';
 import { Briefcase, ArrowLeft, Users, Zap, MapPin, Trash2, PauseCircle, PlayCircle, Edit, Kanban, List } from 'lucide-react';
 import { hayOverlapCategorias, getCategoriaSkill } from '../utils/categories';
 import { fetchFeatureFlags, isFeatureActive } from '../utils/featureFlags';
+import posthog from '../posthog';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -556,6 +557,10 @@ export default function OfertaDetalleEmpresa() {
                 .eq('id', postulacionId);
 
             if (updateErr) throw updateErr;
+            posthog.capture('application_status_changed', {
+                previous_status: currentStatus,
+                new_status: targetStatus
+            });
         } catch (err) {
             console.error("Error al actualizar estado de postulación:", err);
             // Revertir estado local en caso de error
@@ -586,6 +591,10 @@ export default function OfertaDetalleEmpresa() {
 
             if (updateErr) throw updateErr;
 
+            posthog.capture('application_status_changed', {
+                previous_status: revertState,
+                new_status: 'Rechazado'
+            });
             setShowRejectionModal(false);
             setSelectedPostulacionId(null);
             setSelectedReasonId('');

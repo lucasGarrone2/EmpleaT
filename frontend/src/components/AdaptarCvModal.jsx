@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, X, Copy, Check, AlertTriangle, Lightbulb } from 'lucide-react';
 import { supabase } from '../supabase';
+import posthog from '../posthog';
 
 export default function AdaptarCvModal({ isOpen, onClose, candidatoId, ofertaId }) {
     const [loading, setLoading] = useState(false);
@@ -47,6 +48,7 @@ export default function AdaptarCvModal({ isOpen, onClose, candidatoId, ofertaId 
             }
 
             const json = await response.json();
+            posthog.capture('cv_adaptation_generated');
             setData(json);
         } catch (err) {
             console.error("Error adaptando CV:", err);

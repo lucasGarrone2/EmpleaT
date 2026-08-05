@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageCircle, Send, Lock, Clock } from 'lucide-react';
 import { supabase } from '../supabase';
 import { triggerSessionExpired } from '../context/AuthContext';
+import posthog from '../posthog';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const POLL_INTERVAL_MS = 15000; // 15 segundos
@@ -171,6 +172,9 @@ export default function ChatPostulacion({ postulacionId, miTipo, nombreOtro }) {
             };
 
             setMensajes(prev => [...prev, mensajeOptimista]);
+            posthog.capture('application_message_sent', {
+                sender_type: miTipo
+            });
             lastTimestampRef.current = mensajeOptimista.created_at;
             setNuevoMensaje('');
             if (textareaRef.current) textareaRef.current.style.height = 'auto';

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import { Briefcase, ArrowLeft, CheckCircle2, X, FileSearch } from 'lucide-react';
 import { COMMON_SKILLS } from '../utils/commonSkills';
+import posthog from '../posthog';
 
 export default function EditarOferta() {
     const { id: ofertaId } = useParams();
@@ -289,6 +290,12 @@ export default function EditarOferta() {
                 }
             }
 
+            posthog.capture('job_updated', {
+                job_status: formData.estado,
+                work_mode: formData.modalidad,
+                seniority: formData.seniority,
+                skills_count: skillsList.length
+            });
             navigate(`/oferta-empresa/${ofertaId}`);
             
         } catch (err) {

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import './posthog.js'
 import App from './App.jsx'
 
 // 1. Agregás esta línea para traer tu memoria
