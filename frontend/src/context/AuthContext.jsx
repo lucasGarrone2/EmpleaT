@@ -1,5 +1,6 @@
-import {createContext, useContext, useEffect, useState} from 'react'
+import {createContext, useContext, useEffect, useRef, useState} from 'react'
 import {supabase} from '../supabase'
+import posthog, { posthogEnabled } from '../posthog'
 import { AlertTriangle } from 'lucide-react'
 
 // Helper global para gatillar el modal de sesión expirada desde cualquier petición API
@@ -15,8 +16,30 @@ export function AuthProvider({children}){
     const [user, setUser]= useState(null);
     const [loading, setLoading]= useState(true);
     const [sessionExpiredModal, setSessionExpiredModal]= useState(false);
+    const identifiedUserIdRef = useRef(null);
 
     useEffect(()=>{
+        const identifyUser = (user) => {
+            if (!posthogEnabled || !user?.id || identifiedUserIdRef.current === user.id) return;
+
+            if (identifiedUserIdRef.current) {
+                posthog.reset();
+            }
+
+            posthog.identify(user.id, {
+                email: user.email,
+                role: user.user_metadata?.rol,
+            });
+            identifiedUserIdRef.current = user.id;
+        };
+
+        const resetIdentity = () => {
+            if (posthogEnabled) {
+                posthog.reset();
+            }
+            identifiedUserIdRef.current = null;
+        };
+
         const handleSessionExpired = () => {
             setSessionExpiredModal(true);
         };
@@ -25,7 +48,9 @@ export function AuthProvider({children}){
 
         //Cuando la pagina carga, pregunta a supabase si hay alguien logeado
         supabase.auth.getSession().then(({data: {session}  })=>{
-            setUser(session?.user ?? null);
+            const currentUser = session?.user ?? null;
+            identifyUser(currentUser);
+            setUser(currentUser);
             setLoading(false);
         });
 
@@ -40,6 +65,7 @@ export function AuthProvider({children}){
             }
             // Si el token de sesion expiro o es invalido, limpiar y forzar login
             if (event === 'TOKEN_REFRESH_FAILED') {
+                resetIdentity();
                 setUser(null);
                 setLoading(false);
                 setSessionExpiredModal(true);
@@ -51,6 +77,7 @@ export function AuthProvider({children}){
                 return;
             }
             if (event === 'SIGNED_OUT') {
+                resetIdentity();
                 setUser(null);
                 setLoading(false);
                 sessionStorage.removeItem('is_recovering_password');
@@ -60,7 +87,11 @@ export function AuthProvider({children}){
                 });
                 return;
             }
-            setUser(session?.user ?? null);
+            const currentUser = session?.user ?? null;
+            if (event === 'SIGNED_IN') {
+                identifyUser(currentUser);
+            }
+            setUser(currentUser);
             setLoading(false);
         });
 

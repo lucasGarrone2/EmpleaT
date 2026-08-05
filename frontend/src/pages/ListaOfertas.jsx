@@ -12,6 +12,7 @@ import OfertaCardSkeleton from '../components/OfertaCardSkeleton';
 import AdaptarCvModal from '../components/AdaptarCvModal';
 import { hayOverlapCategorias, getCategoriaSkill } from '../utils/categories';
 import { fetchFeatureFlags, isFeatureActive } from '../utils/featureFlags';
+import posthog from '../posthog';
 
 function PremiumStats({ offerId, candidatoId, currentCandidateMatch, currentOfferSalary, esPremium, marketAvgSalary }) {
     const [stats, setStats] = useState({ totalPostulantes: 0, candidateRank: 0, avgMatch: 0 });
@@ -639,6 +640,11 @@ export default function ListaOfertas() {
                 }
             }
 
+            if (!postError) {
+                posthog.capture('application_submitted', {
+                    match_percentage: porcentajeMatch
+                });
+            }
             setPostulacionesMap(prev => ({
                 ...prev,
                 [ofertaId]: { oferta_id: ofertaId, match_boost_estado: 'pendiente' }

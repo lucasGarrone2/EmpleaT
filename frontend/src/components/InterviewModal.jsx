@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Sparkles, Loader2, Send, CheckCircle } from 'lucide-react';
 import { supabase } from '../supabase';
+import posthog from '../posthog';
 
 export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch, onClose }) {
     const [step, setStep] = useState('generating'); // generating | asking | evaluating | results
@@ -138,6 +139,9 @@ export default function InterviewModal({ candidatoId, ofertaId, porcentajeMatch,
 
             const data = await response.json();
             if (isMountedRef.current) {
+                posthog.capture('interview_simulation_completed', {
+                    score: data.score
+                });
                 setEvaluacion(data);
                 setStep('results');
             }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../supabase';
 import { Zap, Sparkles, X, CheckCircle2, XCircle, BrainCircuit, Loader2 } from 'lucide-react';
 import { getQuestionsForSkills } from '../utils/questionsBank';
+import posthog from '../posthog';
 
 export default function BoostQuizModal({ candidatoId, oferta, onClose, onSuccess }) {
     // 1. Obtener preguntas basadas en las skills de la oferta (se ejecuta una sola vez al montar el componente)
@@ -69,6 +70,11 @@ export default function BoostQuizModal({ candidatoId, oferta, onClose, onSuccess
                 aprobado,
                 aciertos,
                 total: preguntas.length
+            });
+            posthog.capture('match_boost_completed', {
+                passed: aprobado,
+                correct_answers: aciertos,
+                question_count: preguntas.length
             });
 
             // Disparar callback para refrescar estado en ListaOfertas sin recargar página

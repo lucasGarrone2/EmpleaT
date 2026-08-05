@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from '../supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import posthog from '../posthog';
 import './Register.css'; // Reusing the same styles for visual consistency
 
 export default function Login() {   
@@ -33,6 +34,9 @@ export default function Login() {
             }
             setError(msg);
         } else {
+            posthog.capture('login_completed', {
+                authentication_method: 'password'
+            });
             navigate('/');
         }
         setLoading(false);
