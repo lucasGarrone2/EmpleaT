@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from '../supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import posthog from '../posthog';
 import './Register.css'; // Reusing the same styles for visual consistency
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -92,6 +93,9 @@ export default function Login() {
             }
             setError(msg);
         } else {
+            posthog.capture('login_completed', {
+                authentication_method: 'password'
+            });
             navigate('/');
         }
         setLoading(false);

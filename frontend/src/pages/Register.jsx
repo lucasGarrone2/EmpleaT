@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
+import posthog from '../posthog';
 import './Register.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -133,6 +134,10 @@ export default function Register() {
             // Supabase devuelve un usuario sin identidades (array vacío).
             setError("Este correo electrónico ya se encuentra registrado.");
         } else {
+            posthog.capture('signup_completed', {
+                account_role: rol,
+                authentication_method: 'password'
+            });
             setMensaje("¡Registro exitoso! Revisa tu correo para confirmar la cuenta (recuerda revisar también tu carpeta de Spam / Correo no deseado).");
             // Clear fields on success
             if (rol === 'candidato') {

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
 import { Info, FileText, BrainCircuit, Target, X, Edit3, Sparkles, Brain, Cpu, Database, RefreshCw } from 'lucide-react';
+import posthog from '../posthog';
 import './Register.css';
 
 const loadingIcons = [
@@ -301,6 +302,11 @@ export default function PerfilCandidato() {
             }
 
             // Paso C: Exito y redirección
+            posthog.capture('candidate_profile_saved', {
+                skills_count: datosExtraidos.skills.length,
+                available_for_search: disponibleBusqueda,
+                cv_attached: Boolean(pdfPath)
+            });
             setGuardadoExito(true);
             showAlert("Tu perfil ha sido procesado y guardado correctamente.", "¡Éxito!", "success");
             setTimeout(() => {

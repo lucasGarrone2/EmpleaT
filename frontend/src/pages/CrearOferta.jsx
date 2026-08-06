@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import { Briefcase, ArrowLeft, CheckCircle2, X, FileSearch } from 'lucide-react';
 import { COMMON_SKILLS } from '../utils/commonSkills';
+import posthog from '../posthog';
 
 export default function CrearOferta() {
     const { user } = useAuth();
@@ -249,6 +250,12 @@ export default function CrearOferta() {
                 }
             }
 
+            posthog.capture('job_created', {
+                job_status: formData.estado,
+                work_mode: formData.modalidad,
+                seniority: formData.seniority,
+                skills_count: skillsList.length
+            });
             navigate('/dashboard-empresa');
             
         } catch (err) {
