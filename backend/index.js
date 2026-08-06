@@ -183,6 +183,44 @@ app.get('/api/feature-flags', async (req, res) => {
   }
 });
 
+// -------------------------------------------------------------
+// CLOUDFLARE TURNSTILE VERIFICATION ENDPOINT
+// -------------------------------------------------------------
+const turnstileLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { success: false, error: "Demasiados intentos de verificación. Esperá un momento e intentá de nuevo." }
+});
+
+app.post('/api/verify-turnstile', turnstileLimiter, async (req, res) => {
+  const token = req.body?.['cf-turnstile-response'];
+  if (!token) {
+    return res.status(400).json({ success: false, error: 'Missing Turnstile token' });
+  }
+
+  let result;
+  try {
+    const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        secret: process.env.TURNSTILE_SECRET,
+        response: token,
+        remoteip: req.ip,
+      }),
+    });
+    if (!r.ok) throw new Error(`siteverify ${r.status}`);
+    result = await r.json();
+  } catch (err) {
+    // Network error, non-2xx, or non-JSON body from siteverify. Fail closed.
+    return res.status(403).json({ success: false, error: 'forbidden' });
+  }
+  if (!result.success) {
+    return res.status(403).json({ success: false, error: 'forbidden' });
+  }
+
+  return res.json({ success: true });
+});
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";

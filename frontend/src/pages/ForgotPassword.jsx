@@ -1,20 +1,78 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft } from 'lucide-react';
 import './Register.css'; 
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const TURNSTILE_SITEKEY = '0x4AAAAAAEINkBbJLCv7nSq7';
 
 export default function ForgotPassword() {   
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
     const [error, setError] = useState(null);
+    const [turnstileToken, setTurnstileToken] = useState(null);
+    const turnstileRef = useRef(null);
+
+    useEffect(() => {
+        const renderWidget = () => {
+            if (turnstileRef.current && window.turnstile) {
+                turnstileRef.current.innerHTML = '';
+                window.turnstile.render(turnstileRef.current, {
+                    sitekey: TURNSTILE_SITEKEY,
+                    action: 'turnstile-spin-v2',
+                    callback: (token) => setTurnstileToken(token),
+                    'expired-callback': () => setTurnstileToken(null),
+                    'error-callback': () => setTurnstileToken(null),
+                });
+            }
+        };
+
+        const interval = setInterval(() => {
+            if (window.turnstile) {
+                clearInterval(interval);
+                renderWidget();
+            }
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, []);
 
     const handleResetRequest = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
         setMessage(null);
+
+        // Verify Turnstile token server-side
+        if (!turnstileToken) {
+            setError('Por favor, completa la verificación de seguridad.');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const verifyRes = await fetch(`${API_URL}/api/verify-turnstile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 'cf-turnstile-response': turnstileToken }),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyData.success) {
+                setError('Verificación de seguridad fallida. Por favor, intenta de nuevo.');
+                setTurnstileToken(null);
+                window.turnstile?.reset();
+                setLoading(false);
+                return;
+            }
+        } catch (err) {
+            setError('Error al verificar la seguridad. Por favor, intenta de nuevo.');
+            setTurnstileToken(null);
+            window.turnstile?.reset();
+            setLoading(false);
+            return;
+        }
 
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: window.location.origin + '/reset-password',
@@ -33,6 +91,9 @@ export default function ForgotPassword() {
             setMessage("¡Enlace enviado! Revisa tu bandeja de entrada.");
         }
         setLoading(false);
+        // Reset Turnstile for next attempt
+        setTurnstileToken(null);
+        window.turnstile?.reset();
     }
 
     return (
@@ -76,10 +137,11 @@ export default function ForgotPassword() {
                                 />
                             </div>
 
+                            <div ref={turnstileRef} className="cf-turnstile" data-sitekey={TURNSTILE_SITEKEY} data-action="turnstile-spin-v2" style={{ marginBottom: '1rem' }}></div>
                             <button 
                                 type="submit" 
                                 className="submit-btn"
-                                disabled={loading || message}
+                                disabled={loading || message || !turnstileToken}
                                 style={{ marginTop: '2rem' }}
                             >
                                 {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}

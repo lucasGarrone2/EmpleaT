@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from '../supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import './Register.css'; // Reusing the same styles for visual consistency
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const TURNSTILE_SITEKEY = '0x4AAAAAAEINkBbJLCv7nSq7';
 
 export default function Login() {   
     const [email, setEmail] = useState('');
@@ -14,10 +17,66 @@ export default function Login() {
     
     const navigate = useNavigate();
 
+    const [turnstileToken, setTurnstileToken] = useState(null);
+    const turnstileRef = useRef(null);
+
+    useEffect(() => {
+        const renderWidget = () => {
+            if (turnstileRef.current && window.turnstile) {
+                turnstileRef.current.innerHTML = '';
+                window.turnstile.render(turnstileRef.current, {
+                    sitekey: TURNSTILE_SITEKEY,
+                    action: 'turnstile-spin-v2',
+                    callback: (token) => setTurnstileToken(token),
+                    'expired-callback': () => setTurnstileToken(null),
+                    'error-callback': () => setTurnstileToken(null),
+                });
+            }
+        };
+
+        const interval = setInterval(() => {
+            if (window.turnstile) {
+                clearInterval(interval);
+                renderWidget();
+            }
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, []);
+
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+
+        // Verify Turnstile token server-side
+        if (!turnstileToken) {
+            setError('Por favor, completa la verificación de seguridad.');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const verifyRes = await fetch(`${API_URL}/api/verify-turnstile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 'cf-turnstile-response': turnstileToken }),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyData.success) {
+                setError('Verificación de seguridad fallida. Por favor, intenta de nuevo.');
+                setTurnstileToken(null);
+                window.turnstile?.reset();
+                setLoading(false);
+                return;
+            }
+        } catch (err) {
+            setError('Error al verificar la seguridad. Por favor, intenta de nuevo.');
+            setTurnstileToken(null);
+            window.turnstile?.reset();
+            setLoading(false);
+            return;
+        }
 
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
@@ -36,6 +95,10 @@ export default function Login() {
             navigate('/');
         }
         setLoading(false);
+
+        // Reset Turnstile for next attempt
+        setTurnstileToken(null);
+        window.turnstile?.reset();
     }
 
     const handleGoogleLogin = async () => {
@@ -103,10 +166,11 @@ export default function Login() {
                                 </div>
                             </div>
 
+                            <div ref={turnstileRef} className="cf-turnstile" data-sitekey={TURNSTILE_SITEKEY} data-action="turnstile-spin-v2" style={{ marginBottom: '1rem' }}></div>
                             <button 
                                 type="submit" 
                                 className="submit-btn"
-                                disabled={loading}
+                                disabled={loading || !turnstileToken}
                                 style={{ marginTop: '1.5rem' }}
                             >
                                 {loading ? 'Iniciando sesión...' : 'Ingresar'}

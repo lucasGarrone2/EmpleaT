@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import './Register.css';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const TURNSTILE_SITEKEY = '0x4AAAAAAEINkBbJLCv7nSq7';
 
 export default function Register() {   
     // Candidate States
@@ -23,6 +26,38 @@ export default function Register() {
     const [mensaje, setMensaje] = useState(null);
     const [loading, setLoading] = useState(false);
 
+    const [turnstileToken, setTurnstileToken] = useState(null);
+
+    const candidateTurnstileRef = useRef(null);
+    const empresaTurnstileRef = useRef(null);
+
+    useEffect(() => {
+        const renderWidget = (container) => {
+            if (container && window.turnstile) {
+                // Clear any existing widget
+                container.innerHTML = '';
+                window.turnstile.render(container, {
+                    sitekey: TURNSTILE_SITEKEY,
+                    action: 'turnstile-spin-v2',
+                    callback: (token) => setTurnstileToken(token),
+                    'expired-callback': () => setTurnstileToken(null),
+                    'error-callback': () => setTurnstileToken(null),
+                });
+            }
+        };
+
+        // Wait for Turnstile script to load
+        const interval = setInterval(() => {
+            if (window.turnstile) {
+                clearInterval(interval);
+                renderWidget(candidateTurnstileRef.current);
+                renderWidget(empresaTurnstileRef.current);
+            }
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, []);
+
     const toggleRole = (newRole) => {
         if (newRole !== rol) {
             setRol(newRole);
@@ -36,6 +71,35 @@ export default function Register() {
         setLoading(true);
         setError(null);
         setMensaje(null);
+
+        // Verify Turnstile token server-side
+        if (!turnstileToken) {
+            setError('Por favor, completa la verificación de seguridad.');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            const verifyRes = await fetch(`${API_URL}/api/verify-turnstile`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 'cf-turnstile-response': turnstileToken }),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyData.success) {
+                setError('Verificación de seguridad fallida. Por favor, intenta de nuevo.');
+                setTurnstileToken(null);
+                window.turnstile?.reset();
+                setLoading(false);
+                return;
+            }
+        } catch (err) {
+            setError('Error al verificar la seguridad. Por favor, intenta de nuevo.');
+            setTurnstileToken(null);
+            window.turnstile?.reset();
+            setLoading(false);
+            return;
+        }
 
         const email = rol === 'candidato' ? candidateEmail : companyEmail;
         const password = rol === 'candidato' ? candidatePassword : companyPassword;
@@ -80,6 +144,10 @@ export default function Register() {
             }
         }
         setLoading(false);
+
+        // Reset Turnstile for next attempt
+        setTurnstileToken(null);
+        window.turnstile?.reset();
     }
 
     const handleGoogleRegister = async () => {
@@ -183,11 +251,12 @@ export default function Register() {
                                 </label>
                             </div>
 
+                            <div ref={candidateTurnstileRef} className="cf-turnstile" data-sitekey={TURNSTILE_SITEKEY} data-action="turnstile-spin-v2" style={{ marginBottom: '1rem' }}></div>
                             <button 
                                 type="submit"  
                                 className="submit-btn"
-                                disabled={loading || !candidatoTerminos}
-                                style={{ opacity: (!candidatoTerminos) ? 0.6 : 1, cursor: (!candidatoTerminos) ? 'not-allowed' : 'pointer' }}
+                                disabled={loading || !candidatoTerminos || !turnstileToken}
+                                style={{ opacity: (!candidatoTerminos || !turnstileToken) ? 0.6 : 1, cursor: (!candidatoTerminos || !turnstileToken) ? 'not-allowed' : 'pointer' }}
                             >
                                 {loading ? 'Creando cuenta...' : 'Crear Cuenta de Candidato'}
                             </button>
@@ -299,11 +368,12 @@ export default function Register() {
                                 </label>
                             </div>
 
+                            <div ref={empresaTurnstileRef} className="cf-turnstile" data-sitekey={TURNSTILE_SITEKEY} data-action="turnstile-spin-v2" style={{ marginBottom: '1rem' }}></div>
                             <button 
                                 type="submit" 
                                 className="submit-btn"
-                                disabled={loading || !empresaTerminos}
-                                style={{ opacity: (!empresaTerminos) ? 0.6 : 1, cursor: (!empresaTerminos) ? 'not-allowed' : 'pointer' }}
+                                disabled={loading || !empresaTerminos || !turnstileToken}
+                                style={{ opacity: (!empresaTerminos || !turnstileToken) ? 0.6 : 1, cursor: (!empresaTerminos || !turnstileToken) ? 'not-allowed' : 'pointer' }}
                             >
                                 {loading ? 'Creando cuenta...' : 'Crear Cuenta de Empresa'}
                             </button>
