@@ -40,8 +40,8 @@
   background-color: transparent;
   width: 100%;
   max-width: 440px;
-  min-height: 680px;
-  height: 680px;
+  min-height: 780px;
+  height: 780px;
   perspective: 1000px;
   z-index: 10;
 }

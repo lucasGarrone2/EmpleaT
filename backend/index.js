@@ -198,13 +198,18 @@ app.post('/api/verify-turnstile', turnstileLimiter, async (req, res) => {
     return res.status(400).json({ success: false, error: 'Missing Turnstile token' });
   }
 
+  const secret = process.env.TURNSTILE_SECRET;
+  if (!secret) {
+    console.error('[Turnstile Error] TURNSTILE_SECRET environment variable is missing on the server backend!');
+  }
+
   let result;
   try {
     const r = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        secret: process.env.TURNSTILE_SECRET,
+        secret: secret || '',
         response: token,
         remoteip: req.ip,
       }),
@@ -212,11 +217,13 @@ app.post('/api/verify-turnstile', turnstileLimiter, async (req, res) => {
     if (!r.ok) throw new Error(`siteverify ${r.status}`);
     result = await r.json();
   } catch (err) {
+    console.error('[Turnstile Error] siteverify network or parsing error:', err.message);
     // Network error, non-2xx, or non-JSON body from siteverify. Fail closed.
     return res.status(403).json({ success: false, error: 'forbidden' });
   }
   if (!result.success) {
-    return res.status(403).json({ success: false, error: 'forbidden' });
+    console.error('[Turnstile Verification Failed]', result['error-codes'] || result);
+    return res.status(403).json({ success: false, error: 'forbidden', codes: result['error-codes'] });
   }
 
   return res.json({ success: true });
