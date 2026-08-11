@@ -2601,7 +2601,7 @@ async function requireAdmin(req, res) {
     // Verificación real contra la tabla administradores (no user_metadata)
     const { data: adminRow, error: adminErr } = await supabaseAdmin
         .from('administradores')
-        .select('id')
+        .select('auth_id')
         .eq('auth_id', user.id)
         .maybeSingle();
 
@@ -2679,26 +2679,142 @@ ${descripcion.substring(0, 4000)}
     }
 });
 
+// Helpers para seguimiento de suscripciones otorgadas manualmente
+const MANUAL_PREMIUM_FILE = path.join(process.cwd(), 'manual_premium.json');
+
+function getManualPremiumSet() {
+    try {
+        if (fs.existsSync(MANUAL_PREMIUM_FILE)) {
+            const raw = fs.readFileSync(MANUAL_PREMIUM_FILE, 'utf8');
+            return new Set(JSON.parse(raw));
+        }
+    } catch (err) {
+        console.error("Error leyendo manual_premium.json:", err.message);
+    }
+    return new Set();
+}
+
+function addManualPremium(authId) {
+    if (!authId) return;
+    const set = getManualPremiumSet();
+    set.add(authId);
+    try {
+        fs.writeFileSync(MANUAL_PREMIUM_FILE, JSON.stringify(Array.from(set), null, 2));
+    } catch (err) {
+        console.error("Error guardando manual_premium.json:", err.message);
+    }
+}
+
+function removeManualPremium(authId) {
+    if (!authId) return;
+    const set = getManualPremiumSet();
+    set.delete(authId);
+    try {
+        fs.writeFileSync(MANUAL_PREMIUM_FILE, JSON.stringify(Array.from(set), null, 2));
+    } catch (err) {
+        console.error("Error guardando manual_premium.json:", err.message);
+    }
+}
+
 // --- GET /api/admin/data — Obtener todos los datos del panel ---
 app.get('/api/admin/data', adminLimiter, async (req, res) => {
     try {
         const user = await requireAdmin(req, res);
         if (!user) return;
 
-        const [ofertasRes, candidatosRes, empresasRes] = await Promise.all([
+        const [ofertasRes, candidatosRes, empresasRes, postulacionesCountRes, insigniasRes] = await Promise.all([
             supabaseAdmin.from('ofertas')
-                .select('id, titulo, modalidad, estado, creada_en, oculta_admin, empresas(nombre)')
+                .select('id, titulo, descripcion, modalidad, estado, creada_en, oculta_admin, empresas(nombre)')
                 .order('creada_en', { ascending: false }),
             supabaseAdmin.from('candidatos')
-                .select('id, nombre_completo, titulo_profesional, baneado'),
+                .select('id, auth_id, nombre_completo, email, titulo_profesional, es_premium, premium_desde, premium_hasta, baneado, creada_en')
+                .order('creada_en', { ascending: false }),
             supabaseAdmin.from('empresas')
-                .select('id, nombre, sector, baneada')
+                .select('id, auth_id, nombre, sector, plan, premium_hasta, baneada, creada_en')
+                .order('creada_en', { ascending: false }),
+            supabaseAdmin.from('postulaciones').select('id', { count: 'exact', head: true }),
+            supabaseAdmin.from('candidato_insignias')
+                .select('id, candidato_id, insignia_id, fecha_obtenida, candidatos(nombre_completo, email), insignias(nombre, descripcion)')
+                .order('fecha_obtenida', { ascending: false })
         ]);
 
+        const candidatosRaw = candidatosRes.data || [];
+        const empresasRaw = empresasRes.data || [];
+        const ofertas = ofertasRes.data || [];
+        const insignias = insigniasRes.data || [];
+        const manualSet = getManualPremiumSet();
+
+        const isCandManual = (c) => {
+            if (manualSet.has(c.auth_id)) return true;
+            if (c.premium_desde && new Date(c.premium_desde).getFullYear() === 1970) return true;
+            return false;
+        };
+
+        const isEmpManual = (e) => {
+            if (manualSet.has(e.auth_id)) return true;
+            return false;
+        };
+
+        const candidatos = candidatosRaw.map(c => ({
+            ...c,
+            es_manual_premium: isCandManual(c)
+        }));
+
+        const empresas = empresasRaw.map(e => ({
+            ...e,
+            es_manual_premium: isEmpManual(e)
+        }));
+
+        const now = new Date();
+        
+        // Candidatos Premium (Activos)
+        const candPremiumActivos = candidatos.filter(c => c.es_premium && c.premium_hasta && new Date(c.premium_hasta) > now);
+        const candPremiumPagados = candPremiumActivos.filter(c => !c.es_manual_premium);
+        const candPremiumManuales = candPremiumActivos.filter(c => c.es_manual_premium);
+        const candFreeCount = candidatos.length - candPremiumActivos.length;
+
+        // Empresas Premium (Activas)
+        const empPremiumActivas = empresas.filter(e => e.plan === 'premium' && e.premium_hasta && new Date(e.premium_hasta) > now);
+        const empPremiumPagadas = empPremiumActivas.filter(e => !e.es_manual_premium);
+        const empPremiumManuales = empPremiumActivas.filter(e => e.es_manual_premium);
+        const empFreeCount = empresas.length - empPremiumActivas.length;
+
+        // Cálculo de ingresos REALES (excluyendo asignaciones manuales/de prueba)
+        const PRECIO_CANDIDATO_MES = 5000;
+        const PRECIO_EMPRESA_MES = 25000;
+        const ingresoCandidatos = candPremiumPagados.length * PRECIO_CANDIDATO_MES;
+        const ingresoEmpresas = empPremiumPagadas.length * PRECIO_EMPRESA_MES;
+        const ingresoTotalBruto = ingresoCandidatos + ingresoEmpresas;
+
         return res.json({
-            ofertas: ofertasRes.data || [],
-            candidatos: candidatosRes.data || [],
-            empresas: empresasRes.data || []
+            stats: {
+                totalPostulaciones: postulacionesCountRes.count || 0,
+                totalInsignias: insignias.length,
+                candidatosPremium: candPremiumActivos.length,
+                candidatosPremiumPagados: candPremiumPagados.length,
+                candidatosPremiumManuales: candPremiumManuales.length,
+                candidatosFree: candFreeCount,
+                empresasPremium: empPremiumActivas.length,
+                empresasPremiumPagadas: empPremiumPagadas.length,
+                empresasPremiumManuales: empPremiumManuales.length,
+                empresasFree: empFreeCount,
+                totalUsuarios: candidatos.length + empresas.length,
+                finanzas: {
+                    ingresoTotalBruto,
+                    ingresoCandidatos,
+                    ingresoEmpresas,
+                    candidatosPagadosCount: candPremiumPagados.length,
+                    candidatosManualesCount: candPremiumManuales.length,
+                    empresasPagadasCount: empPremiumPagadas.length,
+                    empresasManualesCount: empPremiumManuales.length,
+                    precioBaseCandidato: PRECIO_CANDIDATO_MES,
+                    precioBaseEmpresa: PRECIO_EMPRESA_MES
+                }
+            },
+            ofertas,
+            candidatos,
+            empresas,
+            insignias
         });
     } catch (err) {
         console.error('[Admin] Error en /api/admin/data:', err.message);
@@ -2777,6 +2893,93 @@ app.post('/api/admin/ban-empresa', adminLimiter, async (req, res) => {
         return res.json({ success: true });
     } catch (err) {
         console.error('[Admin] Error en /api/admin/ban-empresa:', err.message);
+        return res.status(500).json({ error: 'Error interno del servidor.' });
+    }
+});
+
+// --- POST /api/admin/toggle-premium-candidato — Otorgar/revocar premium a candidato ---
+app.post('/api/admin/toggle-premium-candidato', adminLimiter, async (req, res) => {
+    try {
+        const user = await requireAdmin(req, res);
+        if (!user) return;
+
+        const { candidato_id, es_premium, dias = 30 } = req.body;
+        if (!candidato_id || typeof es_premium !== 'boolean') {
+            return res.status(400).json({ error: 'Datos inválidos.' });
+        }
+
+        const { data: cand } = await supabaseAdmin
+            .from('candidatos')
+            .select('auth_id')
+            .eq('id', candidato_id)
+            .maybeSingle();
+
+        const premium_hasta = es_premium 
+            ? new Date(Date.now() + (parseInt(dias) || 30) * 24 * 60 * 60 * 1000).toISOString()
+            : null;
+
+        const updateData = es_premium 
+            ? { es_premium: true, premium_desde: '1970-01-01T00:00:00.000Z', premium_hasta }
+            : { es_premium: false, premium_desde: null, premium_hasta: null };
+
+        const { error } = await supabaseAdmin
+            .from('candidatos')
+            .update(updateData)
+            .eq('id', candidato_id);
+
+        if (error) throw error;
+
+        if (cand && cand.auth_id) {
+            if (es_premium) addManualPremium(cand.auth_id);
+            else removeManualPremium(cand.auth_id);
+        }
+
+        console.log(`[Admin] ${user.id} toggled premium candidato ${candidato_id} → ${es_premium}`);
+        return res.json({ success: true, es_premium, premium_hasta, es_manual_premium: es_premium });
+    } catch (err) {
+        console.error('[Admin] Error en /api/admin/toggle-premium-candidato:', err.message);
+        return res.status(500).json({ error: 'Error interno del servidor.' });
+    }
+});
+
+// --- POST /api/admin/toggle-premium-empresa — Otorgar/revocar premium a empresa ---
+app.post('/api/admin/toggle-premium-empresa', adminLimiter, async (req, res) => {
+    try {
+        const user = await requireAdmin(req, res);
+        if (!user) return;
+
+        const { empresa_id, es_premium, dias = 30 } = req.body;
+        if (!empresa_id || typeof es_premium !== 'boolean') {
+            return res.status(400).json({ error: 'Datos inválidos.' });
+        }
+
+        const { data: emp } = await supabaseAdmin
+            .from('empresas')
+            .select('auth_id')
+            .eq('id', empresa_id)
+            .maybeSingle();
+
+        const plan = es_premium ? 'premium' : 'free';
+        const premium_hasta = es_premium 
+            ? new Date(Date.now() + (parseInt(dias) || 30) * 24 * 60 * 60 * 1000).toISOString()
+            : null;
+
+        const { error } = await supabaseAdmin
+            .from('empresas')
+            .update({ plan, premium_hasta })
+            .eq('id', empresa_id);
+
+        if (error) throw error;
+
+        if (emp && emp.auth_id) {
+            if (es_premium) addManualPremium(emp.auth_id);
+            else removeManualPremium(emp.auth_id);
+        }
+
+        console.log(`[Admin] ${user.id} toggled premium empresa ${empresa_id} → ${es_premium}`);
+        return res.json({ success: true, plan, premium_hasta, es_manual_premium: es_premium });
+    } catch (err) {
+        console.error('[Admin] Error en /api/admin/toggle-premium-empresa:', err.message);
         return res.status(500).json({ error: 'Error interno del servidor.' });
     }
 });
