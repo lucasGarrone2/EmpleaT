@@ -75,9 +75,10 @@ export default function BusquedaCandidatos() {
         fetchData();
     }, [user, navigate]);
 
-    // Skill autocomplete with debounce
+    // Skill autocomplete with 400ms debounce & min 3 characters to protect DB Disk I/O
     useEffect(() => {
-        if (skillInput.length < 2) {
+        const trimmed = skillInput.trim();
+        if (trimmed.length < 3) {
             setSuggestions([]);
             return;
         }
@@ -87,7 +88,7 @@ export default function BusquedaCandidatos() {
                 const { data, error } = await supabase
                     .from('diccionario_skills')
                     .select('nombre_skill')
-                    .ilike('nombre_skill', `%${skillInput}%`)
+                    .ilike('nombre_skill', `%${trimmed}%`)
                     .limit(8);
 
                 if (!error && data) {
@@ -96,7 +97,7 @@ export default function BusquedaCandidatos() {
             } catch (err) {
                 console.error("Error fetching skill suggestions:", err);
             }
-        }, 300);
+        }, 400);
 
         return () => clearTimeout(timer);
     }, [skillInput, selectedSkills]);
