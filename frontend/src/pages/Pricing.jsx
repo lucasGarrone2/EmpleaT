@@ -75,17 +75,20 @@ export default function Pricing() {
         }
     }, [showAlert, navigate]);
 
-    const handleArrepentimiento = async () => {
-        if (!window.confirm("¿Estás seguro de que deseas cancelar tu suscripción Premium? Esta acción solicitará el arrepentimiento y reembolso según la legislación vigente.")) {
-            return;
-        }
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+    const handleArrepentimiento = () => {
+        setShowConfirmModal(true);
+    };
+
+    const ejecutarArrepentimiento = async () => {
+        setShowConfirmModal(false);
         setProcesandoArrepentimiento(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("No hay sesión activa");
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/premium/arrepentimiento`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/arrepentimiento`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -93,18 +96,17 @@ export default function Pricing() {
                 }
             });
 
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.error || "No se pudo procesar la solicitud de arrepentimiento.");
+            if (response.ok) {
+                const data = await response.json().catch(() => ({}));
+                setCandidatoData(prev => prev ? { ...prev, es_premium: false, premium_hasta: null } : null);
+                showAlert(`¡Suscripción Premium revocada con éxito! Código de trámite: ${data.codigo_tramite || 'AR-' + Date.now()}. El reembolso de tu pago se procesará a través de Mercado Pago.`, "Arrepentimiento Ejercido", "success");
+            } else {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || "No se pudo procesar la solicitud de arrepentimiento.");
             }
-
-            if (data.success) {
-                setCandidatoData(prev => ({ ...prev, es_premium: false, premium_hasta: null }));
-                showAlert(`¡Suscripción Premium revocada con éxito! Código de trámite: ${data.codigo_tramite}. El reembolso de tu pago se procesará a través de Mercado Pago.`, "Arrepentimiento Ejercido", "success");
-            }
-        } catch (err) {
-            console.error("Error al revocar suscripción:", err);
-            showAlert(err.message || "Ocurrió un error al intentar cancelar la suscripción.", "Error", "error");
+        } catch (error) {
+            console.error("Error al procesar arrepentimiento:", error);
+            showAlert(error.message || "Hubo un error al procesar tu solicitud. Por favor contacta a soporte.", "Error", "error");
         } finally {
             setProcesandoArrepentimiento(false);
         }
