@@ -1,11 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import HeroSearch from '../components/HeroSearch';
 import FeatureCards from '../components/FeatureCards';
+import SeoHead from '../components/SeoHead';
 import { Facebook, Twitter, Instagram, ArrowRight, Sparkles, Zap, Shield, Award, Check, MessageSquare, Mail, Copy, X, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../supabase';
 import './LandingPage.css';
+
+const webAppSchema = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "EmpleaT",
+  "url": "https://empleat.com.ar",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "All",
+  "browserRequirements": "Requires JavaScript. Requires HTML5.",
+  "inLanguage": "es-AR",
+  "description": "Plataforma de desarrollo profesional e IA en Argentina. Optimizá tu CV con Inteligencia Artificial, simulá entrevistas laborales y postulate a empleos tech.",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "ARS"
+  },
+  "author": {
+    "@type": "Organization",
+    "name": "EmpleaT Argentina",
+    "url": "https://empleat.com.ar"
+  },
+  "featureList": [
+    "Optimización de CV con IA",
+    "Simulador interactivo de entrevistas laborales",
+    "Bolsa de trabajo IT en Argentina",
+    "Smart Match de perfil y ofertas laborales"
+  ]
+};
+
+const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "¿Cómo optimizar un CV con Inteligencia Artificial para el mercado tech de Argentina?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "En EmpleaT, subí tu currículum en PDF o Word. Nuestra IA analiza las palabras clave del puesto objetivo, adapta el formato a los filtros ATS, destaca logros cuantificables y sugiere competencias demandadas en Argentina."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Qué es el simulador de entrevistas laborales de EmpleaT?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "El simulador de entrevistas interactivo de EmpleaT permite practicar preguntas técnicas y comportamentales específicas de roles IT, brindando feedback inmediato antes de tu entrevista real."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "¿Es gratis utilizar EmpleaT para buscar trabajo en Argentina?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Sí, el registro, la postulación a empleos tech y la optimización básica de CV con Inteligencia Artificial son 100% gratuitos para candidatos en Argentina."
+      }
+    }
+  ]
+};
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -24,9 +84,8 @@ const LandingPage = () => {
           .maybeSingle();
 
         if (data && data.nombre_completo) {
-          setUserName(data.nombre_completo.split(' ')[0]); // Usar solo el primer nombre
+          setUserName(data.nombre_completo.split(' ')[0]);
         } else {
-          // Fallback temporal si todavía no subió CV
           const emailName = user.email.split('@')[0];
           setUserName(emailName.charAt(0).toUpperCase() + emailName.slice(1));
         }
@@ -47,6 +106,12 @@ const LandingPage = () => {
 
   return (
     <div className="landing-page">
+      <SeoHead
+        title="EmpleaT | Potenciá tu Carrera Tech y Optimizá tu CV con IA en Argentina"
+        description="Plataforma de empleo tech e impulso profesional en Argentina. Optimizá tu CV con Inteligencia Artificial, practicá entrevistas con nuestro simulador y postulate a las mejores ofertas IT."
+        canonical="https://empleat.com.ar/"
+        schema={[webAppSchema, faqSchema]}
+      />
       {/* Banner de Testeo / Beta */}
       <div style={{
         background: 'linear-gradient(90deg, #fff7ed 0%, #ffedd5 100%)',

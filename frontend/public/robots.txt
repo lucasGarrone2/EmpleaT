@@ -1,0 +1,46 @@
+# Permitir a los principales motores de búsqueda
+User-agent: Googlebot
+Allow: /
+Allow: /ofertas
+Allow: /pricing
+Allow: /terminos-legales
+Disallow: /dashboard-empresa
+Disallow: /admin
+Disallow: /mis-chats
+Disallow: /mi-perfil
+Disallow: /auth/
+Disallow: /api/
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+# Bloquear bots scrapers agresivos y bots de IA no autorizados
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+# Todos los demás buscadores
+User-agent: *
+Allow: /
+Disallow: /dashboard-empresa
+Disallow: /admin
+Disallow: /mis-chats
+Disallow: /mi-perfil
+Disallow: /auth/
+
+# Especificación del Sitemap principal
+Sitemap: https://empleat.com.ar/sitemap.xml
