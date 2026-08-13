@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../context/AlertContext';
 import { supabase } from '../supabase';
-import { Sparkles, Check, Zap, BarChart3, Search, Star, Users, Shield, ArrowLeft } from 'lucide-react';
+import { Sparkles, Check, Zap, BarChart3, Search, Star, Users, Shield, ArrowLeft, AlertTriangle } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -61,48 +61,26 @@ export default function EmpresaPricing() {
 
         const fetchData = async () => {
             try {
-                const { data: miembro } = await supabase
-                    .from('empresa_miembros')
-                    .select('empresa_id, rol, empresas(id, nombre, plan, premium_hasta)')
+                const { data: miembroData } = await supabase
+                    .from('miembros_empresa')
+                    .select('rol, empresa_id, empresas(*)')
                     .eq('auth_id', user.id)
                     .maybeSingle();
 
-                if (miembro?.empresas) {
-                    setEmpresa(miembro.empresas);
-                    setMiembroRol(miembro.rol);
-                }
+                if (miembroData) {
+                    setMiembroRol(miembroData.rol);
+                    setEmpresa(miembroData.empresas);
 
-                // Handle payment callback
-                const paymentId = queryParams.get('payment_id');
-                const paymentStatus = queryParams.get('status');
-                if (paymentId && paymentStatus === 'approved') {
-                    try {
-                        const { data: { session } } = await supabase.auth.getSession();
-                        const res = await fetch(`${API_URL}/api/empresa/confirm-payment`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${session.access_token}`
-                            },
-                            body: JSON.stringify({ payment_id: paymentId })
-                        });
-
-                        const data = await res.json();
-                        if (data.success) {
-                            showAlert("¡Plan Premium activado para tu empresa!", "¡Éxito!", "success");
-                            window.history.replaceState({}, document.title, window.location.pathname);
-                            // Refresh empresa data
-                            const { data: refreshedMiembro } = await supabase
-                                .from('empresa_miembros')
-                                .select('empresas(id, nombre, plan, premium_hasta)')
-                                .eq('auth_id', user.id)
-                                .maybeSingle();
-                            if (refreshedMiembro?.empresas) {
-                                setEmpresa(refreshedMiembro.empresas);
-                            }
+                    if (queryParams.get('payment_status') === 'success') {
+                        showAlert("¡Suscripción actualizada con éxito!", "¡Felicidades!", "success");
+                        const { data: refreshedMiembro } = await supabase
+                            .from('miembros_empresa')
+                            .select('empresas(*)')
+                            .eq('auth_id', user.id)
+                            .maybeSingle();
+                        if (refreshedMiembro?.empresas) {
+                            setEmpresa(refreshedMiembro.empresas);
                         }
-                    } catch (e) {
-                        console.error("Error confirming empresa payment:", e);
                     }
                 }
             } catch (err) {
@@ -138,13 +116,12 @@ export default function EmpresaPricing() {
             if (data.init_point) {
                 window.location.href = data.init_point;
             } else {
-                throw new Error(data.error || "No se pudo crear el enlace de pago.");
+                throw new Error("Respuesta inválida");
             }
         } catch (err) {
-            showAlert(err.message, "Error", "error");
+            showAlert("Error al iniciar el proceso de pago.", "Error", "error");
         } finally {
             setLoading(false);
-            setSelectedPlan(null);
         }
     };
 
@@ -169,6 +146,31 @@ export default function EmpresaPricing() {
                 }}>
                     <ArrowLeft size={18} /> Volver al panel
                 </button>
+
+                {/* Banner de Suscripciones Deshabilitadas */}
+                <div style={{
+                    background: 'linear-gradient(90deg, #fff7ed 0%, #ffedd5 100%)',
+                    border: '1px solid #fed7aa',
+                    borderRadius: '12px',
+                    color: '#9a3412',
+                    padding: '10px 16px',
+                    textAlign: 'center',
+                    fontSize: '0.88rem',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.03)',
+                    marginBottom: '2rem',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                }} className="notranslate" translate="no">
+                    <AlertTriangle size={17} color="#c2410c" style={{ flexShrink: 0 }} />
+                    <span>
+                        <strong>SUSCRIPCIONES TEMPORALMENTE DESHABILITADAS:</strong> Las suscripciones se encuentran temporalmente deshabilitadas por estar en fase de desarrollo.
+                    </span>
+                </div>
 
                 {/* Header */}
                 <div style={{ textAlign: 'center', marginBottom: '3rem' }}>

@@ -275,6 +275,31 @@ const LandingPage = () => {
             </div>
 
             {/* Planes de Precios Simplificados */}
+            <div style={{
+              background: 'linear-gradient(90deg, #fff7ed 0%, #ffedd5 100%)',
+              border: '1px solid #fed7aa',
+              borderRadius: '12px',
+              color: '#9a3412',
+              padding: '10px 16px',
+              textAlign: 'center',
+              fontSize: '0.88rem',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.03)',
+              margin: '1.5rem auto 1.5rem',
+              maxWidth: '850px',
+              width: '100%',
+              boxSizing: 'border-box'
+            }} className="notranslate" translate="no">
+              <AlertTriangle size={17} color="#c2410c" style={{ flexShrink: 0 }} />
+              <span>
+                <strong>SUSCRIPCIONES TEMPORALMENTE DESHABILITADAS:</strong> Las suscripciones se encuentran temporalmente deshabilitadas por estar en fase de desarrollo.
+              </span>
+            </div>
+
             <div className="pricing-showcase-title">
               <h2>Nuestros Planes Premium</h2>
               <p>Invierte en tu futuro laboral hoy mismo y acelera tu inserción en el mercado.</p>

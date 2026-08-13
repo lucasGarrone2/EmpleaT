@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Sparkles, Zap, Shield, ChevronRight, Loader2, Crown } from 'lucide-react';
+import { Check, Sparkles, Zap, Shield, ChevronRight, Loader2, Crown, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
@@ -57,19 +57,29 @@ export default function Pricing() {
         const params = new URLSearchParams(window.location.search);
         if (params.get('payment_status') === 'failure') {
             showAlert("Hubo un problema al procesar tu pago. Por favor, intenta de nuevo.", "Error de pago", "error");
-            // Limpiar los parámetros de búsqueda de la URL
-            navigate('/pricing', { replace: true });
+            params.delete('payment_status');
+            const newSearch = params.toString();
+            const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+            window.history.replaceState(null, '', newUrl);
+        } else if (params.get('payment_status') === 'success') {
+            setSuccess(true);
+            showAlert("¡Gracias por tu compra! Tu suscripción Premium ha sido activada.", "¡Suscripción Activada!", "success");
+            params.delete('payment_status');
+            const newSearch = params.toString();
+            const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
+            window.history.replaceState(null, '', newUrl);
+
+            setTimeout(() => {
+                navigate('/ofertas');
+            }, 3000);
         }
     }, [showAlert, navigate]);
 
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const handleArrepentimiento = async () => {
+        if (!window.confirm("¿Estás seguro de que deseas cancelar tu suscripción Premium? Esta acción solicitará el arrepentimiento y reembolso según la legislación vigente.")) {
+            return;
+        }
 
-    const handleArrepentimiento = () => {
-        setShowConfirmModal(true);
-    };
-
-    const ejecutarArrepentimiento = async () => {
-        setShowConfirmModal(false);
         setProcesandoArrepentimiento(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -107,9 +117,8 @@ export default function Pricing() {
         }
         setLoadingPlan(plan.meses);
         try {
-            // Obtenemos token para el backend
-            const { data: session } = await supabase.auth.getSession();
-            const token = session.session.access_token;
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session.access_token;
 
             const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/create-preference`, {
                 method: 'POST',
@@ -126,7 +135,6 @@ export default function Pricing() {
 
             const data = await response.json();
             
-            // SEC-20: Validar que el dominio del link de pago sea realmente Mercado Pago
             if (data.init_point) {
                 const ALLOWED_MP_DOMAINS = ['mercadopago.com', 'mercadolibre.com', 'mercadopago.com.ar'];
                 try {
@@ -183,6 +191,32 @@ export default function Pricing() {
 
     return (
         <div style={{ padding: '4rem 1rem', background: '#FAFAFB', minHeight: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {/* Banner de Suscripciones Deshabilitadas */}
+            <div style={{
+                background: 'linear-gradient(90deg, #fff7ed 0%, #ffedd5 100%)',
+                border: '1px solid #fed7aa',
+                borderRadius: '12px',
+                color: '#9a3412',
+                padding: '10px 16px',
+                textAlign: 'center',
+                fontSize: '0.88rem',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                boxShadow: 'inset 0 -1px 0 rgba(0,0,0,0.03)',
+                marginBottom: '2rem',
+                maxWidth: '850px',
+                width: '100%',
+                boxSizing: 'border-box'
+            }} className="notranslate" translate="no">
+                <AlertTriangle size={17} color="#c2410c" style={{ flexShrink: 0 }} />
+                <span>
+                    <strong>SUSCRIPCIONES TEMPORALMENTE DESHABILITADAS:</strong> Las suscripciones se encuentran temporalmente deshabilitadas por estar en fase de desarrollo.
+                </span>
+            </div>
+
             <div style={{ textAlign: 'center', marginBottom: '3rem', maxWidth: '800px' }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(255,176,32,0.1)', color: '#D48800', padding: '8px 16px', borderRadius: '20px', fontWeight: 'bold', marginBottom: '1rem' }}>
                     <Sparkles size={18} /> EmpleaT Premium
