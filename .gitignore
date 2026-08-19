@@ -69,5 +69,5 @@ backend/scratch/
 !backend/supabase/seed_motivos_rechazo.sql
 !backend/supabase/skill_validation.sql
 
-
-
+manual_premium.json
+backend/manual_premium.json

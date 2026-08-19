@@ -7,17 +7,33 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const EMAIL_SENDER = 'EmpleaT <no-reply@empleat.com.ar>';
 
 /**
+ * Función de escapeo HTML para prevenir inyecciones XSS / HTML en correos
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
  * Plantilla Base HTML para correos de EmpleaT
  * Garantiza compatibilidad con clientes modernos y legacy (Gmail, Outlook, Apple Mail, Yahoo)
  */
 const generarLayoutEmail = ({ titulo, contenidoHtml, ctaText, ctaUrl }) => {
+  const safeTitulo = escapeHtml(titulo);
+  const safeCtaText = escapeHtml(ctaText);
+  const safeCtaUrl = ctaUrl ? String(ctaUrl).replace(/"/g, '&quot;') : '';
   return `
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${titulo}</title>
+  <title>${safeTitulo}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #1e293b;">
   <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f7fa; padding: 40px 0;">
@@ -44,12 +60,12 @@ const generarLayoutEmail = ({ titulo, contenidoHtml, ctaText, ctaUrl }) => {
               ${contenidoHtml}
 
               <!-- Botón Call To Action (Opcional) -->
-              ${ctaText && ctaUrl ? `
+              ${safeCtaText && safeCtaUrl ? `
                 <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin-top: 32px; width: 100%;">
                   <tr>
                     <td align="center">
-                      <a href="${ctaUrl}" target="_blank" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);">
-                        ${ctaText}
+                      <a href="${safeCtaUrl}" target="_blank" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);">
+                        ${safeCtaText}
                       </a>
                     </td>
                   </tr>
@@ -89,9 +105,10 @@ export async function enviarEmailConfirmacion(emailDestino, nombre, confirmLink)
       throw new Error('Parametros incompletos: emailDestino y confirmLink son obligatorios.');
     }
 
+    const safeNombre = escapeHtml(nombre);
     const asunto = `Confirma tu cuenta en EmpleaT ✉️`;
     const contenidoHtml = `
-      <h2 style="margin-top: 0; color: #0f172a; font-size: 22px; font-weight: 700;">¡Hola${nombre ? `, ${nombre}` : ''}!</h2>
+      <h2 style="margin-top: 0; color: #0f172a; font-size: 22px; font-weight: 700;">¡Hola${safeNombre ? `, ${safeNombre}` : ''}!</h2>
       <p style="margin-bottom: 20px;">Gracias por registrarte en <strong>EmpleaT</strong>. Para poder ingresar a la plataforma y utilizar tu cuenta, necesitamos que confirmes tu dirección de correo electrónico.</p>
       
       <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin-bottom: 24px; text-align: center;">
@@ -140,9 +157,10 @@ export async function enviarEmailBienvenida(emailDestino, nombre) {
       throw new Error('Parametros incompletos: emailDestino y nombre son obligatorios.');
     }
 
-    const asunto = `¡Bienvenido/a a EmpleaT, ${nombre}! 🚀`;
+    const safeNombre = escapeHtml(nombre);
+    const asunto = `¡Bienvenido/a a EmpleaT, ${safeNombre}! 🚀`;
     const contenidoHtml = `
-      <h2 style="margin-top: 0; color: #0f172a; font-size: 22px; font-weight: 700;">¡Hola, ${nombre}!</h2>
+      <h2 style="margin-top: 0; color: #0f172a; font-size: 22px; font-weight: 700;">¡Hola, ${safeNombre}!</h2>
       <p style="margin-bottom: 20px;">Nos alegra darte la bienvenida a <strong>EmpleaT</strong>, la plataforma donde conectamos el mejor talento laboral con las mejores empresas del país.</p>
       
       <div style="background-color: #f1f5f9; border-left: 4px solid #2563eb; padding: 16px 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
@@ -199,9 +217,8 @@ export async function enviarEmailNotificacion(emailDestino, asunto, mensaje) {
       throw new Error('Parametros incompletos: emailDestino, asunto y mensaje son obligatorios.');
     }
 
-    const mensajeFormateado = mensaje.includes('<p>') || mensaje.includes('<div>')
-      ? mensaje
-      : mensaje.replace(/\n/g, '<br/>');
+    const safeMensaje = escapeHtml(mensaje);
+    const mensajeFormateado = safeMensaje.replace(/\n/g, '<br/>');
 
     const contenidoHtml = `
       <h2 style="margin-top: 0; color: #0f172a; font-size: 20px; font-weight: 700;">Notificación del Sistema</h2>

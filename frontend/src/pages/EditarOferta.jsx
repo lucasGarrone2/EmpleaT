@@ -129,9 +129,13 @@ export default function EditarOferta() {
 
         setExtractingSkills(true);
         try {
+            const { data: { session } } = await supabase.auth.getSession();
             const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/empresa/extraer-skills-oferta`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session?.access_token || ''}`
+                },
                 body: JSON.stringify({ descripcion: formData.descripcion })
             });
 

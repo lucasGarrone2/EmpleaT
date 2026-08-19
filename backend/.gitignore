@@ -1,3 +1,4 @@
 node_modules/
 .env
 *.log
+manual_premium.json

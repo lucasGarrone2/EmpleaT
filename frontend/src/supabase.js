@@ -9,6 +9,4 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-if (typeof window !== 'undefined') {
-  window.supabase = supabase;
-}
+// SEC-A01: window.supabase eliminado para no exponer credenciales ni cliente en el scope global.
